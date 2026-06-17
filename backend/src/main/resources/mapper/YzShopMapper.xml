@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzShopMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.youzan.YzShop">
+        <id column="id" property="id"/>
+        <result column="kdt_id" property="kdtId"/>
+        <result column="root_kdt_id" property="rootKdtId"/>
+        <result column="app_id" property="appId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_display_no" property="shopDisplayNo"/>
+        <result column="shop_type" property="shopType"/>
+        <result column="shop_role" property="shopRole"/>
+        <result column="buyer_id" property="buyerId"/>
+        <result column="buyer_phone" property="buyerPhone"/>
+        <result column="open_id" property="openId"/>
+        <result column="env" property="env"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, kdt_id, root_kdt_id, app_id, shop_name, shop_display_no, shop_type, shop_role,
+        buyer_id, buyer_phone, open_id, env, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_shop
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByKdtId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_shop
+        WHERE kdt_id = #{kdtId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzShop" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_shop (
+            kdt_id, root_kdt_id, app_id, shop_name, shop_display_no, shop_type, shop_role,
+            buyer_id, buyer_phone, open_id, env, create_time, update_time
+        ) VALUES (
+            #{kdtId}, #{rootKdtId}, #{appId}, #{shopName}, #{shopDisplayNo}, #{shopType}, #{shopRole},
+            #{buyerId}, #{buyerPhone}, #{openId}, #{env}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.youzan.YzShop">
+        UPDATE yz_shop
+        SET root_kdt_id = #{rootKdtId},
+            app_id = #{appId},
+            shop_name = #{shopName},
+            shop_display_no = #{shopDisplayNo},
+            shop_type = #{shopType},
+            shop_role = #{shopRole},
+            buyer_id = #{buyerId},
+            buyer_phone = #{buyerPhone},
+            open_id = #{openId},
+            env = #{env},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

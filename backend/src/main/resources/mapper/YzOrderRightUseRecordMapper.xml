@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzOrderRightUseRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.youzan.YzOrderRightUseRecord">
+        <id column="id" property="id"/>
+        <result column="yz_app_order_id" property="yzAppOrderId"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="mt_shop_id" property="mtShopId"/>
+        <result column="right_code" property="rightCode"/>
+        <result column="interval_days" property="intervalDays"/>
+        <result column="previous_expire_at" property="previousExpireAt"/>
+        <result column="new_expire_at" property="newExpireAt"/>
+        <result column="operator_user_id" property="operatorUserId"/>
+        <result column="operator_username" property="operatorUsername"/>
+        <result column="remark" property="remark"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectSuccessByOrderId" resultMap="BaseResultMap">
+        SELECT id, yz_app_order_id, order_no, mt_shop_id, right_code, interval_days,
+               previous_expire_at, new_expire_at, operator_user_id, operator_username,
+               remark, status, create_time, update_time
+        FROM yz_order_right_use_record
+        WHERE yz_app_order_id = #{yzAppOrderId}
+          AND status = 'SUCCESS'
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzOrderRightUseRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_order_right_use_record (
+            yz_app_order_id, order_no, mt_shop_id, right_code, interval_days, previous_expire_at,
+            new_expire_at, operator_user_id, operator_username, remark, status, create_time, update_time
+        ) VALUES (
+            #{yzAppOrderId}, #{orderNo}, #{mtShopId}, #{rightCode}, #{intervalDays}, #{previousExpireAt},
+            #{newExpireAt}, #{operatorUserId}, #{operatorUsername}, #{remark}, #{status}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+</mapper>

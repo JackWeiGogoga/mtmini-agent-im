@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.UserAuthMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.UserAuth">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="provider" property="provider"/>
+        <result column="provider_user_id" property="providerUserId"/>
+        <result column="provider_username" property="providerUsername"/>
+        <result column="provider_email" property="providerEmail"/>
+        <result column="provider_avatar" property="providerAvatar"/>
+        <result column="access_token" property="accessToken"/>
+        <result column="refresh_token" property="refreshToken"/>
+        <result column="token_expire_time" property="tokenExpireTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, provider, provider_user_id, provider_username, provider_email, 
+        provider_avatar, access_token, refresh_token, token_expire_time, create_time, update_time
+    </sql>
+
+    <!-- 插入用户认证绑定记录 -->
+    <insert id="insert" parameterType="com.gogoga.backend.entity.UserAuth" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_user_auth (
+            user_id, provider, provider_user_id, provider_username, provider_email, 
+            provider_avatar, access_token, refresh_token, token_expire_time
+        ) VALUES (
+            #{userId}, #{provider}, #{providerUserId}, #{providerUsername}, #{providerEmail}, 
+            #{providerAvatar}, #{accessToken}, #{refreshToken}, #{tokenExpireTime}
+        )
+    </insert>
+
+    <!-- 根据提供者和提供者用户ID查询绑定记录 -->
+    <select id="selectByProviderAndProviderUserId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user_auth
+        WHERE provider = #{provider} AND provider_user_id = #{providerUserId}
+    </select>
+
+    <!-- 根据用户ID查询所有绑定记录 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user_auth
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据用户ID和提供者查询绑定记录 -->
+    <select id="selectByUserIdAndProvider" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user_auth
+        WHERE user_id = #{userId} AND provider = #{provider}
+    </select>
+
+    <!-- 删除用户认证绑定记录 -->
+    <delete id="deleteByUserIdAndProvider">
+        DELETE FROM ai_user_auth 
+        WHERE user_id = #{userId} AND provider = #{provider}
+    </delete>
+
+    <!-- 根据用户ID删除所有绑定记录 -->
+    <delete id="deleteByUserId">
+        DELETE FROM ai_user_auth WHERE user_id = #{userId}
+    </delete>
+
+</mapper>

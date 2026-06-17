@@ -1,0 +1,157 @@
+{
+  "code": "OP_SUCCESS",
+  "msg": "成功",
+  "traceId": "1771853022517478454",
+  "data": {
+    "result": { "success": true, "code": "0", "message": "success" },
+    "adDataInfoList": [
+      {
+        "time": "00:00-01:00",
+        "show": "tQTJLfGszROySweds7eYKw==",
+        "click": "FvCaLA6dFfo7ZC3vA7jgeQ==",
+        "debit": "ItI7WWXnTxe5RXtMSz/bjw=="
+      },
+      {
+        "time": "01:00-02:00",
+        "show": "XNZVNhbaxpo1gtJTAG9g5A==",
+        "click": "X1fKHzgGfY7HhXQAA38qdA==",
+        "debit": "4Z+R1mv3stLGrOmYzLnd8A=="
+      },
+      {
+        "time": "02:00-03:00",
+        "show": "gJEO4Mbze79BJliE7RuIVg==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "03:00-04:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "04:00-05:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "05:00-06:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "06:00-07:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "07:00-08:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "08:00-09:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "09:00-10:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "10:00-11:00",
+        "show": "3R1zEKuuGPVdjZmcEPbtPA==",
+        "click": "garkVCDI7vPSmpQYC/sYiw==",
+        "debit": "KfuEv+NdXMUbCaVIKKSyvQ=="
+      },
+      {
+        "time": "11:00-12:00",
+        "show": "KDuSWIB0QFzEBr2eVJYR6A==",
+        "click": "0r7a7vObn8jNYZMNrJEVXQ==",
+        "debit": "q8NLYdFxxrDhR5eoyGOShw=="
+      },
+      {
+        "time": "12:00-13:00",
+        "show": "11E0pZd/rvDgbL0lW5ERAw==",
+        "click": "O0jHzBZOgfm6L94k4xkOmQ==",
+        "debit": "q1iHE49SKf7kv2Bzag815w=="
+      },
+      {
+        "time": "13:00-14:00",
+        "show": "E/WhgjI778tjuE1G35On+Q==",
+        "click": "AjABfUbW1mX35CA0TMQPuQ==",
+        "debit": "m1BIuqsgbiAxPao1EHyeNA=="
+      },
+      {
+        "time": "14:00-15:00",
+        "show": "UVpkTpAVXGLOL+RP8yhd1A==",
+        "click": "KRjQGtKcMHATeLl23cMcCw==",
+        "debit": "8fyzLtNcPYQjMVX3JP7/0g=="
+      },
+      {
+        "time": "15:00-16:00",
+        "show": "r41GmPnP6R1XHmFAhp1mXg==",
+        "click": "O0jHzBZOgfm6L94k4xkOmQ==",
+        "debit": "1Vq3DhezcTJb8qsYJ4b/eQ=="
+      },
+      {
+        "time": "16:00-17:00",
+        "show": "VzqeC2Ih9qCk9M/yOUp+OQ==",
+        "click": "zXrY+6NpUP5Sn4Q1o+Q3NQ==",
+        "debit": "MmjxDyXISbi/01JiWogtow=="
+      },
+      {
+        "time": "17:00-18:00",
+        "show": "FeCOHMbpnST4CL4tBgdomw==",
+        "click": "X1fKHzgGfY7HhXQAA38qdA==",
+        "debit": "LElfzdMMf08FQyKhHvMo3w=="
+      },
+      {
+        "time": "18:00-19:00",
+        "show": "0aZTGuc41cDEiEWrmO1fqg==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "19:00-20:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "20:00-21:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "21:00-22:00",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "22:00-23:00",
+        "show": "f1jaisIIewzWy9zQUt1wAA==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      },
+      {
+        "time": "23:00-24:00",
+        "show": "gJEO4Mbze79BJliE7RuIVg==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      }
+    ],
+    "show": "J6Y2V760wnAHXG79UTIe8Q==",
+    "click": "62/SPyGfHfwcl4Nv74ZGNw==",
+    "debit": "7ajzeNT/dpRAgOBlItrmTA=="
+  }
+}

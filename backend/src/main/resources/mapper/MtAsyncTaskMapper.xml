@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtAsyncTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtAsyncTask">
+        <id column="id" property="id"/>
+        <result column="task_type" property="taskType"/>
+        <result column="biz_key" property="bizKey"/>
+        <result column="scope_key" property="scopeKey"/>
+        <result column="payload_json" property="payloadJson"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="max_retry_count" property="maxRetryCount"/>
+        <result column="available_at" property="availableAt"/>
+        <result column="claimed_at" property="claimedAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="worker_id" property="workerId"/>
+        <result column="last_error" property="lastError"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="BacklogSummaryResultMap" type="com.gogoga.backend.entity.mt.MtAsyncTaskBacklogSummary">
+        <result column="task_type" property="taskType"/>
+        <result column="pending_count" property="pendingCount"/>
+        <result column="ready_count" property="readyCount"/>
+        <result column="processing_count" property="processingCount"/>
+        <result column="success_count" property="successCount"/>
+        <result column="dead_count" property="deadCount"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, task_type, biz_key, scope_key, payload_json, status, retry_count, max_retry_count,
+        available_at, claimed_at, finished_at, worker_id, last_error, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAsyncTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_async_task (
+            task_type, biz_key, scope_key, payload_json, status, retry_count, max_retry_count,
+            available_at, claimed_at, finished_at, worker_id, last_error, create_time, update_time
+        ) VALUES (
+            #{taskType}, #{bizKey}, #{scopeKey}, #{payloadJson}, #{status}, #{retryCount}, #{maxRetryCount},
+            #{availableAt}, #{claimedAt}, #{finishedAt}, #{workerId}, #{lastError}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_async_task
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByTaskTypeAndBizKey" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_async_task
+        WHERE task_type = #{taskType}
+          AND biz_key = #{bizKey}
+        LIMIT 1
+    </select>
+
+    <select id="selectExecutableIds" resultType="java.lang.Long">
+        SELECT id
+        FROM mt_async_task
+        WHERE task_type = #{taskType}
+          AND status = 'PENDING'
+          AND available_at &lt;= #{availableAt}
+        ORDER BY available_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimPendingById">
+        UPDATE mt_async_task
+        SET status = 'PROCESSING',
+            worker_id = #{workerId},
+            claimed_at = #{claimedAt},
+            finished_at = NULL,
+            update_time = #{claimedAt}
+        WHERE id = #{id}
+          AND task_type = #{taskType}
+          AND status = 'PENDING'
+    </update>
+
+    <update id="markSuccess">
+        UPDATE mt_async_task
+        SET status = 'SUCCESS',
+            finished_at = #{finishedAt},
+            update_time = #{finishedAt}
+        WHERE id = #{id}
+          AND task_type = #{taskType}
+          AND status = 'PROCESSING'
+    </update>
+
+    <update id="rescheduleFromProcessing">
+        UPDATE mt_async_task
+        SET status = 'PENDING',
+            retry_count = #{retryCount},
+            available_at = #{availableAt},
+            last_error = #{lastError},
+            worker_id = NULL,
+            claimed_at = NULL,
+            finished_at = NULL,
+            update_time = #{updatedAt}
+        WHERE id = #{id}
+          AND task_type = #{taskType}
+          AND status = 'PROCESSING'
+    </update>
+
+    <update id="markDead">
+        UPDATE mt_async_task
+        SET status = 'DEAD',
+            retry_count = #{retryCount},
+            finished_at = #{finishedAt},
+            last_error = #{lastError},
+            update_time = #{finishedAt}
+        WHERE id = #{id}
+          AND task_type = #{taskType}
+          AND status = 'PROCESSING'
+    </update>
+
+    <select id="selectStaleProcessingTasks" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_async_task
+        WHERE task_type = #{taskType}
+          AND status = 'PROCESSING'
+          AND claimed_at IS NOT NULL
+          AND claimed_at &lt;= #{claimedBefore}
+        ORDER BY claimed_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectBacklogSummary" resultMap="BacklogSummaryResultMap">
+        SELECT task_type,
+               SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+               SUM(CASE WHEN status = 'PENDING' AND available_at &lt;= #{currentTime} THEN 1 ELSE 0 END) AS ready_count,
+               SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END) AS processing_count,
+               SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS success_count,
+               SUM(CASE WHEN status = 'DEAD' THEN 1 ELSE 0 END) AS dead_count
+        FROM mt_async_task
+        GROUP BY task_type
+        ORDER BY task_type ASC
+    </select>
+
+    <delete id="deleteHistoricalTerminalTasks">
+        DELETE FROM mt_async_task
+        WHERE status = #{status}
+          AND finished_at IS NOT NULL
+          AND finished_at &lt;= #{finishedBefore}
+        ORDER BY finished_at ASC, id ASC
+        LIMIT #{limit}
+    </delete>
+</mapper>

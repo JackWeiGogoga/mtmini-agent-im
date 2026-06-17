@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `mt_access_token_history` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint DEFAULT NULL COMMENT '店铺ID，授权核心落库前可能为空',
+  `op_biz_code` varchar(255) DEFAULT NULL COMMENT '商家唯一标识',
+  `event_type` varchar(32) NOT NULL COMMENT '事件类型 AUTH_CALLBACK/REFRESH',
+  `event_status` varchar(32) NOT NULL COMMENT '事件状态 SUCCESS/FAILED',
+  `access_token_cipher` text COMMENT '加密后的access token',
+  `refresh_token_cipher` text COMMENT '加密后的refresh token',
+  `access_token_fingerprint` varchar(64) DEFAULT NULL COMMENT 'access token指纹',
+  `refresh_token_fingerprint` varchar(64) DEFAULT NULL COMMENT 'refresh token指纹',
+  `expires_at` datetime DEFAULT NULL COMMENT 'access token过期时间',
+  `response_code` int DEFAULT NULL COMMENT '美团响应码',
+  `response_msg` varchar(1000) DEFAULT NULL COMMENT '美团响应消息',
+  `failure_reason` varchar(1000) DEFAULT NULL COMMENT '本地处理失败原因',
+  `trace_id` varchar(128) DEFAULT NULL COMMENT '链路追踪ID',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_mt_access_token_history_shop_time` (`shop_id`, `create_time`),
+  KEY `idx_mt_access_token_history_op_biz_time` (`op_biz_code`, `create_time`),
+  KEY `idx_mt_access_token_history_access_fp` (`access_token_fingerprint`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团token历史表';

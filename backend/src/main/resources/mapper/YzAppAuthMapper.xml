@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzAppAuthMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.youzan.YzAppAuth">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="yz_shop_id" property="yzShopId"/>
+        <result column="kdt_id" property="kdtId"/>
+        <result column="app_id" property="appId"/>
+        <result column="buyer_id" property="buyerId"/>
+        <result column="buyer_phone" property="buyerPhone"/>
+        <result column="open_id" property="openId"/>
+        <result column="shop_display_no" property="shopDisplayNo"/>
+        <result column="shop_type" property="shopType"/>
+        <result column="shop_role" property="shopRole"/>
+        <result column="effect_time" property="effectTime"/>
+        <result column="effect_time_at" property="effectTimeAt"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="expire_time_at" property="expireTimeAt"/>
+        <result column="pay_time" property="payTime"/>
+        <result column="pay_time_at" property="payTimeAt"/>
+        <result column="env" property="env"/>
+        <result column="raw_payload_json" property="rawPayloadJson"/>
+        <result column="callback_event_id" property="callbackEventId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, order_no, yz_shop_id, kdt_id, app_id, buyer_id, buyer_phone, open_id, shop_display_no,
+        shop_type, shop_role, effect_time, effect_time_at, expire_time, expire_time_at, pay_time,
+        pay_time_at, env, raw_payload_json, callback_event_id, create_time, update_time
+    </sql>
+
+    <select id="selectByNaturalKey" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_auth
+        WHERE order_no = #{orderNo}
+          AND kdt_id = #{kdtId}
+          AND app_id = #{appId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzAppAuth" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_app_auth (
+            order_no, yz_shop_id, kdt_id, app_id, buyer_id, buyer_phone, open_id, shop_display_no,
+            shop_type, shop_role, effect_time, effect_time_at, expire_time, expire_time_at, pay_time,
+            pay_time_at, env, raw_payload_json, callback_event_id, create_time, update_time
+        ) VALUES (
+            #{orderNo}, #{yzShopId}, #{kdtId}, #{appId}, #{buyerId}, #{buyerPhone}, #{openId}, #{shopDisplayNo},
+            #{shopType}, #{shopRole}, #{effectTime}, #{effectTimeAt}, #{expireTime}, #{expireTimeAt}, #{payTime},
+            #{payTimeAt}, #{env}, #{rawPayloadJson}, #{callbackEventId}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.youzan.YzAppAuth">
+        UPDATE yz_app_auth
+        SET yz_shop_id = #{yzShopId},
+            buyer_id = #{buyerId},
+            buyer_phone = #{buyerPhone},
+            open_id = #{openId},
+            shop_display_no = #{shopDisplayNo},
+            shop_type = #{shopType},
+            shop_role = #{shopRole},
+            effect_time = #{effectTime},
+            effect_time_at = #{effectTimeAt},
+            expire_time = #{expireTime},
+            expire_time_at = #{expireTimeAt},
+            pay_time = #{payTime},
+            pay_time_at = #{payTimeAt},
+            env = #{env},
+            raw_payload_json = #{rawPayloadJson},
+            callback_event_id = #{callbackEventId},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

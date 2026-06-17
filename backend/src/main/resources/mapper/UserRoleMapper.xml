@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.UserRoleMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.UserRole">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="role_id" property="roleId"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 插入用户角色关联 -->
+    <insert id="insert" parameterType="com.gogoga.backend.entity.UserRole" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_user_role (user_id, role_id)
+        VALUES (#{userId}, #{roleId})
+    </insert>
+
+    <insert id="insertIgnoreDuplicate" parameterType="com.gogoga.backend.entity.UserRole">
+        INSERT INTO ai_user_role (user_id, role_id)
+        VALUES (#{userId}, #{roleId})
+        ON DUPLICATE KEY UPDATE user_id = user_id
+    </insert>
+
+    <!-- 批量插入用户角色关联 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO ai_user_role (user_id, role_id) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.userId}, #{item.roleId})
+        </foreach>
+    </insert>
+
+    <!-- 根据用户ID删除关联 -->
+    <delete id="deleteByUserId">
+        DELETE FROM ai_user_role WHERE user_id = #{userId}
+    </delete>
+
+    <!-- 根据角色ID删除关联 -->
+    <delete id="deleteByRoleId">
+        DELETE FROM ai_user_role WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- 根据用户ID查询角色ID列表 -->
+    <select id="selectRoleIdsByUserId" resultType="java.lang.String">
+        SELECT role_id FROM ai_user_role WHERE user_id = #{userId}
+    </select>
+
+    <!-- 根据角色ID查询用户ID列表 -->
+    <select id="selectUserIdsByRoleId" resultType="java.lang.String">
+        SELECT user_id FROM ai_user_role WHERE role_id = #{roleId}
+    </select>
+
+</mapper>

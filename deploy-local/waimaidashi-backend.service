@@ -1,0 +1,20 @@
+[Unit]
+Description=waimaidashi backend
+After=network.target
+
+[Service]
+Type=simple
+User=waimaidashi
+Group=waimaidashi
+WorkingDirectory=/opt/waimaidashi/backend
+EnvironmentFile=/etc/waimaidashi/backend.env
+ExecStart=/usr/bin/java -Xms512m -Xmx1024m -jar /opt/waimaidashi/backend/backend.jar --spring.profiles.active=online
+KillSignal=SIGTERM
+TimeoutStopSec=90
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

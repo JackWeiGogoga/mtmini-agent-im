@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.RoleMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.Role">
+        <id column="id" property="id"/>
+        <result column="role_id" property="roleId"/>
+        <result column="role_code" property="roleCode"/>
+        <result column="role_name" property="roleName"/>
+        <result column="description" property="description"/>
+        <result column="order_num" property="orderNum"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, role_id, role_code, role_name, description, order_num, status, create_time, update_time
+    </sql>
+
+    <!-- 插入角色 -->
+    <insert id="insert" parameterType="com.gogoga.backend.entity.Role" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_role (role_id, role_code, role_name, description, order_num, status)
+        VALUES (#{roleId}, #{roleCode}, #{roleName}, #{description}, #{orderNum}, #{status})
+    </insert>
+
+    <!-- 根据角色ID更新角色 -->
+    <update id="updateByRoleId" parameterType="com.gogoga.backend.entity.Role">
+        UPDATE ai_role
+        SET role_code = #{roleCode},
+            role_name = #{roleName},
+            description = #{description},
+            order_num = #{orderNum},
+            status = #{status}
+        WHERE role_id = #{roleId}
+    </update>
+
+    <!-- 根据角色ID查询角色 -->
+    <select id="selectByRoleId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_role
+        WHERE role_id = #{roleId}
+    </select>
+
+    <!-- 根据角色编码查询角色 -->
+    <select id="selectByRoleCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_role
+        WHERE role_code = #{roleCode}
+    </select>
+
+    <!-- 查询角色列表 -->
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_role
+        WHERE 1=1
+        <if test="keyword != null and keyword != ''">
+            AND (role_code LIKE CONCAT('%', #{keyword}, '%')
+                 OR role_name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 查询所有启用的角色 -->
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_role
+        WHERE status = 1
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 更新角色状态 -->
+    <update id="updateStatus">
+        UPDATE ai_role
+        SET status = #{status}
+        WHERE role_id = #{roleId}
+    </update>
+
+    <!-- 删除角色 -->
+    <delete id="deleteByRoleId">
+        DELETE FROM ai_role WHERE role_id = #{roleId}
+    </delete>
+
+    <!-- 根据用户ID查询角色列表 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT r.id, r.role_id, r.role_code, r.role_name, r.description, r.status, r.create_time, r.update_time
+        FROM ai_role r
+        INNER JOIN ai_user_role ur ON r.role_id = ur.role_id
+        WHERE ur.user_id = #{userId} AND r.status = 1
+        ORDER BY r.create_time DESC
+    </select>
+
+    <!-- 根据角色ID列表查询角色 -->
+    <select id="selectByRoleIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_role
+        WHERE role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+    </select>
+
+</mapper>

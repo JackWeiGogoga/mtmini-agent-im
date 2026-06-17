@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPowerGrantMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPowerGrant">
+        <id column="id" property="id"/>
+        <result column="grant_no" property="grantNo"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="power_amount" property="powerAmount"/>
+        <result column="grant_reason" property="grantReason"/>
+        <result column="remark" property="remark"/>
+        <result column="operator_user_id" property="operatorUserId"/>
+        <result column="operator_username" property="operatorUsername"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, grant_no, shop_id, power_amount, grant_reason, remark, operator_user_id, operator_username, status, create_time, update_time
+    </sql>
+
+    <select id="selectByGrantNo" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_grant
+        WHERE grant_no = #{grantNo}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_grant
+        WHERE shop_id = #{shopId}
+        ORDER BY id DESC
+    </select>
+
+    <select id="selectByShopIdAndCreateTimeBetween" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_grant
+        WHERE shop_id = #{shopId}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+        ORDER BY id DESC
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtPowerGrant" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_power_grant (
+            grant_no, shop_id, power_amount, grant_reason, remark, operator_user_id, operator_username, status, create_time, update_time
+        ) VALUES (
+            #{grantNo}, #{shopId}, #{powerAmount}, #{grantReason}, #{remark}, #{operatorUserId}, #{operatorUsername}, #{status}, #{createTime}, #{updateTime}
+        )
+    </insert>
+</mapper>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtAccessTokenHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtAccessTokenHistory">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="op_biz_code" property="opBizCode"/>
+        <result column="event_type" property="eventType"/>
+        <result column="event_status" property="eventStatus"/>
+        <result column="access_token_cipher" property="accessTokenCipher"/>
+        <result column="refresh_token_cipher" property="refreshTokenCipher"/>
+        <result column="access_token_fingerprint" property="accessTokenFingerprint"/>
+        <result column="refresh_token_fingerprint" property="refreshTokenFingerprint"/>
+        <result column="expires_at" property="expiresAt"/>
+        <result column="response_code" property="responseCode"/>
+        <result column="response_msg" property="responseMsg"/>
+        <result column="failure_reason" property="failureReason"/>
+        <result column="trace_id" property="traceId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, op_biz_code, event_type, event_status, access_token_cipher, refresh_token_cipher,
+        access_token_fingerprint, refresh_token_fingerprint, expires_at, response_code, response_msg,
+        failure_reason, trace_id, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAccessTokenHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_access_token_history (
+            shop_id, op_biz_code, event_type, event_status, access_token_cipher, refresh_token_cipher,
+            access_token_fingerprint, refresh_token_fingerprint, expires_at, response_code, response_msg,
+            failure_reason, trace_id, create_time, update_time
+        )
+        VALUES (
+            #{shopId}, #{opBizCode}, #{eventType}, #{eventStatus}, #{accessTokenCipher}, #{refreshTokenCipher},
+            #{accessTokenFingerprint}, #{refreshTokenFingerprint}, #{expiresAt}, #{responseCode}, #{responseMsg},
+            #{failureReason}, #{traceId}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token_history
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+</mapper>

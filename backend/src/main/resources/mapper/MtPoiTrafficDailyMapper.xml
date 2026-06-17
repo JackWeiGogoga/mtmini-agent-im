@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPoiTrafficDailyMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPoiTrafficDaily">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="biz_date" property="bizDate"/>
+        <result column="flow_prop" property="flowProp"/>
+        <result column="exposure_count" property="exposureCount"/>
+        <result column="visit_count" property="visitCount"/>
+        <result column="payload_json" property="payloadJson"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, biz_date, flow_prop, exposure_count, visit_count, payload_json, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndBizDateAndFlowProp" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_poi_traffic_daily
+        WHERE shop_id = #{shopId}
+          AND biz_date = #{bizDate}
+          AND flow_prop = #{flowProp}
+        LIMIT 1
+    </select>
+
+    <insert id="insertOrUpdate" parameterType="com.gogoga.backend.entity.mt.MtPoiTrafficDaily"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_poi_traffic_daily (
+            shop_id, biz_date, flow_prop, exposure_count, visit_count, payload_json, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{bizDate}, #{flowProp}, #{exposureCount}, #{visitCount}, #{payloadJson}, #{createTime}, #{updateTime}
+        )
+        ON DUPLICATE KEY UPDATE
+            exposure_count = VALUES(exposure_count),
+            visit_count = VALUES(visit_count),
+            payload_json = VALUES(payload_json),
+            update_time = VALUES(update_time)
+    </insert>
+
+    <select id="sumExposureCountByShopIdAndBizDateBetween" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(exposure_count), 0)
+        FROM mt_poi_traffic_daily
+        WHERE shop_id = #{shopId}
+          AND flow_prop = #{flowProp}
+          AND biz_date &gt;= #{fromInclusive}
+          AND biz_date &lt; #{toExclusive}
+    </select>
+</mapper>

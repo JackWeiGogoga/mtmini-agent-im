@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+REMOTE_HOST="${REMOTE_HOST:-mt_ai_agent}"
+APP_USER="${APP_USER:-waimaidashi}"
+APP_GROUP="${APP_GROUP:-waimaidashi}"
+APP_HOME="${APP_HOME:-/opt/waimaidashi}"
+REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-${APP_HOME}/backend}"
+REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-ai-promotion}"
+REMOTE_FRONTEND_DIR="${REMOTE_FRONTEND_DIR:-/var/www/mt-admin}"
+REMOTE_CERT_DIR="${REMOTE_CERT_DIR:-${APP_HOME}/certs/wechat}"
+REMOTE_ENV_PATH="${REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
+REMOTE_SERVICE_PATH="${REMOTE_SERVICE_PATH:-/etc/systemd/system/waimaidashi-backend.service}"
+REMOTE_CADDYFILE_PATH="${REMOTE_CADDYFILE_PATH:-/etc/caddy/Caddyfile}"
+BACKEND_SERVICE_NAME="${BACKEND_SERVICE_NAME:-waimaidashi-backend}"
+LOCAL_ENV_FILE="${LOCAL_ENV_FILE:-${REPO_ROOT}/deploy-local/backend.env}"
+LOCAL_SERVICE_FILE="${LOCAL_SERVICE_FILE:-${REPO_ROOT}/deploy-local/waimaidashi-backend.service}"
+LOCAL_CADDYFILE="${LOCAL_CADDYFILE:-${REPO_ROOT}/deploy-local/Caddyfile}"
+LOCAL_WECHAT_KEY_FILE="${LOCAL_WECHAT_KEY_FILE:-}"
+LOCAL_WECHAT_PUB_KEY_FILE="${LOCAL_WECHAT_PUB_KEY_FILE:-}"
+
+UPLOAD_ENV=1
+UPLOAD_CADDY=1
+UPLOAD_SERVICE=1
+UPLOAD_CERTS=0
+ENABLE_BACKEND=1
+RELOAD_CADDY=1
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  --host <ssh-host>           SSH host alias, default: ${REMOTE_HOST}
+  --skip-env                  Do not upload backend.env
+  --skip-caddy                Do not upload Caddyfile
+  --skip-service              Do not upload systemd service file
+  --upload-certs              Upload WeChat cert files defined by env vars
+  --skip-enable-backend       Do not daemon-reload/enable backend service
+  --skip-reload-caddy         Do not validate/reload caddy
+  -h, --help                  Show help
+
+Environment variables:
+  REMOTE_HOST                 SSH host alias
+  APP_USER                    App user name
+  APP_GROUP                   App group name
+  APP_HOME                    App home directory
+  REMOTE_BACKEND_DIR          Remote backend directory
+  REMOTE_H5_DIR               Remote H5 static directory
+  REMOTE_FRONTEND_DIR         Remote frontend static directory
+  REMOTE_CERT_DIR             Remote WeChat cert directory
+  REMOTE_ENV_PATH             Remote backend env file path
+  REMOTE_SERVICE_PATH         Remote systemd service file path
+  REMOTE_CADDYFILE_PATH       Remote Caddyfile path
+  BACKEND_SERVICE_NAME        systemd backend service name
+  LOCAL_ENV_FILE              Local backend env file path
+  LOCAL_SERVICE_FILE          Local service file path
+  LOCAL_CADDYFILE             Local Caddyfile path
+  LOCAL_WECHAT_KEY_FILE       Local apiclient_key.pem path
+  LOCAL_WECHAT_PUB_KEY_FILE   Local pub_key.pem path
+EOF
+}
+
+log() {
+  printf '[bootstrap] %s\n' "$*"
+}
+
+fail() {
+  printf '[bootstrap] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host)
+      [[ $# -ge 2 ]] || fail "--host requires a value"
+      REMOTE_HOST="$2"
+      shift 2
+      ;;
+    --skip-env)
+      UPLOAD_ENV=0
+      shift
+      ;;
+    --skip-caddy)
+      UPLOAD_CADDY=0
+      shift
+      ;;
+    --skip-service)
+      UPLOAD_SERVICE=0
+      shift
+      ;;
+    --upload-certs)
+      UPLOAD_CERTS=1
+      shift
+      ;;
+    --skip-enable-backend)
+      ENABLE_BACKEND=0
+      shift
+      ;;
+    --skip-reload-caddy)
+      RELOAD_CADDY=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "Unknown option: $1"
+      ;;
+  esac
+done
+
+require_cmd ssh
+require_cmd scp
+
+prepare_remote() {
+  log "Preparing remote directories and user on ${REMOTE_HOST}"
+  ssh "${REMOTE_HOST}" "
+    set -e
+    if ! id -u '${APP_USER}' >/dev/null 2>&1; then
+      sudo useradd -r -m -d '${APP_HOME}' -s /sbin/nologin '${APP_USER}'
+    fi
+    sudo mkdir -p '${REMOTE_BACKEND_DIR}' '${REMOTE_CERT_DIR}' '${REMOTE_H5_DIR}' '${REMOTE_FRONTEND_DIR}' '/etc/waimaidashi' '/var/log/caddy'
+    sudo chown -R '${APP_USER}:${APP_GROUP}' '${APP_HOME}'
+    sudo chown -R root:root '${REMOTE_H5_DIR}'
+    sudo chown -R root:root '${REMOTE_FRONTEND_DIR}'
+    sudo chown -R caddy:caddy /var/log/caddy || true
+    sudo chmod 755 '${REMOTE_BACKEND_DIR}'
+    sudo chmod 700 '${APP_HOME}/certs' '${REMOTE_CERT_DIR}' || true
+    sudo chmod 750 /var/log/caddy || true
+  "
+}
+
+upload_env() {
+  [[ -f "${LOCAL_ENV_FILE}" ]] || fail "Env file not found: ${LOCAL_ENV_FILE}"
+  log "Uploading backend env"
+  scp "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
+  ssh "${REMOTE_HOST}" "
+    sudo mkdir -p \"$(dirname "${REMOTE_ENV_PATH}")\"
+    sudo mv /tmp/waimaidashi-backend.env '${REMOTE_ENV_PATH}'
+    sudo chown root:root '${REMOTE_ENV_PATH}'
+    sudo chmod 600 '${REMOTE_ENV_PATH}'
+  "
+}
+
+upload_service() {
+  [[ -f "${LOCAL_SERVICE_FILE}" ]] || fail "Service file not found: ${LOCAL_SERVICE_FILE}"
+  log "Uploading systemd service"
+  scp "${LOCAL_SERVICE_FILE}" "${REMOTE_HOST}:/tmp/${BACKEND_SERVICE_NAME}.service"
+  ssh "${REMOTE_HOST}" "
+    sudo mv /tmp/${BACKEND_SERVICE_NAME}.service '${REMOTE_SERVICE_PATH}'
+    sudo chown root:root '${REMOTE_SERVICE_PATH}'
+    sudo chmod 644 '${REMOTE_SERVICE_PATH}'
+  "
+}
+
+upload_caddy() {
+  [[ -f "${LOCAL_CADDYFILE}" ]] || fail "Caddyfile not found: ${LOCAL_CADDYFILE}"
+  log "Uploading Caddyfile"
+  scp "${LOCAL_CADDYFILE}" "${REMOTE_HOST}:/tmp/Caddyfile"
+  ssh "${REMOTE_HOST}" "
+    sudo mv /tmp/Caddyfile '${REMOTE_CADDYFILE_PATH}'
+    sudo chown root:root '${REMOTE_CADDYFILE_PATH}'
+    sudo chmod 644 '${REMOTE_CADDYFILE_PATH}'
+  "
+}
+
+upload_certs() {
+  [[ -n "${LOCAL_WECHAT_KEY_FILE}" ]] || fail "LOCAL_WECHAT_KEY_FILE is required for --upload-certs"
+  [[ -n "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "LOCAL_WECHAT_PUB_KEY_FILE is required for --upload-certs"
+  [[ -f "${LOCAL_WECHAT_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_KEY_FILE}"
+  [[ -f "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_PUB_KEY_FILE}"
+  log "Uploading WeChat cert files"
+  scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
+  scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
+  ssh "${REMOTE_HOST}" "
+    sudo mv /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
+    sudo mv /tmp/pub_key.pem '${REMOTE_CERT_DIR}/pub_key.pem'
+    sudo chown '${APP_USER}:${APP_GROUP}' '${REMOTE_CERT_DIR}/apiclient_key.pem' '${REMOTE_CERT_DIR}/pub_key.pem'
+    sudo chmod 600 '${REMOTE_CERT_DIR}/apiclient_key.pem'
+    sudo chmod 644 '${REMOTE_CERT_DIR}/pub_key.pem'
+  "
+}
+
+enable_backend() {
+  log "Reloading systemd and enabling backend service"
+  ssh "${REMOTE_HOST}" "
+    sudo systemctl daemon-reload
+    sudo systemctl enable '${BACKEND_SERVICE_NAME}'
+    sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager || true
+  "
+}
+
+reload_caddy() {
+  log "Validating and reloading caddy"
+  ssh "${REMOTE_HOST}" "
+    sudo caddy validate --config '${REMOTE_CADDYFILE_PATH}'
+    sudo systemctl reload caddy
+    sudo systemctl status caddy --no-pager || true
+  "
+}
+
+normalize_permissions() {
+  log "Normalizing remote permissions"
+  ssh "${REMOTE_HOST}" "
+    sudo find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
+    sudo find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
+    sudo find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
+    sudo find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
+  "
+}
+
+prepare_remote
+
+if (( UPLOAD_ENV == 1 )); then
+  upload_env
+fi
+
+if (( UPLOAD_SERVICE == 1 )); then
+  upload_service
+fi
+
+if (( UPLOAD_CADDY == 1 )); then
+  upload_caddy
+fi
+
+if (( UPLOAD_CERTS == 1 )); then
+  upload_certs
+fi
+
+normalize_permissions
+
+if (( ENABLE_BACKEND == 1 )); then
+  enable_backend
+fi
+
+if (( RELOAD_CADDY == 1 )); then
+  reload_caddy
+fi
+
+log "Bootstrap finished"

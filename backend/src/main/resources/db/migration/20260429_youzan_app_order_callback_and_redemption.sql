@@ -1,0 +1,202 @@
+CREATE TABLE IF NOT EXISTS `yz_shop` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `kdt_id` bigint NOT NULL COMMENT '有赞店铺ID',
+  `root_kdt_id` bigint DEFAULT NULL COMMENT '有赞连锁总部店铺ID',
+  `app_id` bigint DEFAULT NULL COMMENT '有赞应用编号',
+  `shop_name` varchar(255) DEFAULT NULL COMMENT '有赞店铺名称',
+  `shop_display_no` varchar(64) DEFAULT NULL COMMENT '有赞店铺编号',
+  `shop_type` varchar(64) DEFAULT NULL COMMENT '店铺类型',
+  `shop_role` varchar(64) DEFAULT NULL COMMENT '店铺角色',
+  `buyer_id` bigint DEFAULT NULL COMMENT '购买者有赞用户ID',
+  `buyer_phone` varchar(64) DEFAULT NULL COMMENT '购买者手机号',
+  `open_id` varchar(128) DEFAULT NULL COMMENT '购买者有赞开放ID',
+  `env` varchar(32) DEFAULT NULL COMMENT '有赞环境',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_yz_shop_kdt_id` (`kdt_id`),
+  KEY `idx_yz_shop_root_kdt_id` (`root_kdt_id`),
+  KEY `idx_yz_shop_open_id` (`open_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞店铺表';
+
+CREATE TABLE IF NOT EXISTS `yz_app_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_no` varchar(128) NOT NULL COMMENT '有赞订购订单号',
+  `yz_shop_id` bigint DEFAULT NULL COMMENT '有赞店铺表ID',
+  `kdt_id` bigint DEFAULT NULL COMMENT '有赞店铺ID',
+  `root_kdt_id` bigint DEFAULT NULL COMMENT '有赞连锁总部店铺ID',
+  `app_id` bigint DEFAULT NULL COMMENT '有赞应用编号',
+  `buyer_id` bigint DEFAULT NULL COMMENT '购买者有赞用户ID',
+  `buyer_phone` varchar(64) DEFAULT NULL COMMENT '购买者手机号',
+  `open_id` varchar(128) DEFAULT NULL COMMENT '购买者有赞开放ID',
+  `shop_name` varchar(255) DEFAULT NULL COMMENT '有赞店铺名称',
+  `shop_display_no` varchar(64) DEFAULT NULL COMMENT '有赞店铺编号',
+  `shop_type` varchar(64) DEFAULT NULL COMMENT '店铺类型',
+  `shop_role` varchar(64) DEFAULT NULL COMMENT '店铺角色',
+  `sku_version_text` varchar(255) DEFAULT NULL COMMENT '套餐名称',
+  `sku_interval_text` varchar(64) DEFAULT NULL COMMENT '套餐有效期文本，单位天',
+  `price` int DEFAULT NULL COMMENT '订单价格，分',
+  `status` int DEFAULT NULL COMMENT '支付状态，20表示支付成功',
+  `pay_time` bigint DEFAULT NULL COMMENT '支付时间戳，毫秒',
+  `pay_time_at` datetime DEFAULT NULL COMMENT '支付时间',
+  `env` varchar(32) DEFAULT NULL COMMENT '有赞环境',
+  `use_status` varchar(32) NOT NULL DEFAULT 'UNUSED' COMMENT '使用状态 UNUSED/USED',
+  `used_mt_shop_id` bigint DEFAULT NULL COMMENT '已核销到的美团门店ID',
+  `used_right_code` varchar(64) DEFAULT NULL COMMENT '已授予权益编码',
+  `used_at` datetime DEFAULT NULL COMMENT '核销时间',
+  `used_by_user_id` varchar(64) DEFAULT NULL COMMENT '核销操作人ID',
+  `used_by_username` varchar(128) DEFAULT NULL COMMENT '核销操作人名称',
+  `use_remark` varchar(500) DEFAULT NULL COMMENT '核销备注',
+  `raw_payload_json` longtext COMMENT '原始解密消息JSON',
+  `callback_event_id` bigint DEFAULT NULL COMMENT '最近一次回调事件ID',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_yz_app_order_order_no` (`order_no`),
+  KEY `idx_yz_app_order_kdt_id` (`kdt_id`),
+  KEY `idx_yz_app_order_yz_shop_id` (`yz_shop_id`),
+  KEY `idx_yz_app_order_pay_time` (`pay_time_at`),
+  KEY `idx_yz_app_order_use_status` (`use_status`),
+  KEY `idx_yz_app_order_used_mt_shop` (`used_mt_shop_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞应用订购订单表';
+
+CREATE TABLE IF NOT EXISTS `yz_app_auth` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_no` varchar(128) DEFAULT NULL COMMENT '有赞订购订单号',
+  `yz_shop_id` bigint DEFAULT NULL COMMENT '有赞店铺表ID',
+  `kdt_id` bigint DEFAULT NULL COMMENT '有赞店铺ID',
+  `app_id` bigint DEFAULT NULL COMMENT '有赞应用编号',
+  `buyer_id` bigint DEFAULT NULL COMMENT '购买者有赞用户ID',
+  `buyer_phone` varchar(64) DEFAULT NULL COMMENT '购买者手机号',
+  `open_id` varchar(128) DEFAULT NULL COMMENT '购买者有赞开放ID',
+  `shop_display_no` varchar(64) DEFAULT NULL COMMENT '有赞店铺编号',
+  `shop_type` varchar(64) DEFAULT NULL COMMENT '店铺类型',
+  `shop_role` varchar(64) DEFAULT NULL COMMENT '店铺角色',
+  `effect_time` bigint DEFAULT NULL COMMENT '授权生效时间戳，毫秒',
+  `effect_time_at` datetime DEFAULT NULL COMMENT '授权生效时间',
+  `expire_time` bigint DEFAULT NULL COMMENT '授权失效时间戳，毫秒',
+  `expire_time_at` datetime DEFAULT NULL COMMENT '授权失效时间',
+  `pay_time` bigint DEFAULT NULL COMMENT '支付时间戳，毫秒',
+  `pay_time_at` datetime DEFAULT NULL COMMENT '支付时间',
+  `env` varchar(32) DEFAULT NULL COMMENT '有赞环境',
+  `raw_payload_json` longtext COMMENT '原始解密消息JSON',
+  `callback_event_id` bigint DEFAULT NULL COMMENT '最近一次回调事件ID',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_yz_app_auth_order_kdt_app` (`order_no`, `kdt_id`, `app_id`),
+  KEY `idx_yz_app_auth_kdt_id` (`kdt_id`),
+  KEY `idx_yz_app_auth_yz_shop_id` (`yz_shop_id`),
+  KEY `idx_yz_app_auth_expire_time` (`expire_time_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞应用授权消息表';
+
+CREATE TABLE IF NOT EXISTS `yz_app_token` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `yz_shop_id` bigint DEFAULT NULL COMMENT '有赞店铺表ID',
+  `kdt_id` bigint DEFAULT NULL COMMENT '有赞店铺ID',
+  `authority_id` varchar(128) DEFAULT NULL COMMENT '有赞授权主体ID',
+  `access_token` varchar(2000) DEFAULT NULL COMMENT '有赞访问令牌',
+  `refresh_token` varchar(2000) DEFAULT NULL COMMENT '有赞刷新令牌',
+  `scope` text COMMENT '授权范围',
+  `expires_in` bigint DEFAULT NULL COMMENT 'access token有效秒数',
+  `expires_at` datetime DEFAULT NULL COMMENT 'access token过期时间',
+  `refresh_expires_in` bigint DEFAULT NULL COMMENT 'refresh token有效秒数',
+  `refresh_expires_at` datetime DEFAULT NULL COMMENT 'refresh token过期时间',
+  `status` varchar(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态 ACTIVE/REFRESH_FAILED/INVALID',
+  `last_refresh_at` datetime DEFAULT NULL COMMENT '最近刷新时间',
+  `raw_response_json` longtext COMMENT '令牌接口原始响应JSON',
+  `last_error_msg` varchar(1000) DEFAULT NULL COMMENT '最近错误信息',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_yz_app_token_authority_id` (`authority_id`),
+  KEY `idx_yz_app_token_kdt_id` (`kdt_id`),
+  KEY `idx_yz_app_token_yz_shop_id` (`yz_shop_id`),
+  KEY `idx_yz_app_token_expires_at` (`expires_at`),
+  KEY `idx_yz_app_token_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞应用授权token表';
+
+CREATE TABLE IF NOT EXISTS `yz_callback_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `event_type` varchar(64) DEFAULT NULL COMMENT '事件类型 APP_SUBSCRIBE/APP_AUTH/CODE/UNSUPPORTED',
+  `request_uri` varchar(500) DEFAULT NULL COMMENT '请求URI',
+  `raw_query_string` longtext COMMENT '原始查询串',
+  `message_ciphertext` longtext COMMENT '有赞message密文',
+  `auth_code` varchar(500) DEFAULT NULL COMMENT '有赞授权code',
+  `decoded_payload_json` longtext COMMENT '解密后的消息JSON',
+  `process_status` varchar(32) NOT NULL DEFAULT 'INIT' COMMENT '处理状态 INIT/SUCCESS/FAILED/UNSUPPORTED',
+  `error_msg` varchar(1000) DEFAULT NULL COMMENT '错误信息',
+  `client_ip` varchar(128) DEFAULT NULL COMMENT '客户端IP',
+  `user_agent` varchar(500) DEFAULT NULL COMMENT 'User-Agent',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_yz_callback_event_type_status` (`event_type`, `process_status`),
+  KEY `idx_yz_callback_event_create_time` (`create_time`),
+  KEY `idx_yz_callback_event_auth_code` (`auth_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞回调事件表';
+
+CREATE TABLE IF NOT EXISTS `yz_order_right_use_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `yz_app_order_id` bigint NOT NULL COMMENT '有赞订购订单ID',
+  `order_no` varchar(128) NOT NULL COMMENT '有赞订购订单号',
+  `mt_shop_id` bigint NOT NULL COMMENT '美团门店ID',
+  `right_code` varchar(64) NOT NULL COMMENT '授予权益编码',
+  `interval_days` int NOT NULL COMMENT '本次核销权益天数',
+  `previous_expire_at` datetime DEFAULT NULL COMMENT '核销前权益过期时间',
+  `new_expire_at` datetime NOT NULL COMMENT '核销后权益过期时间',
+  `operator_user_id` varchar(64) DEFAULT NULL COMMENT '操作人ID',
+  `operator_username` varchar(128) DEFAULT NULL COMMENT '操作人名称',
+  `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+  `status` varchar(32) NOT NULL DEFAULT 'SUCCESS' COMMENT '状态 SUCCESS',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_yz_order_right_use_order_success` (`yz_app_order_id`, `status`),
+  KEY `idx_yz_order_right_use_order_no` (`order_no`),
+  KEY `idx_yz_order_right_use_mt_shop` (`mt_shop_id`),
+  KEY `idx_yz_order_right_use_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='有赞订单权益核销记录表';
+
+INSERT INTO `ai_menu` (
+  `menu_id`, `parent_id`, `menu_name`, `path`, `component`, `permission`, `icon`, `menu_type`,
+  `order_num`, `visible`, `status`, `create_time`, `update_time`
+)
+SELECT
+  'MENU_YOUZAN_APP_ORDER', '0', '有赞订单', '/youzan-app-orders', 'pages/youzan-app-order-manage/YouzanAppOrderManage',
+  'youzan:app-order:list', 'ProfileOutlined', 'C', 9, 1, 1, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ai_menu` WHERE `menu_id` = 'MENU_YOUZAN_APP_ORDER'
+);
+
+INSERT INTO `ai_menu` (
+  `menu_id`, `parent_id`, `menu_name`, `path`, `component`, `permission`, `icon`, `menu_type`,
+  `order_num`, `visible`, `status`, `create_time`, `update_time`
+)
+SELECT
+  'MENU_YOUZAN_APP_ORDER_REDEEM', 'MENU_YOUZAN_APP_ORDER', '核销有赞订单', NULL, NULL,
+  'youzan:app-order:redeem', NULL, 'F', 0, 1, 1, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ai_menu` WHERE `menu_id` = 'MENU_YOUZAN_APP_ORDER_REDEEM'
+);
+
+INSERT INTO `ai_role` (
+  `role_id`, `role_code`, `role_name`, `description`, `order_num`, `status`, `create_time`, `update_time`
+)
+SELECT
+  'ROLE_YOUZAN_OPERATOR', 'youzan_operator', '有赞运营', '查看并核销有赞订购订单', 3, 1, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ai_role` WHERE `role_id` = 'ROLE_YOUZAN_OPERATOR'
+);
+
+INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
+SELECT role_id, menu_id, NOW()
+FROM (
+  SELECT 'ROLE_SUPER' AS role_id, 'MENU_YOUZAN_APP_ORDER' AS menu_id
+  UNION ALL SELECT 'ROLE_SUPER', 'MENU_YOUZAN_APP_ORDER_REDEEM'
+  UNION ALL SELECT 'ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER'
+  UNION ALL SELECT 'ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER_REDEEM'
+) seed
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ai_role_menu` arm WHERE arm.role_id = seed.role_id AND arm.menu_id = seed.menu_id
+);

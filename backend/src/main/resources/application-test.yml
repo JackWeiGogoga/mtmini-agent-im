@@ -1,0 +1,6 @@
+sms:
+  mock-enabled: ${SMS_MOCK_ENABLED:true}
+
+power:
+  wechat-pay:
+    mock-enabled: ${POWER_WECHAT_PAY_MOCK_ENABLED:true}

@@ -1,0 +1,39 @@
+{
+  "code": "OP_SUCCESS",
+  "msg": "成功",
+  "traceId": "-5781646763317804937",
+  "data": [
+    {
+      "app_id": 9636,
+      "epoiId": "17745197442",
+      "name": "CHUXINYUMMY韩式炸鸡（雨花台店）",
+      "address": "江苏省南京市雨花台区西善桥北路3-31号(新天都商住楼02幢08#)",
+      "latitude": 3.1971637e7,
+      "longitude": 1.18730161e8,
+      "pic_url": "http://p0.meituan.net/ziruzhu/c9f28b14ad60c8cbca1121e1ef396b8896432.jpg",
+      "phone": "15252165500",
+      "standby_tel": "15252165500",
+      "shipping_fee": 3.2,
+      "shipping_time": "00:00-02:00,10:00-24:00",
+      "promotion_info": "CHUXIN YUMMY品牌韩式炸鸡源于苏州，意译为中文叫“初心 吖咪”；秉承着公司的宗旨：不忘初心 方得始终 ，将实惠 美味送到每位顾客手中～用餐过程中如遇任何问题，请第一时间联系门店为您售后处理",
+      "remark": "",
+      "open_level": 1,
+      "is_online": 1,
+      "invoice_support": 1,
+      "invoice_min_price": 0,
+      "invoice_description": "",
+      "city_id": 320100,
+      "location_id": 0,
+      "ctime": 1773305634,
+      "utime": 1775788447,
+      "tag_name": "炸鸡及炸物类小吃",
+      "pre_book": 1,
+      "time_select": 1,
+      "pre_book_min_days": 0,
+      "pre_book_max_days": 7,
+      "logistics_codes": "1006",
+      "poiDeliveryTime": "",
+      "contact_name": ""
+    }
+  ]
+}

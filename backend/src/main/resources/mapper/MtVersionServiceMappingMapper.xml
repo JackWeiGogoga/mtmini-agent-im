@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtVersionServiceMappingMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtVersionServiceMapping">
+        <id column="id" property="id"/>
+        <result column="mt_version" property="mtVersion"/>
+        <result column="service_code" property="serviceCode"/>
+        <result column="enabled" property="enabled"/>
+        <result column="sort" property="sort"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, mt_version, service_code, enabled, sort, create_time, update_time
+    </sql>
+
+    <select id="selectEnabledByMtVersion" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_version_service_mapping
+        WHERE mt_version = #{mtVersion}
+          AND enabled = 1
+        ORDER BY sort ASC, id ASC
+    </select>
+
+</mapper>

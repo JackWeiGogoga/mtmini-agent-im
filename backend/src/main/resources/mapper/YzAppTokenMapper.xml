@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzAppTokenMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.youzan.YzAppToken">
+        <id column="id" property="id"/>
+        <result column="yz_shop_id" property="yzShopId"/>
+        <result column="kdt_id" property="kdtId"/>
+        <result column="authority_id" property="authorityId"/>
+        <result column="access_token" property="accessToken"/>
+        <result column="refresh_token" property="refreshToken"/>
+        <result column="scope" property="scope"/>
+        <result column="expires_in" property="expiresIn"/>
+        <result column="expires_at" property="expiresAt"/>
+        <result column="refresh_expires_in" property="refreshExpiresIn"/>
+        <result column="refresh_expires_at" property="refreshExpiresAt"/>
+        <result column="status" property="status"/>
+        <result column="last_refresh_at" property="lastRefreshAt"/>
+        <result column="raw_response_json" property="rawResponseJson"/>
+        <result column="last_error_msg" property="lastErrorMsg"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, yz_shop_id, kdt_id, authority_id, access_token, refresh_token, scope, expires_in,
+        expires_at, refresh_expires_in, refresh_expires_at, status, last_refresh_at, raw_response_json,
+        last_error_msg, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_token
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByAuthorityId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_token
+        WHERE authority_id = #{authorityId}
+        LIMIT 1
+    </select>
+
+    <select id="selectRefreshCandidates" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_token
+        WHERE status = 'ACTIVE'
+          AND refresh_token IS NOT NULL
+          AND refresh_token != ''
+          AND expires_at IS NOT NULL
+          AND expires_at &lt;= #{expiresBefore}
+        ORDER BY expires_at ASC, id ASC
+        LIMIT 100
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzAppToken" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_app_token (
+            yz_shop_id, kdt_id, authority_id, access_token, refresh_token, scope, expires_in,
+            expires_at, refresh_expires_in, refresh_expires_at, status, last_refresh_at,
+            raw_response_json, last_error_msg, create_time, update_time
+        ) VALUES (
+            #{yzShopId}, #{kdtId}, #{authorityId}, #{accessToken}, #{refreshToken}, #{scope}, #{expiresIn},
+            #{expiresAt}, #{refreshExpiresIn}, #{refreshExpiresAt}, #{status}, #{lastRefreshAt},
+            #{rawResponseJson}, #{lastErrorMsg}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.youzan.YzAppToken">
+        UPDATE yz_app_token
+        SET yz_shop_id = #{yzShopId},
+            kdt_id = #{kdtId},
+            authority_id = #{authorityId},
+            access_token = #{accessToken},
+            refresh_token = #{refreshToken},
+            scope = #{scope},
+            expires_in = #{expiresIn},
+            expires_at = #{expiresAt},
+            refresh_expires_in = #{refreshExpiresIn},
+            refresh_expires_at = #{refreshExpiresAt},
+            status = #{status},
+            last_refresh_at = #{lastRefreshAt},
+            raw_response_json = #{rawResponseJson},
+            last_error_msg = #{lastErrorMsg},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="linkShopByKdtId">
+        UPDATE yz_app_token
+        SET yz_shop_id = #{yzShopId},
+            update_time = NOW()
+        WHERE kdt_id = #{kdtId}
+          AND yz_shop_id IS NULL
+    </update>
+
+</mapper>

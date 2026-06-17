@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtShopMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtShop">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="contact_name" property="contactName"/>
+        <result column="contact_phone" property="contactPhone"/>
+        <result column="less_delivery_price" property="lessDeliveryPrice"/>
+        <result column="member_price" property="memberPrice"/>
+        <result column="new_person_price" property="newPersonPrice"/>
+        <result column="reduction" property="reduction"/>
+        <result column="category1" property="category1"/>
+        <result column="category2" property="category2"/>
+        <result column="category3" property="category3"/>
+        <result column="address" property="address"/>
+        <result column="latitude" property="latitude"/>
+        <result column="longitude" property="longitude"/>
+        <result column="epoi_id" property="epoiId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="poi_name" property="poiName"/>
+        <result column="send_price" property="sendPrice"/>
+        <result column="guaranteed_price" property="guaranteedPrice"/>
+        <result column="create_time" property="createTime"/>
+        <result column="promotion_info" property="promotionInfo"/>
+        <result column="door_head_posters" property="doorHeadPosters"/>
+        <result column="promote_img" property="promoteImg"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="door_head_posters_code" property="doorHeadPostersCode"/>
+        <result column="promote_img_code" property="promoteImgCode"/>
+        <result column="mini_poi_id" property="miniPoiId"/>
+        <result column="laber_name" property="laberName"/>
+        <result column="logo" property="logo"/>
+        <result column="phone" property="phone"/>
+        <result column="shipping_time" property="shippingTime"/>
+        <result column="promotion_ad_backfill_status" property="promotionAdBackfillStatus"/>
+        <result column="promotion_ad_backfill_at" property="promotionAdBackfillAt"/>
+        <result column="historical_order_backfill_status" property="historicalOrderBackfillStatus"/>
+        <result column="historical_order_backfill_at" property="historicalOrderBackfillAt"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, name, contact_name, contact_phone, less_delivery_price, member_price, new_person_price, reduction,
+        category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
+        guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
+        door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
+        promotion_ad_backfill_status, promotion_ad_backfill_at,
+        historical_order_backfill_status, historical_order_backfill_at
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByEpoiId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop
+        WHERE epoi_id = #{epoiId}
+        LIMIT 1
+    </select>
+
+    <select id="selectByPoiId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop
+        WHERE poi_id = #{poiId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtShop" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_shop (
+            name, contact_name, contact_phone, less_delivery_price, member_price, new_person_price, reduction,
+            category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
+            guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
+            door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
+            promotion_ad_backfill_status, promotion_ad_backfill_at,
+            historical_order_backfill_status, historical_order_backfill_at
+        ) VALUES (
+            #{name}, #{contactName}, #{contactPhone}, #{lessDeliveryPrice}, #{memberPrice}, #{newPersonPrice},
+            #{reduction}, #{category1}, #{category2}, #{category3}, #{address}, #{latitude}, #{longitude},
+            #{epoiId}, #{poiId}, #{poiName}, #{sendPrice}, #{guaranteedPrice}, #{createTime}, #{promotionInfo},
+            #{doorHeadPosters}, #{promoteImg}, #{updateTime}, #{doorHeadPostersCode}, #{promoteImgCode},
+            #{miniPoiId}, #{laberName}, #{logo}, #{phone}, #{shippingTime},
+            #{promotionAdBackfillStatus}, #{promotionAdBackfillAt},
+            #{historicalOrderBackfillStatus}, #{historicalOrderBackfillAt}
+        )
+    </insert>
+
+    <update id="updatePromotionAdBackfillState">
+        UPDATE mt_shop
+        SET promotion_ad_backfill_status = #{status},
+            promotion_ad_backfill_at = #{backfillAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markHistoricalOrderBackfillProcessing">
+        UPDATE mt_shop
+        SET historical_order_backfill_status = #{processingStatus},
+            historical_order_backfill_at = #{backfillAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND historical_order_backfill_status = #{expectedStatus}
+    </update>
+
+    <update id="markHistoricalOrderBackfillProcessingIfRetryable">
+        UPDATE mt_shop
+        SET historical_order_backfill_status = #{processingStatus},
+            historical_order_backfill_at = #{backfillAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND historical_order_backfill_status IN (#{initStatus}, #{failedStatus})
+    </update>
+
+    <update id="updateHistoricalOrderBackfillState">
+        UPDATE mt_shop
+        SET historical_order_backfill_status = #{status},
+            historical_order_backfill_at = #{backfillAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtShop">
+        UPDATE mt_shop
+        SET name = #{name},
+            contact_name = #{contactName},
+            contact_phone = #{contactPhone},
+            less_delivery_price = #{lessDeliveryPrice},
+            member_price = #{memberPrice},
+            new_person_price = #{newPersonPrice},
+            reduction = #{reduction},
+            category1 = #{category1},
+            category2 = #{category2},
+            category3 = #{category3},
+            address = #{address},
+            latitude = #{latitude},
+            longitude = #{longitude},
+            epoi_id = #{epoiId},
+            poi_id = #{poiId},
+            poi_name = #{poiName},
+            send_price = #{sendPrice},
+            guaranteed_price = #{guaranteedPrice},
+            promotion_info = #{promotionInfo},
+            door_head_posters = #{doorHeadPosters},
+            promote_img = #{promoteImg},
+            update_time = #{updateTime},
+            door_head_posters_code = #{doorHeadPostersCode},
+            promote_img_code = #{promoteImgCode},
+            mini_poi_id = #{miniPoiId},
+            laber_name = #{laberName},
+            logo = #{logo},
+            phone = #{phone},
+            shipping_time = #{shippingTime},
+            promotion_ad_backfill_status = #{promotionAdBackfillStatus},
+            promotion_ad_backfill_at = #{promotionAdBackfillAt},
+            historical_order_backfill_status = #{historicalOrderBackfillStatus},
+            historical_order_backfill_at = #{historicalOrderBackfillAt}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

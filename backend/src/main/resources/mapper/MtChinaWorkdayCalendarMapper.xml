@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtChinaWorkdayCalendarMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtChinaWorkdayCalendar">
+        <id column="id" property="id"/>
+        <result column="calendar_date" property="calendarDate"/>
+        <result column="day_type" property="dayType"/>
+        <result column="holiday_name" property="holidayName"/>
+        <result column="source_year" property="sourceYear"/>
+        <result column="source_title" property="sourceTitle"/>
+        <result column="source_url" property="sourceUrl"/>
+        <result column="enabled" property="enabled"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, calendar_date, day_type, holiday_name, source_year, source_title, source_url,
+        enabled, create_time, update_time
+    </sql>
+
+    <select id="selectEnabledByDateRange" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_china_workday_calendar
+        WHERE enabled = 1
+          AND calendar_date &gt;= #{startDate}
+          AND calendar_date &lt; #{endDateExclusive}
+        ORDER BY calendar_date ASC
+    </select>
+
+    <select id="countEnabledBySourceYear" resultType="int">
+        SELECT COUNT(1)
+        FROM mt_china_workday_calendar
+        WHERE enabled = 1
+          AND source_year = #{sourceYear}
+    </select>
+</mapper>

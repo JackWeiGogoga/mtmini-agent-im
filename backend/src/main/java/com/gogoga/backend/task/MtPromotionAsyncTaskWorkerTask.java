@@ -1,0 +1,285 @@
+package com.gogoga.backend.task;
+
+import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.entity.mt.MtAsyncTask;
+import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.service.MtAsyncTaskService;
+import com.gogoga.backend.service.MtAuthAsyncTaskService;
+import com.gogoga.backend.service.MtOrderAsyncTaskService;
+import com.gogoga.backend.service.MtPromotionAutoBidService;
+import com.gogoga.backend.service.RedisDistributedLockService;
+import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
+import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
+import com.gogoga.backend.service.async.MtOrderNotifyTaskPayload;
+import com.gogoga.backend.service.async.MtPromotionAutoBidTaskPayload;
+import com.gogoga.backend.service.async.MtPromotionLogMarkdownTaskPayload;
+import com.gogoga.backend.util.JsonUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+
+/**
+ * 推广数据库异步任务 worker。
+ */
+@Slf4j
+@Component
+@ConditionalOnProperty(name = {"mt.promotion.async-task.enabled", "mt.promotion.async-task.worker-enabled"}, havingValue = "true")
+public class MtPromotionAsyncTaskWorkerTask {
+
+    private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
+            MtAsyncTaskTypeEnum.ORDER_NOTIFY,
+            MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID,
+            MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN,
+            MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
+            MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
+            MtAsyncTaskTypeEnum.AUTH_SYNC_RECENT_AD_DATA,
+            MtAsyncTaskTypeEnum.AUTH_HISTORICAL_ORDER_BACKFILL,
+            MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH
+    );
+
+    private final MtAsyncTaskService mtAsyncTaskService;
+    private final MtPromotionAutoBidService mtPromotionAutoBidService;
+    private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
+    private final MtOrderAsyncTaskService mtOrderAsyncTaskService;
+    private final RedisDistributedLockService redisDistributedLockService;
+    private final MtProperties mtProperties;
+
+    @Qualifier("mtPromotionAsyncTaskExecutor")
+    private final Executor mtPromotionAsyncTaskExecutor;
+
+    private final String workerInstanceId = "promotion-async-" + UUID.randomUUID();
+
+    public MtPromotionAsyncTaskWorkerTask(
+            MtAsyncTaskService mtAsyncTaskService,
+            MtPromotionAutoBidService mtPromotionAutoBidService,
+            MtAuthAsyncTaskService mtAuthAsyncTaskService,
+            MtOrderAsyncTaskService mtOrderAsyncTaskService,
+            RedisDistributedLockService redisDistributedLockService,
+            MtProperties mtProperties,
+            @Qualifier("mtPromotionAsyncTaskExecutor") Executor mtPromotionAsyncTaskExecutor
+    ) {
+        this.mtAsyncTaskService = mtAsyncTaskService;
+        this.mtPromotionAutoBidService = mtPromotionAutoBidService;
+        this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
+        this.mtOrderAsyncTaskService = mtOrderAsyncTaskService;
+        this.redisDistributedLockService = redisDistributedLockService;
+        this.mtProperties = mtProperties;
+        this.mtPromotionAsyncTaskExecutor = mtPromotionAsyncTaskExecutor;
+    }
+
+    @Scheduled(fixedDelayString = "${mt.promotion.async-task.poll-delay-ms:1000}")
+    public void pollAsyncTasks() {
+        POLL_TASK_TYPES.forEach(this::submitExecutableTasks);
+    }
+
+    @Scheduled(fixedDelayString = "${mt.promotion.async-task.recovery-delay-ms:30000}")
+    public void recoverStaleTasks() {
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        int recoveredCount = 0;
+        for (MtAsyncTaskTypeEnum taskType : POLL_TASK_TYPES) {
+            recoveredCount += mtAsyncTaskService.recoverStaleTasks(
+                    taskType,
+                    resolvePolicy(taskType),
+                    asyncTask.getRecoveryLimit(),
+                    LocalDateTime.now()
+            );
+        }
+        if (recoveredCount > 0) {
+            log.warn("数据库异步任务完成超时回收，recoveredCount={}", recoveredCount);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${mt.promotion.async-task.cleanup.delay-ms:3600000}")
+    public void cleanupHistoricalTasks() {
+        MtProperties.Cleanup cleanup = mtProperties.getPromotion().getAsyncTask().getCleanup();
+        if (cleanup == null || !cleanup.isEnabled()) {
+            return;
+        }
+        redisDistributedLockService.tryRun(
+                "MtAsyncTaskCleanupTask",
+                Duration.ofSeconds(cleanup.getLockSeconds()),
+                () -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    int deletedCount = mtAsyncTaskService.cleanupHistoricalTerminalTasks(
+                            now.minusDays(cleanup.getSuccessRetentionDays()),
+                            now.minusDays(cleanup.getDeadRetentionDays()),
+                            cleanup.getBatchSize()
+                    );
+                    if (deletedCount > 0) {
+                        log.info("推广数据库异步任务历史清理完成，deletedCount={}", deletedCount);
+                    }
+                }
+        );
+    }
+
+    private void submitExecutableTasks(MtAsyncTaskTypeEnum taskType) {
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        List<Long> taskIds = mtAsyncTaskService.selectExecutableTaskIds(taskType, asyncTask.getPollSize(), LocalDateTime.now());
+        for (Long taskId : taskIds) {
+            mtPromotionAsyncTaskExecutor.execute(() -> executeClaimedTask(taskType, taskId));
+        }
+    }
+
+    private void executeClaimedTask(MtAsyncTaskTypeEnum taskType, Long taskId) {
+        String workerId = workerInstanceId + "-" + Thread.currentThread().getName();
+        MtAsyncTask task = mtAsyncTaskService.claimTask(taskType, taskId, workerId, LocalDateTime.now());
+        if (task == null) {
+            return;
+        }
+        try {
+            switch (taskType) {
+                case ORDER_NOTIFY -> executeOrderNotifyTask(task);
+                case PROMOTION_AUTO_BID -> executeAutoBidTask(task);
+                case PROMOTION_LOG_MARKDOWN -> executePromotionLogMarkdownTask(task);
+                case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
+                case AUTH_BACKFILL_POI_ID -> executeAuthBackfillPoiIdTask(task);
+                case AUTH_SYNC_RECENT_AD_DATA -> executeAuthSyncRecentAdDataTask(task);
+                case AUTH_HISTORICAL_ORDER_BACKFILL -> executeAuthHistoricalOrderBackfillTask(task);
+                case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
+                default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
+            }
+            mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
+        } catch (BusyRescheduleException e) {
+            log.info("推广数据库异步任务因同店互斥延后执行，taskType={}, taskId={}", taskType.name(), taskId);
+        } catch (Exception e) {
+            log.error("推广数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
+            mtAsyncTaskService.handleFailure(task, resolvePolicy(taskType), e.getMessage(), LocalDateTime.now());
+        }
+    }
+
+    private void executeOrderNotifyTask(MtAsyncTask task) {
+        MtOrderNotifyTaskPayload payload = parseOrderNotifyPayload(task);
+        if (payload == null) {
+            throw new IllegalArgumentException("ORDER_NOTIFY_TASK_PAYLOAD_INVALID");
+        }
+        if (payload.getOrderId() == null) {
+            mtOrderAsyncTaskService.executeOrderNotifyTask(payload);
+            return;
+        }
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        String lockName = "MtOrderNotifyWorker:" + payload.getOrderId();
+        boolean executed = redisDistributedLockService.tryRun(
+                lockName,
+                Duration.ofSeconds(asyncTask.getOrderNotifyLockSeconds()),
+                () -> mtOrderAsyncTaskService.executeOrderNotifyTask(payload)
+        );
+        if (!executed) {
+            mtAsyncTaskService.rescheduleWithoutRetry(
+                    task,
+                    LocalDateTime.now().plusSeconds(asyncTask.getOrderNotifyBusyBackoffSeconds()),
+                    "ORDER_EXECUTION_BUSY",
+                    LocalDateTime.now()
+            );
+            throw new BusyRescheduleException();
+        }
+    }
+
+    private void executeAutoBidTask(MtAsyncTask task) {
+        MtPromotionAutoBidTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtPromotionAutoBidTaskPayload.class);
+        if (payload == null || payload.getShopId() == null) {
+            throw new IllegalArgumentException("AUTO_BID_TASK_PAYLOAD_INVALID");
+        }
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        String lockName = "MtPromotionAutoBidShopWorker:" + payload.getShopId();
+        boolean executed = redisDistributedLockService.tryRun(
+                lockName,
+                Duration.ofSeconds(asyncTask.getAutoBidShopLockSeconds()),
+                () -> mtPromotionAutoBidService.executeAutoBidTask(payload)
+        );
+        if (!executed) {
+            mtAsyncTaskService.rescheduleWithoutRetry(
+                    task,
+                    LocalDateTime.now().plusSeconds(asyncTask.getAutoBidBusyBackoffSeconds()),
+                    "SHOP_EXECUTION_BUSY",
+                    LocalDateTime.now()
+            );
+            throw new BusyRescheduleException();
+        }
+    }
+
+    private void executePromotionLogMarkdownTask(MtAsyncTask task) {
+        MtPromotionLogMarkdownTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtPromotionLogMarkdownTaskPayload.class);
+        if (payload == null || payload.getRecordId() == null) {
+            throw new IllegalArgumentException("PROMOTION_LOG_TASK_PAYLOAD_INVALID");
+        }
+        mtPromotionAutoBidService.executePromotionLogMarkdownTask(payload);
+    }
+
+    private void executeAuthSyncRightsTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthSyncRightsTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthBackfillPoiIdTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthBackfillPoiIdTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthSyncRecentAdDataTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthSyncRecentAdDataTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthHistoricalOrderBackfillTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthHistoricalOrderBackfillTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthBlockOrderPushTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthBlockOrderPushTask(parseAuthPayload(task));
+    }
+
+    private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
+        MtAuthPostProcessTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtAuthPostProcessTaskPayload.class);
+        if (payload == null || payload.getShopId() == null) {
+            throw new IllegalArgumentException("AUTH_TASK_PAYLOAD_INVALID");
+        }
+        return payload;
+    }
+
+    private MtOrderNotifyTaskPayload parseOrderNotifyPayload(MtAsyncTask task) {
+        MtOrderNotifyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtOrderNotifyTaskPayload.class);
+        if (payload == null || payload.getEPoiId() == null || payload.getMessage() == null) {
+            throw new IllegalArgumentException("ORDER_NOTIFY_TASK_PAYLOAD_INVALID");
+        }
+        return payload;
+    }
+
+    private MtAsyncTaskExecutionPolicy resolvePolicy(MtAsyncTaskTypeEnum taskType) {
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        return switch (taskType) {
+            case ORDER_NOTIFY -> resolvePolicy(asyncTask.getOrderNotify());
+            case PROMOTION_AUTO_BID -> resolvePolicy(asyncTask.getAutoBid());
+            case PROMOTION_LOG_MARKDOWN -> resolvePolicy(asyncTask.getLogMarkdown());
+            case AUTH_SYNC_RIGHTS -> resolvePolicy(asyncTask.getAuthSyncRights());
+            case AUTH_BACKFILL_POI_ID -> resolvePolicy(asyncTask.getAuthBackfillPoiId());
+            case AUTH_SYNC_RECENT_AD_DATA -> resolvePolicy(asyncTask.getAuthSyncRecentAdData());
+            case AUTH_HISTORICAL_ORDER_BACKFILL -> resolvePolicy(asyncTask.getAuthHistoricalOrderBackfill());
+            case AUTH_BLOCK_ORDER_PUSH -> MtAsyncTaskExecutionPolicy.builder()
+                    .maxRetryCount(0)
+                    .timeout(Duration.ofSeconds(180))
+                    .initialBackoff(Duration.ofSeconds(60))
+                    .maxBackoff(Duration.ofSeconds(60))
+                    .build();
+        };
+    }
+
+    private MtAsyncTaskExecutionPolicy resolvePolicy(MtProperties.TaskPolicy taskPolicy) {
+        return MtAsyncTaskExecutionPolicy.builder()
+                .maxRetryCount(taskPolicy.getMaxRetryCount())
+                .timeout(Duration.ofSeconds(taskPolicy.getTimeoutSeconds()))
+                .initialBackoff(Duration.ofSeconds(taskPolicy.getInitialBackoffSeconds()))
+                .maxBackoff(Duration.ofSeconds(taskPolicy.getMaxBackoffSeconds()))
+                .build();
+    }
+
+    private static final class BusyRescheduleException extends RuntimeException {
+        private BusyRescheduleException() {
+            super("SHOP_EXECUTION_BUSY");
+        }
+    }
+}

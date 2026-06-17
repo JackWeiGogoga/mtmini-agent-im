@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPowerAccountMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPowerAccount">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="balance" property="balance"/>
+        <result column="recharge_balance" property="rechargeBalance"/>
+        <result column="grant_balance" property="grantBalance"/>
+        <result column="total_recharge" property="totalRecharge"/>
+        <result column="total_grant" property="totalGrant"/>
+        <result column="total_consume" property="totalConsume"/>
+        <result column="version" property="version"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, balance, recharge_balance, grant_balance, total_recharge, total_grant, total_consume, version, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_account
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_account
+        WHERE shop_id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <insert id="initAccountIfAbsent">
+        INSERT INTO mt_power_account (
+            shop_id, balance, recharge_balance, grant_balance, total_recharge, total_grant, total_consume, version, create_time, update_time
+        ) VALUES (
+            #{shopId}, 0, 0, 0, 0, 0, 0, 0, #{now}, #{now}
+        )
+        ON DUPLICATE KEY UPDATE update_time = update_time
+    </insert>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtPowerAccount" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_power_account (
+            shop_id, balance, recharge_balance, grant_balance, total_recharge, total_grant, total_consume, version, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{balance}, #{rechargeBalance}, #{grantBalance}, #{totalRecharge}, #{totalGrant}, #{totalConsume}, #{version}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtPowerAccount">
+        UPDATE mt_power_account
+        SET shop_id = #{shopId},
+            balance = #{balance},
+            recharge_balance = #{rechargeBalance},
+            grant_balance = #{grantBalance},
+            total_recharge = #{totalRecharge},
+            total_grant = #{totalGrant},
+            total_consume = #{totalConsume},
+            version = #{version},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="addPaidRecharge">
+        UPDATE mt_power_account
+        SET balance = balance + #{powerAmount},
+            recharge_balance = recharge_balance + #{powerAmount},
+            total_recharge = total_recharge + #{powerAmount},
+            version = version + 1,
+            update_time = #{now}
+        WHERE shop_id = #{shopId}
+          AND version = #{version}
+    </update>
+
+    <update id="addAdminGrant">
+        UPDATE mt_power_account
+        SET balance = balance + #{powerAmount},
+            grant_balance = grant_balance + #{powerAmount},
+            total_grant = total_grant + #{powerAmount},
+            version = version + 1,
+            update_time = #{now}
+        WHERE shop_id = #{shopId}
+          AND version = #{version}
+    </update>
+
+    <update id="deductBySource">
+        UPDATE mt_power_account
+        SET balance = balance - #{powerAmount},
+            grant_balance = grant_balance - #{grantAmount},
+            recharge_balance = recharge_balance - #{rechargeAmount},
+            total_consume = total_consume + #{powerAmount},
+            version = version + 1,
+            update_time = #{now}
+        WHERE shop_id = #{shopId}
+          AND version = #{version}
+          AND balance &gt;= #{powerAmount}
+          AND grant_balance &gt;= #{grantAmount}
+          AND recharge_balance &gt;= #{rechargeAmount}
+    </update>
+</mapper>

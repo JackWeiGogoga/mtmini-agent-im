@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.SalesRedemptionCodeMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.SalesRedemptionCode">
+        <id column="id" property="id"/>
+        <result column="code" property="code"/>
+        <result column="sales_user_id" property="salesUserId"/>
+        <result column="sales_user_phone" property="salesUserPhone"/>
+        <result column="status" property="status"/>
+        <result column="created_by_user_id" property="createdByUserId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, code, sales_user_id, sales_user_phone, status, created_by_user_id, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.SalesRedemptionCode" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_sales_redemption_code (
+            code, sales_user_id, sales_user_phone, status, created_by_user_id, create_time, update_time
+        ) VALUES (
+            #{code}, #{salesUserId}, #{salesUserPhone}, #{status}, #{createdByUserId}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.SalesRedemptionCode">
+        UPDATE ai_sales_redemption_code
+        SET code = #{code},
+            sales_user_id = #{salesUserId},
+            sales_user_phone = #{salesUserPhone},
+            status = #{status},
+            created_by_user_id = #{createdByUserId},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM ai_sales_redemption_code
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM ai_sales_redemption_code
+        WHERE code = #{code}
+        LIMIT 1
+    </select>
+
+    <select id="selectBySalesUserId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM ai_sales_redemption_code
+        WHERE sales_user_id = #{salesUserId}
+        LIMIT 1
+    </select>
+
+    <select id="selectAdminList" resultType="com.gogoga.backend.vo.AdminSalesRedemptionCodeRowVO">
+        SELECT src.id,
+               src.code,
+               src.sales_user_id AS salesUserId,
+               COALESCE(u.nickname, u.username, src.sales_user_id) AS salesUserName,
+               src.sales_user_phone AS salesUserPhone,
+               sup.receipt_code_url AS receiptCodeUrl,
+               sup.receipt_code_object_key AS receiptCodeObjectKey,
+               src.create_time AS createTime
+        FROM ai_sales_redemption_code src
+        LEFT JOIN ai_user u ON u.user_id = src.sales_user_id
+        LEFT JOIN ai_sales_user_profile sup ON sup.user_id = src.sales_user_id
+        WHERE src.status = 1
+        <if test="keyword != null and keyword != ''">
+            AND (
+                src.code LIKE CONCAT('%', #{keyword}, '%')
+                OR src.sales_user_phone LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(u.nickname, u.username, src.sales_user_id) LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY src.id DESC
+    </select>
+</mapper>

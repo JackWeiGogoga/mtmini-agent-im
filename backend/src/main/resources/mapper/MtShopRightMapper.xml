@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtShopRightMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtShopRight">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="service_code" property="serviceCode"/>
+        <result column="type" property="type"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="remaining_times" property="remainingTimes"/>
+        <result column="source_version" property="sourceVersion"/>
+        <result column="last_order_id" property="lastOrderId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, service_code, type, expire_at, remaining_times, source_version, last_order_id, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop_right
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopIdAndServiceCode" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop_right
+        WHERE shop_id = #{shopId}
+          AND service_code = #{serviceCode}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop_right
+        WHERE shop_id = #{shopId}
+        ORDER BY service_code ASC, id ASC
+    </select>
+
+    <select id="existsActivePromotionRight" resultType="boolean">
+        SELECT COUNT(1) > 0
+        FROM mt_shop_right
+        WHERE shop_id = #{shopId}
+          AND service_code IN ('H5_PROMOTION', 'VIP_CODE')
+          AND (
+                (type = 2 AND expire_at IS NOT NULL AND expire_at &gt; #{now})
+                OR (type != 2 AND remaining_times IS NOT NULL AND remaining_times &gt; 0)
+              )
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtShopRight" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_shop_right (
+            shop_id, service_code, type, expire_at, remaining_times, source_version, last_order_id, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{serviceCode}, #{type}, #{expireAt}, #{remainingTimes}, #{sourceVersion}, #{lastOrderId},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtShopRight">
+        UPDATE mt_shop_right
+        SET shop_id = #{shopId},
+            service_code = #{serviceCode},
+            type = #{type},
+            expire_at = #{expireAt},
+            remaining_times = #{remainingTimes},
+            source_version = #{sourceVersion},
+            last_order_id = #{lastOrderId},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

@@ -1,0 +1,748 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.UserShopBindingMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.UserShopBinding">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="UserShopBindingVOResultMap" type="com.gogoga.backend.vo.UserShopBindingVO">
+        <id column="binding_id" property="bindingId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="epoi_id" property="epoiId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="address" property="address"/>
+        <result column="contact_phone" property="contactPhone"/>
+        <result column="bound_user_id" property="boundUserId"/>
+        <result column="bound_user_name" property="boundUserName"/>
+        <result column="binding_domain" property="bindingDomain"/>
+        <result column="binding_domain_name" property="bindingDomainName"/>
+        <result column="binding_status" property="bindingStatus"/>
+        <result column="binding_status_name" property="bindingStatusName"/>
+        <result column="ordinary_binding_id" property="ordinaryBindingId"/>
+        <result column="ordinary_bound_user_id" property="ordinaryBoundUserId"/>
+        <result column="ordinary_bound_user_name" property="ordinaryBoundUserName"/>
+        <result column="ordinary_bind_time" property="ordinaryBindTime"/>
+        <result column="sales_binding_id" property="salesBindingId"/>
+        <result column="sales_bound_user_id" property="salesBoundUserId"/>
+        <result column="sales_bound_user_name" property="salesBoundUserName"/>
+        <result column="sales_bound_user_phone" property="salesBoundUserPhone"/>
+        <result column="sales_bind_time" property="salesBindTime"/>
+        <result column="power_balance" property="powerBalance"/>
+        <result column="total_recharge" property="totalRecharge"/>
+        <result column="total_grant" property="totalGrant"/>
+        <result column="total_consume" property="totalConsume"/>
+        <result column="right_expire_at" property="rightExpireAt"/>
+        <result column="bind_time" property="bindTime"/>
+        <result column="ordinary_binding_count" property="ordinaryBindingCount"/>
+        <result column="sales_binding_count" property="salesBindingCount"/>
+    </resultMap>
+
+    <resultMap id="AdminPowerManagementRowVOResultMap" type="com.gogoga.backend.vo.AdminPowerManagementRowVO">
+        <id column="binding_id" property="bindingId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="epoi_id" property="epoiId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="address" property="address"/>
+        <result column="bound_user_id" property="boundUserId"/>
+        <result column="bound_user_name" property="boundUserName"/>
+        <result column="binding_domain" property="bindingDomain"/>
+        <result column="binding_domain_name" property="bindingDomainName"/>
+        <result column="binding_status" property="bindingStatus"/>
+        <result column="binding_status_name" property="bindingStatusName"/>
+        <result column="ordinary_binding_id" property="ordinaryBindingId"/>
+        <result column="ordinary_bound_user_id" property="ordinaryBoundUserId"/>
+        <result column="ordinary_bound_user_name" property="ordinaryBoundUserName"/>
+        <result column="sales_binding_id" property="salesBindingId"/>
+        <result column="sales_bound_user_id" property="salesBoundUserId"/>
+        <result column="sales_bound_user_name" property="salesBoundUserName"/>
+        <result column="balance" property="balance"/>
+        <result column="recharge_balance" property="rechargeBalance"/>
+        <result column="grant_balance" property="grantBalance"/>
+        <result column="total_recharge" property="totalRecharge"/>
+        <result column="total_grant" property="totalGrant"/>
+        <result column="total_consume" property="totalConsume"/>
+        <result column="ordinary_binding_count" property="ordinaryBindingCount"/>
+        <result column="sales_binding_count" property="salesBindingCount"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.UserShopBinding" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_user_shop_binding (
+            user_id, shop_id, poi_id, create_time, update_time
+        ) VALUES (
+            #{userId}, #{shopId}, #{poiId}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectByUserIdAndPoiId" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE user_id = #{userId}
+          AND poi_id = #{poiId}
+        LIMIT 1
+    </select>
+
+    <select id="selectByUserIdAndShopId" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE user_id = #{userId}
+          AND shop_id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <select id="selectByPoiId" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE poi_id = #{poiId}
+        LIMIT 1
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE shop_id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM ai_user_shop_binding
+        WHERE id = #{id}
+          AND user_id = #{userId}
+    </delete>
+
+    <delete id="deleteById">
+        DELETE FROM ai_user_shop_binding
+        WHERE id = #{id}
+    </delete>
+
+    <select id="selectByVisibleUserIdsAndShopId" resultMap="BaseResultMap">
+        SELECT id, user_id, shop_id, poi_id, create_time, update_time
+        FROM ai_user_shop_binding
+        WHERE shop_id = #{shopId}
+          AND user_id IN
+          <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+              #{userId}
+          </foreach>
+        LIMIT 1
+    </select>
+
+    <select id="selectBoundShopsByVisibleUserIds" resultMap="UserShopBindingVOResultMap">
+        <include refid="SelectBoundShopColumns"/>
+        WHERE usb.user_id IN
+        <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        <if test="targetUserId != null and targetUserId != ''">
+            AND usb.user_id = #{targetUserId}
+        </if>
+        <include refid="SelectBoundShopKeywordWhere"/>
+        <include refid="SelectPromotionStatusWhere"/>
+        <include refid="SelectBoundShopOrderBy"/>
+    </select>
+
+    <select id="selectBoundShopsByUserId" resultMap="UserShopBindingVOResultMap">
+        <include refid="SelectBoundShopColumns"/>
+        WHERE usb.user_id = #{userId}
+        <include refid="SelectBoundShopKeywordWhere"/>
+        <include refid="SelectPromotionStatusWhere"/>
+        <include refid="SelectBoundShopOrderBy"/>
+    </select>
+
+    <select id="selectAllBoundShops" resultMap="UserShopBindingVOResultMap">
+        <include refid="SelectBoundShopColumns"/>
+        WHERE 1 = 1
+        <include refid="SelectBoundShopKeywordWhere"/>
+        <include refid="SelectPromotionStatusWhere"/>
+        <include refid="SelectBoundShopOrderBy"/>
+    </select>
+
+    <select id="selectAdminBoundShops" resultMap="UserShopBindingVOResultMap">
+        <choose>
+            <when test="bindingDomain == 'ORDINARY'">
+                <include refid="SelectBoundShopColumns"/>
+                WHERE 1 = 1
+                <if test="targetUserId != null and targetUserId != ''">
+                    AND usb.user_id = #{targetUserId}
+                </if>
+                <include refid="SelectBoundShopKeywordWhere"/>
+                <include refid="SelectPromotionStatusWhere"/>
+                <include refid="SelectAdminBoundShopOrderBy"/>
+            </when>
+            <when test="bindingDomain == 'SALES'">
+                <include refid="SelectSalesBoundShopColumns"/>
+                WHERE 1 = 1
+                <if test="targetUserId != null and targetUserId != ''">
+                    AND usb.user_id = #{targetUserId}
+                </if>
+                <include refid="SelectBoundShopKeywordWhere"/>
+                <include refid="SelectPromotionStatusWhere"/>
+                <include refid="SelectAdminBoundShopOrderBy"/>
+            </when>
+            <otherwise>
+                SELECT *
+                FROM (
+                    <include refid="SelectBoundShopColumns"/>
+                    WHERE 1 = 1
+                    <if test="targetUserId != null and targetUserId != ''">
+                        AND usb.user_id = #{targetUserId}
+                    </if>
+                    <include refid="SelectBoundShopKeywordWhere"/>
+                    <include refid="SelectPromotionStatusWhere"/>
+                    UNION ALL
+                    <include refid="SelectSalesBoundShopColumns"/>
+                    WHERE 1 = 1
+                    <if test="targetUserId != null and targetUserId != ''">
+                        AND usb.user_id = #{targetUserId}
+                    </if>
+                    <include refid="SelectBoundShopKeywordWhere"/>
+                    <include refid="SelectPromotionStatusWhere"/>
+                ) merged
+                <include refid="SelectAdminBoundShopOrderBy"/>
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminMerchantShops" resultMap="UserShopBindingVOResultMap">
+        <include refid="SelectAdminMerchantShopColumns"/>
+        WHERE 1 = 1
+        <include refid="SelectAdminMerchantBindingDomainWhere"/>
+        <include refid="SelectAdminMerchantBindingStatusWhere"/>
+        <include refid="SelectAdminMerchantTargetUserWhere"/>
+        <include refid="SelectAdminMerchantKeywordWhere"/>
+        <include refid="SelectPromotionStatusWhere"/>
+        <include refid="SelectAdminMerchantShopOrderBy"/>
+    </select>
+
+    <select id="selectAllPowerManagedShops" resultMap="AdminPowerManagementRowVOResultMap">
+        <include refid="SelectPowerManagedShopColumns"/>
+        WHERE 1 = 1
+        <if test="targetUserId != null and targetUserId != ''">
+            AND usb.user_id = #{targetUserId}
+        </if>
+        <include refid="SelectBoundShopKeywordWhere"/>
+        <include refid="SelectPowerRiskWhere"/>
+        <include refid="SelectPowerManagedShopOrderBy"/>
+    </select>
+
+    <select id="selectAdminPowerManagedShops" resultMap="AdminPowerManagementRowVOResultMap">
+        <choose>
+            <when test="bindingDomain == 'ORDINARY'">
+                <include refid="SelectPowerManagedShopColumns"/>
+                WHERE 1 = 1
+                <if test="targetUserId != null and targetUserId != ''">
+                    AND usb.user_id = #{targetUserId}
+                </if>
+                <include refid="SelectBoundShopKeywordWhere"/>
+                <include refid="SelectPowerRiskWhere"/>
+                <include refid="SelectPowerManagedShopOrderBy"/>
+            </when>
+            <when test="bindingDomain == 'SALES'">
+                <include refid="SelectSalesPowerManagedShopColumns"/>
+                WHERE 1 = 1
+                <if test="targetUserId != null and targetUserId != ''">
+                    AND usb.user_id = #{targetUserId}
+                </if>
+                <include refid="SelectBoundShopKeywordWhere"/>
+                <include refid="SelectPowerRiskWhere"/>
+                <include refid="SelectPowerManagedShopOrderBy"/>
+            </when>
+            <otherwise>
+                SELECT *
+                FROM (
+                    <include refid="SelectPowerManagedShopColumns"/>
+                    WHERE 1 = 1
+                    <if test="targetUserId != null and targetUserId != ''">
+                        AND usb.user_id = #{targetUserId}
+                    </if>
+                    <include refid="SelectBoundShopKeywordWhere"/>
+                    <include refid="SelectPowerRiskWhere"/>
+                    UNION ALL
+                    <include refid="SelectSalesPowerManagedShopColumns"/>
+                    WHERE 1 = 1
+                    <if test="targetUserId != null and targetUserId != ''">
+                        AND usb.user_id = #{targetUserId}
+                    </if>
+                    <include refid="SelectBoundShopKeywordWhere"/>
+                    <include refid="SelectPowerRiskWhere"/>
+                ) merged
+                <include refid="SelectPowerManagedShopOrderBy"/>
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminPowerManagedMerchantShops" resultMap="AdminPowerManagementRowVOResultMap">
+        <include refid="SelectAdminPowerManagedMerchantShopColumns"/>
+        WHERE 1 = 1
+        <include refid="SelectAdminMerchantBindingDomainWhere"/>
+        <include refid="SelectAdminMerchantBindingStatusWhere"/>
+        <include refid="SelectAdminMerchantTargetUserWhere"/>
+        <include refid="SelectAdminMerchantKeywordWhere"/>
+        <include refid="SelectPowerRiskWhere"/>
+        <include refid="SelectPowerManagedMerchantShopOrderBy"/>
+    </select>
+
+    <select id="selectPowerManagedShopByShopId" resultMap="AdminPowerManagementRowVOResultMap">
+        <include refid="SelectPowerManagedShopColumns"/>
+        WHERE usb.shop_id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <select id="selectPowerManagedMerchantByShopId" resultMap="AdminPowerManagementRowVOResultMap">
+        <include refid="SelectAdminPowerManagedMerchantShopColumns"/>
+        WHERE sh.id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <sql id="SelectAdminMerchantShopColumns">
+        SELECT NULL AS binding_id,
+               sh.id AS shop_id,
+               sh.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               COALESCE(sh.contact_phone, sh.phone) AS contact_phone,
+               COALESCE(ob.user_id, sb.user_id) AS bound_user_id,
+               COALESCE(ou.nickname, ou.username, ob.user_id, su.nickname, su.username, sb.user_id) AS bound_user_name,
+               <include refid="SelectAdminMerchantBindingDomainCase"/> AS binding_domain,
+               <include refid="SelectAdminMerchantBindingDomainNameCase"/> AS binding_domain_name,
+               <include refid="SelectAdminMerchantBindingStatusCase"/> AS binding_status,
+               <include refid="SelectAdminMerchantBindingStatusNameCase"/> AS binding_status_name,
+               ob.id AS ordinary_binding_id,
+               ob.user_id AS ordinary_bound_user_id,
+               COALESCE(ou.nickname, ou.username, ob.user_id) AS ordinary_bound_user_name,
+               ob.create_time AS ordinary_bind_time,
+               sb.id AS sales_binding_id,
+               sb.user_id AS sales_bound_user_id,
+               COALESCE(su.nickname, su.username, sb.user_id) AS sales_bound_user_name,
+               su.phone AS sales_bound_user_phone,
+               sb.create_time AS sales_bind_time,
+               COALESCE(pa.balance, 0) AS power_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               sr.right_expire_at,
+               <include refid="SelectAdminMerchantBindTimeCase"/> AS bind_time,
+               COALESCE(obc.binding_count, 0) AS ordinary_binding_count,
+               COALESCE(sbc.binding_count, 0) AS sales_binding_count
+        FROM mt_shop sh
+        <include refid="SelectAdminMerchantBindingJoins"/>
+        LEFT JOIN mt_power_account pa ON pa.shop_id = sh.id
+        <include refid="SelectPromotionSettingJoinByShop"/>
+        LEFT JOIN (
+            SELECT shop_id, MAX(expire_at) AS right_expire_at
+            FROM mt_shop_right
+            WHERE expire_at IS NOT NULL
+              AND expire_at &gt; NOW()
+            GROUP BY shop_id
+        ) sr ON sr.shop_id = sh.id
+    </sql>
+
+    <sql id="SelectAdminPowerManagedMerchantShopColumns">
+        SELECT NULL AS binding_id,
+               sh.id AS shop_id,
+               sh.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               COALESCE(sh.contact_phone, sh.phone) AS contact_phone,
+               COALESCE(ob.user_id, sb.user_id) AS bound_user_id,
+               COALESCE(ou.nickname, ou.username, ob.user_id, su.nickname, su.username, sb.user_id) AS bound_user_name,
+               <include refid="SelectAdminMerchantBindingDomainCase"/> AS binding_domain,
+               <include refid="SelectAdminMerchantBindingDomainNameCase"/> AS binding_domain_name,
+               <include refid="SelectAdminMerchantBindingStatusCase"/> AS binding_status,
+               <include refid="SelectAdminMerchantBindingStatusNameCase"/> AS binding_status_name,
+               ob.id AS ordinary_binding_id,
+               ob.user_id AS ordinary_bound_user_id,
+               COALESCE(ou.nickname, ou.username, ob.user_id) AS ordinary_bound_user_name,
+               sb.id AS sales_binding_id,
+               sb.user_id AS sales_bound_user_id,
+               COALESCE(su.nickname, su.username, sb.user_id) AS sales_bound_user_name,
+               su.phone AS sales_bound_user_phone,
+               COALESCE(pa.balance, 0) AS balance,
+               COALESCE(pa.recharge_balance, 0) AS recharge_balance,
+               COALESCE(pa.grant_balance, 0) AS grant_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               <include refid="SelectAdminMerchantBindTimeCase"/> AS bind_time,
+               COALESCE(obc.binding_count, 0) AS ordinary_binding_count,
+               COALESCE(sbc.binding_count, 0) AS sales_binding_count
+        FROM mt_shop sh
+        <include refid="SelectAdminMerchantBindingJoins"/>
+        LEFT JOIN mt_power_account pa ON pa.shop_id = sh.id
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingJoins">
+        LEFT JOIN ai_user_shop_binding ob
+               ON ob.shop_id = sh.id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM ai_user_shop_binding newer_ob
+                  WHERE newer_ob.shop_id = ob.shop_id
+                    AND (
+                        newer_ob.create_time &gt; ob.create_time
+                        OR (newer_ob.create_time = ob.create_time AND newer_ob.id &gt; ob.id)
+                    )
+              )
+        LEFT JOIN ai_sales_user_shop_binding sb
+               ON sb.shop_id = sh.id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM ai_sales_user_shop_binding newer_sb
+                  WHERE newer_sb.shop_id = sb.shop_id
+                    AND (
+                        newer_sb.create_time &gt; sb.create_time
+                        OR (newer_sb.create_time = sb.create_time AND newer_sb.id &gt; sb.id)
+                    )
+              )
+        LEFT JOIN ai_user ou ON ou.user_id = ob.user_id
+        LEFT JOIN ai_user su ON su.user_id = sb.user_id
+        LEFT JOIN (
+            SELECT shop_id, COUNT(*) AS binding_count
+            FROM ai_user_shop_binding
+            GROUP BY shop_id
+        ) obc ON obc.shop_id = sh.id
+        LEFT JOIN (
+            SELECT shop_id, COUNT(*) AS binding_count
+            FROM ai_sales_user_shop_binding
+            GROUP BY shop_id
+        ) sbc ON sbc.shop_id = sh.id
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingDomainCase">
+        CASE
+            WHEN ob.id IS NOT NULL AND sb.id IS NOT NULL THEN 'ALL'
+            WHEN ob.id IS NOT NULL THEN 'ORDINARY'
+            WHEN sb.id IS NOT NULL THEN 'SALES'
+            ELSE 'ALL'
+        END
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingDomainNameCase">
+        CASE
+            WHEN ob.id IS NOT NULL AND sb.id IS NOT NULL THEN '普通商户 / 网销用户'
+            WHEN ob.id IS NOT NULL THEN '普通商户'
+            WHEN sb.id IS NOT NULL THEN '网销用户'
+            ELSE '未绑定'
+        END
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingStatusCase">
+        CASE
+            WHEN ob.id IS NOT NULL AND sb.id IS NOT NULL THEN 'BOTH'
+            WHEN ob.id IS NOT NULL OR sb.id IS NOT NULL THEN 'BOUND'
+            ELSE 'UNBOUND'
+        END
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingStatusNameCase">
+        CASE
+            WHEN ob.id IS NOT NULL AND sb.id IS NOT NULL THEN '双绑定'
+            WHEN ob.id IS NOT NULL OR sb.id IS NOT NULL THEN '已绑定'
+            ELSE '未绑定'
+        END
+    </sql>
+
+    <sql id="SelectAdminMerchantBindTimeCase">
+        CASE
+            WHEN ob.create_time IS NULL THEN sb.create_time
+            WHEN sb.create_time IS NULL THEN ob.create_time
+            WHEN ob.create_time &gt;= sb.create_time THEN ob.create_time
+            ELSE sb.create_time
+        END
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingDomainWhere">
+        <if test="bindingDomain == 'ORDINARY'">
+            AND ob.id IS NOT NULL
+        </if>
+        <if test="bindingDomain == 'SALES'">
+            AND sb.id IS NOT NULL
+        </if>
+    </sql>
+
+    <sql id="SelectAdminMerchantBindingStatusWhere">
+        <if test="bindingStatus == 'UNBOUND'">
+            AND ob.id IS NULL
+            AND sb.id IS NULL
+        </if>
+        <if test="bindingStatus == 'BOUND'">
+            AND (ob.id IS NOT NULL OR sb.id IS NOT NULL)
+        </if>
+        <if test="bindingStatus == 'BOTH'">
+            AND ob.id IS NOT NULL
+            AND sb.id IS NOT NULL
+        </if>
+    </sql>
+
+    <sql id="SelectAdminMerchantTargetUserWhere">
+        <if test="targetUserId != null and targetUserId != ''">
+            <choose>
+                <when test="bindingDomain == 'ORDINARY'">
+                    AND ob.user_id = #{targetUserId}
+                </when>
+                <when test="bindingDomain == 'SALES'">
+                    AND sb.user_id = #{targetUserId}
+                </when>
+                <otherwise>
+                    AND (ob.user_id = #{targetUserId} OR sb.user_id = #{targetUserId})
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
+    <sql id="SelectAdminMerchantKeywordWhere">
+        <if test="keyword != null and keyword != ''">
+            AND (
+                sh.poi_id LIKE CONCAT('%', #{keyword}, '%')
+                OR sh.epoi_id LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(sh.poi_name, sh.name) LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(ou.nickname, ou.username, ob.user_id) LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(su.nickname, su.username, sb.user_id) LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <sql id="SelectPowerRiskWhere">
+        <if test="riskStatus != null and riskStatus != ''">
+            <choose>
+                <when test="riskStatus == 'CRITICAL'">
+                    AND COALESCE(pa.balance, 0) &lt; 2000
+                </when>
+                <when test="riskStatus == 'WARNING'">
+                    AND COALESCE(pa.balance, 0) &gt;= 2000
+                    AND COALESCE(pa.balance, 0) &lt; 20000
+                </when>
+                <when test="riskStatus == 'NORMAL'">
+                    AND COALESCE(pa.balance, 0) &gt;= 20000
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+    <sql id="SelectBoundShopOrderBy">
+        <choose>
+            <when test="sortDirection == 'ASC'">
+                ORDER BY power_balance ASC, usb.create_time DESC, usb.id DESC
+            </when>
+            <when test="sortDirection == 'DESC'">
+                ORDER BY power_balance DESC, usb.create_time DESC, usb.id DESC
+            </when>
+            <otherwise>
+                ORDER BY usb.create_time DESC, usb.id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SelectAdminBoundShopOrderBy">
+        <choose>
+            <when test="sortDirection == 'ASC'">
+                ORDER BY power_balance ASC, bind_time DESC, binding_id DESC
+            </when>
+            <when test="sortDirection == 'DESC'">
+                ORDER BY power_balance DESC, bind_time DESC, binding_id DESC
+            </when>
+            <otherwise>
+                ORDER BY bind_time DESC, binding_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SelectAdminMerchantShopOrderBy">
+        <choose>
+            <when test="sortDirection == 'ASC'">
+                ORDER BY power_balance ASC, bind_time DESC, shop_id DESC
+            </when>
+            <when test="sortDirection == 'DESC'">
+                ORDER BY power_balance DESC, bind_time DESC, shop_id DESC
+            </when>
+            <otherwise>
+                ORDER BY bind_time DESC, shop_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SelectPowerManagedShopOrderBy">
+        <choose>
+            <when test="sortDirection == 'DESC'">
+                ORDER BY balance DESC, bind_time DESC, binding_id DESC
+            </when>
+            <otherwise>
+                ORDER BY balance ASC, bind_time DESC, binding_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SelectPowerManagedMerchantShopOrderBy">
+        <choose>
+            <when test="sortDirection == 'DESC'">
+                ORDER BY balance DESC, bind_time DESC, shop_id DESC
+            </when>
+            <otherwise>
+                ORDER BY balance ASC, bind_time DESC, shop_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SelectPowerManagedShopColumns">
+        SELECT usb.id AS binding_id,
+               usb.shop_id,
+               usb.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               COALESCE(sh.contact_phone, sh.phone) AS contact_phone,
+               usb.user_id AS bound_user_id,
+               COALESCE(u.nickname, u.username, usb.user_id) AS bound_user_name,
+               NULL AS sales_bound_user_phone,
+               'ORDINARY' AS binding_domain,
+               '普通商户' AS binding_domain_name,
+               COALESCE(pa.balance, 0) AS balance,
+               COALESCE(pa.recharge_balance, 0) AS recharge_balance,
+               COALESCE(pa.grant_balance, 0) AS grant_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               usb.create_time AS bind_time
+        FROM ai_user_shop_binding usb
+        INNER JOIN mt_shop sh ON sh.id = usb.shop_id
+        LEFT JOIN ai_user u ON u.user_id = usb.user_id
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
+    </sql>
+
+    <sql id="SelectSalesPowerManagedShopColumns">
+        SELECT usb.id AS binding_id,
+               usb.shop_id,
+               usb.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               COALESCE(sh.contact_phone, sh.phone) AS contact_phone,
+               usb.user_id AS bound_user_id,
+               COALESCE(u.nickname, u.username, usb.user_id) AS bound_user_name,
+               u.phone AS sales_bound_user_phone,
+               'SALES' AS binding_domain,
+               '网销用户' AS binding_domain_name,
+               COALESCE(pa.balance, 0) AS balance,
+               COALESCE(pa.recharge_balance, 0) AS recharge_balance,
+               COALESCE(pa.grant_balance, 0) AS grant_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               usb.create_time AS bind_time
+        FROM ai_sales_user_shop_binding usb
+        INNER JOIN mt_shop sh ON sh.id = usb.shop_id
+        LEFT JOIN ai_user u ON u.user_id = usb.user_id
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
+    </sql>
+
+    <sql id="SelectBoundShopColumns">
+        SELECT usb.id AS binding_id,
+               usb.shop_id,
+               usb.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               usb.user_id AS bound_user_id,
+               COALESCE(u.nickname, u.username, usb.user_id) AS bound_user_name,
+               NULL AS sales_bound_user_phone,
+               'ORDINARY' AS binding_domain,
+               '普通商户' AS binding_domain_name,
+               COALESCE(pa.balance, 0) AS power_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               sr.right_expire_at,
+               usb.create_time AS bind_time
+        FROM ai_user_shop_binding usb
+        INNER JOIN mt_shop sh ON sh.id = usb.shop_id
+        LEFT JOIN ai_user u ON u.user_id = usb.user_id
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
+        <include refid="SelectPromotionSettingJoinByBindingShop"/>
+        LEFT JOIN (
+            SELECT shop_id, MAX(expire_at) AS right_expire_at
+            FROM mt_shop_right
+            WHERE expire_at IS NOT NULL
+              AND expire_at > NOW()
+            GROUP BY shop_id
+        ) sr ON sr.shop_id = usb.shop_id
+    </sql>
+
+    <sql id="SelectSalesBoundShopColumns">
+        SELECT usb.id AS binding_id,
+               usb.shop_id,
+               usb.poi_id,
+               sh.epoi_id,
+               COALESCE(sh.poi_name, sh.name) AS shop_name,
+               sh.address,
+               usb.user_id AS bound_user_id,
+               COALESCE(u.nickname, u.username, usb.user_id) AS bound_user_name,
+               u.phone AS sales_bound_user_phone,
+               'SALES' AS binding_domain,
+               '网销用户' AS binding_domain_name,
+               COALESCE(pa.balance, 0) AS power_balance,
+               COALESCE(pa.total_recharge, 0) AS total_recharge,
+               COALESCE(pa.total_grant, 0) AS total_grant,
+               COALESCE(pa.total_consume, 0) AS total_consume,
+               sr.right_expire_at,
+               usb.create_time AS bind_time
+        FROM ai_sales_user_shop_binding usb
+        INNER JOIN mt_shop sh ON sh.id = usb.shop_id
+        LEFT JOIN ai_user u ON u.user_id = usb.user_id
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
+        <include refid="SelectPromotionSettingJoinByBindingShop"/>
+        LEFT JOIN (
+            SELECT shop_id, MAX(expire_at) AS right_expire_at
+            FROM mt_shop_right
+            WHERE expire_at IS NOT NULL
+              AND expire_at > NOW()
+            GROUP BY shop_id
+        ) sr ON sr.shop_id = usb.shop_id
+    </sql>
+
+    <sql id="SelectBoundShopKeywordWhere">
+        <if test="keyword != null and keyword != ''">
+            AND (
+                usb.poi_id LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(sh.poi_name, sh.name) LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(u.nickname, u.username, usb.user_id) LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <sql id="SelectPromotionStatusWhere">
+        <if test="promotionStatus == 'ENABLED'">
+            AND ps.promotion_enabled = 1
+        </if>
+        <if test="promotionStatus == 'DISABLED'">
+            AND (ps.id IS NULL OR ps.promotion_enabled = 0)
+        </if>
+    </sql>
+
+    <sql id="SelectPromotionSettingJoinByBindingShop">
+        <if test="promotionStatus == 'ENABLED' or promotionStatus == 'DISABLED'">
+            LEFT JOIN mt_promotion_setting ps ON ps.shop_id = usb.shop_id
+        </if>
+    </sql>
+
+    <sql id="SelectPromotionSettingJoinByShop">
+        <if test="promotionStatus == 'ENABLED' or promotionStatus == 'DISABLED'">
+            LEFT JOIN mt_promotion_setting ps ON ps.shop_id = sh.id
+        </if>
+    </sql>
+
+</mapper>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzCallbackEventMapper">
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzCallbackEvent" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_callback_event (
+            event_type, request_uri, raw_query_string, message_ciphertext, auth_code,
+            decoded_payload_json, process_status, error_msg, client_ip, user_agent,
+            create_time, update_time
+        ) VALUES (
+            #{eventType}, #{requestUri}, #{rawQueryString}, #{messageCiphertext}, #{authCode},
+            #{decodedPayloadJson}, #{processStatus}, #{errorMsg}, #{clientIp}, #{userAgent},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.youzan.YzCallbackEvent">
+        UPDATE yz_callback_event
+        SET event_type = #{eventType},
+            decoded_payload_json = #{decodedPayloadJson},
+            process_status = #{processStatus},
+            error_msg = #{errorMsg},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

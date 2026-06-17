@@ -1,0 +1,123 @@
+(common_security) {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=()"
+		-Server
+	}
+
+	@badMethod not method GET POST OPTIONS
+	respond @badMethod 405
+
+	@blockedFiles path /.env /.env.* /.git* /Caddyfile /Dockerfile /docker-compose* /package.json /package-lock.json /pnpm-lock.yaml /yarn.lock
+	respond @blockedFiles 404
+
+	@swagger path /swagger-ui/* /v3/api-docs/*
+	respond @swagger 404
+}
+
+aia.waimaidashi.com {
+	log {
+		output file /var/log/caddy/aia-access.log
+		format console
+	}
+
+	import common_security
+
+	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
+
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		root * /var/www/mt-ai-promotion
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# 如需第二个 H5 域名，可复制这一段并调整 root。
+# aib.waimaidashi.com {
+# 	log {
+# 		output file /var/log/caddy/aib-access.log
+# 		format console
+# 	}
+#
+# 	import common_security
+#
+# 	handle /api/* {
+# 		request_body {
+# 			max_size 10MB
+# 		}
+#
+# 		reverse_proxy 127.0.0.1:8080
+# 	}
+#
+# 	handle {
+# 		root * /var/www/mt-ai-promotion-b
+# 		try_files {path} /index.html
+# 		file_server
+# 	}
+# }
+
+aiadmin.waimaidashi.com {
+	log {
+		output file /var/log/caddy/aiadmin-access.log
+		format console
+	}
+
+	import common_security
+
+	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
+
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		root * /var/www/mt-admin
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+aiapi.waimaidashi.com {
+	log {
+		output file /var/log/caddy/aiapi-access.log
+		format console
+	}
+
+	import common_security
+
+	@callbackBadMethod {
+		path /api/callbacks/*
+		not path /api/callbacks/youzan/app
+		not method POST
+	}
+	@youzanCallbackBadMethod {
+		path /api/callbacks/youzan/app
+		not method GET
+	}
+	respond @callbackBadMethod 405
+	respond @youzanCallbackBadMethod 405
+
+	handle /api/* {
+		request_body {
+			max_size 2MB
+		}
+
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+}

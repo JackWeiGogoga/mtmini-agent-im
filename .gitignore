@@ -1,0 +1,90 @@
+# =========================
+# 通用
+# =========================
+.DS_Store
+*.log
+*.tmp
+*.temp
+.env
+.env.local
+.env.*.local
+tools/wmops/config.json
+tools/wmops/*.local.json
+
+# =========================
+# IDE
+# =========================
+.idea/
+.vscode/
+.claude/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# =========================
+# Codex 项目级配置
+# =========================
+# .codex/skills 是项目协作资产，应该进入 Git；这里只忽略本地状态、缓存和敏感配置。
+.codex/cache/
+.codex/logs/
+.codex/tmp/
+.codex/state/
+.codex/sessions/
+.codex/**/*.local
+.codex/**/*.local.*
+.codex/**/.env
+.codex/**/.env.*
+.codex/**/secrets.*
+.codex/**/secret.*
+.codex/**/credentials.*
+.codex/**/credential.*
+
+# =========================
+# 后端 - Java/Maven
+# =========================
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.class
+
+# Maven
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+
+# Logs
+backend/logs/
+backend/*.log
+
+# =========================
+# 前端 - Node.js/React
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.pnpm-debug.log*
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# =========================
+# 上传文件目录
+# =========================
+uploads/
+
+# =========================
+# OpenSpec 临时文件
+# =========================
+openspec/.cache/
+
+# =========================
+# 本地部署配置
+# =========================
+deploy-local/*
+!deploy-local/deploy.sh
+!deploy-local/bootstrap-server.sh
+!deploy-local/Caddyfile
+!deploy-local/waimaidashi-backend.service

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MenuMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.Menu">
+        <id column="id" property="id"/>
+        <result column="menu_id" property="menuId"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="menu_name" property="menuName"/>
+        <result column="path" property="path"/>
+        <result column="component" property="component"/>
+        <result column="permission" property="permission"/>
+        <result column="icon" property="icon"/>
+        <result column="menu_type" property="menuType"/>
+        <result column="order_num" property="orderNum"/>
+        <result column="visible" property="visible"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, menu_id, parent_id, menu_name, path, component, permission, icon, menu_type, order_num, visible, status, create_time, update_time
+    </sql>
+
+    <!-- 插入菜单 -->
+    <insert id="insert" parameterType="com.gogoga.backend.entity.Menu" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_menu (menu_id, parent_id, menu_name, path, component, permission, icon, menu_type, order_num, visible, status)
+        VALUES (#{menuId}, #{parentId}, #{menuName}, #{path}, #{component}, #{permission}, #{icon}, #{menuType}, #{orderNum}, #{visible}, #{status})
+    </insert>
+
+    <!-- 根据菜单ID更新菜单 -->
+    <update id="updateByMenuId" parameterType="com.gogoga.backend.entity.Menu">
+        UPDATE ai_menu
+        SET parent_id = #{parentId},
+            menu_name = #{menuName},
+            path = #{path},
+            component = #{component},
+            permission = #{permission},
+            icon = #{icon},
+            menu_type = #{menuType},
+            order_num = #{orderNum},
+            visible = #{visible},
+            status = #{status}
+        WHERE menu_id = #{menuId}
+    </update>
+
+    <!-- 根据菜单ID查询菜单 -->
+    <select id="selectByMenuId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_menu
+        WHERE menu_id = #{menuId}
+    </select>
+
+    <!-- 查询所有菜单列表 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_menu
+        ORDER BY order_num ASC, create_time ASC
+    </select>
+
+    <!-- 查询所有启用的菜单 -->
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_menu
+        WHERE status = 1
+        ORDER BY order_num ASC, create_time ASC
+    </select>
+
+    <!-- 根据父ID查询子菜单 -->
+    <select id="selectByParentId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_menu
+        WHERE parent_id = #{parentId}
+        ORDER BY order_num ASC, create_time ASC
+    </select>
+
+    <!-- 更新菜单状态 -->
+    <update id="updateStatus">
+        UPDATE ai_menu
+        SET status = #{status}
+        WHERE menu_id = #{menuId}
+    </update>
+
+    <!-- 删除菜单 -->
+    <delete id="deleteByMenuId">
+        DELETE FROM ai_menu WHERE menu_id = #{menuId}
+    </delete>
+
+    <!-- 根据角色ID查询菜单列表 -->
+    <select id="selectByRoleId" resultMap="BaseResultMap">
+        SELECT m.id, m.menu_id, m.parent_id, m.menu_name, m.path, m.component, m.permission, m.icon, m.menu_type, m.order_num, m.visible, m.status, m.create_time, m.update_time
+        FROM ai_menu m
+        INNER JOIN ai_role_menu rm ON m.menu_id = rm.menu_id
+        WHERE rm.role_id = #{roleId} AND m.status = 1
+        ORDER BY m.order_num ASC, m.create_time ASC
+    </select>
+
+    <!-- 根据用户ID查询菜单列表（含权限） -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT DISTINCT m.id, m.menu_id, m.parent_id, m.menu_name, m.path, m.component, m.permission, m.icon, m.menu_type, m.order_num, m.visible, m.status, m.create_time, m.update_time
+        FROM ai_menu m
+        INNER JOIN ai_role_menu rm ON m.menu_id = rm.menu_id
+        INNER JOIN ai_user_role ur ON rm.role_id = ur.role_id
+        WHERE ur.user_id = #{userId} AND m.status = 1
+        ORDER BY m.order_num ASC, m.create_time ASC
+    </select>
+
+    <!-- 查询用户权限标识列表 -->
+    <select id="selectPermsByUserId" resultType="java.lang.String">
+        SELECT DISTINCT m.permission
+        FROM ai_menu m
+        INNER JOIN ai_role_menu rm ON m.menu_id = rm.menu_id
+        INNER JOIN ai_user_role ur ON rm.role_id = ur.role_id
+        WHERE ur.user_id = #{userId} AND m.status = 1 AND m.permission IS NOT NULL AND m.permission != ''
+    </select>
+
+</mapper>

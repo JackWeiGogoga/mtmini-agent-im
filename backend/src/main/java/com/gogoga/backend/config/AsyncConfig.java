@@ -1,0 +1,46 @@
+package com.gogoga.backend.config;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+
+/**
+ * 异步任务配置类
+ *
+ * @author JackWei
+ * @since 2026-01-22
+ */
+@Slf4j
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    /**
+     * 推广异步任务执行器
+     *
+     * @param mtProperties 美团配置
+     * @return 线程池执行器
+     */
+    @Bean("mtPromotionAsyncTaskExecutor")
+    public Executor mtPromotionAsyncTaskExecutor(MtProperties mtProperties) {
+        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(asyncTask.getExecutorCorePoolSize());
+        executor.setMaxPoolSize(asyncTask.getExecutorMaxPoolSize());
+        executor.setQueueCapacity(asyncTask.getExecutorQueueCapacity());
+        executor.setThreadNamePrefix("mt-promotion-async-");
+        executor.setKeepAliveSeconds(60);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        log.info("Async executor initialized, name=mtPromotionAsyncTaskExecutor, corePoolSize={}, maxPoolSize={}, queueCapacity={}",
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), asyncTask.getExecutorQueueCapacity());
+        return executor;
+    }
+}

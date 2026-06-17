@@ -1,0 +1,22 @@
+import type { IconProps } from "./types";
+
+const DeepSeek = ({ ...props }: IconProps) => {
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <rect width="32" height="32" rx="6" fill="#4D6BFE" />
+      <path
+        d="M16 6C10.477 6 6 10.477 6 16C6 21.523 10.477 26 16 26C21.523 26 26 21.523 26 16C26 10.477 21.523 6 16 6ZM16 8C20.418 8 24 11.582 24 16C24 20.418 20.418 24 16 24C11.582 24 8 20.418 8 16C8 11.582 11.582 8 16 8ZM16 10C12.686 10 10 12.686 10 16C10 19.314 12.686 22 16 22C19.314 22 22 19.314 22 16C22 12.686 19.314 10 16 10ZM16 12C18.209 12 20 13.791 20 16C20 18.209 18.209 20 16 20C13.791 20 12 18.209 12 16C12 13.791 13.791 12 16 12Z"
+        fill="white"
+      />
+    </svg>
+  );
+};
+
+export default DeepSeek;

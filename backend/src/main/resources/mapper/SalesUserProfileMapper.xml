@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.SalesUserProfileMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.SalesUserProfile">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="receipt_code_url" property="receiptCodeUrl"/>
+        <result column="receipt_code_storage_provider" property="receiptCodeStorageProvider"/>
+        <result column="receipt_code_object_key" property="receiptCodeObjectKey"/>
+        <result column="receipt_code_uploaded_at" property="receiptCodeUploadedAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.SalesUserProfile" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_sales_user_profile (
+            user_id, receipt_code_url, receipt_code_storage_provider, receipt_code_object_key,
+            receipt_code_uploaded_at, create_time, update_time
+        ) VALUES (
+            #{userId}, #{receiptCodeUrl}, #{receiptCodeStorageProvider}, #{receiptCodeObjectKey},
+            #{receiptCodeUploadedAt}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.SalesUserProfile">
+        UPDATE ai_sales_user_profile
+        SET user_id = #{userId},
+            receipt_code_url = #{receiptCodeUrl},
+            receipt_code_storage_provider = #{receiptCodeStorageProvider},
+            receipt_code_object_key = #{receiptCodeObjectKey},
+            receipt_code_uploaded_at = #{receiptCodeUploadedAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT id, user_id, receipt_code_url, receipt_code_storage_provider, receipt_code_object_key,
+               receipt_code_uploaded_at, create_time, update_time
+        FROM ai_sales_user_profile
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <update id="clearReceiptCodeUrl">
+        UPDATE ai_sales_user_profile
+        SET receipt_code_url = NULL,
+            receipt_code_storage_provider = NULL,
+            receipt_code_object_key = NULL,
+            receipt_code_uploaded_at = NULL
+        WHERE user_id = #{userId}
+    </update>
+</mapper>

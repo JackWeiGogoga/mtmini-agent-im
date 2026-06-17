@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPromotionPeriodMetricDailyMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPromotionPeriodMetricDaily">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="biz_date" property="bizDate"/>
+        <result column="show_count" property="showCount"/>
+        <result column="debit_cents" property="debitCents"/>
+        <result column="income" property="income"/>
+        <result column="order_count" property="orderCount"/>
+        <result column="source_hash" property="sourceHash"/>
+        <result column="calculated_at" property="calculatedAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, biz_date, show_count, debit_cents, income, order_count,
+        source_hash, calculated_at, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndBizDate" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_promotion_period_metric_daily
+        WHERE shop_id = #{shopId}
+          AND biz_date = #{bizDate}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopIdsAndBizDateRange" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_promotion_period_metric_daily
+        WHERE biz_date &gt;= #{startBizDate}
+          AND biz_date &lt; #{endBizDate}
+        <if test="shopIds != null and shopIds.size() > 0">
+          AND shop_id IN
+          <foreach collection="shopIds" item="shopId" open="(" separator="," close=")">
+            #{shopId}
+          </foreach>
+        </if>
+        ORDER BY shop_id ASC, biz_date ASC
+    </select>
+
+    <insert id="insertOrUpdate" parameterType="com.gogoga.backend.entity.mt.MtPromotionPeriodMetricDaily"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_promotion_period_metric_daily (
+            shop_id, biz_date, show_count, debit_cents, income, order_count,
+            source_hash, calculated_at, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{bizDate}, #{showCount}, #{debitCents}, #{income}, #{orderCount},
+            #{sourceHash}, #{calculatedAt}, #{createTime}, #{updateTime}
+        )
+        ON DUPLICATE KEY UPDATE
+            show_count = VALUES(show_count),
+            debit_cents = VALUES(debit_cents),
+            income = VALUES(income),
+            order_count = VALUES(order_count),
+            source_hash = VALUES(source_hash),
+            calculated_at = VALUES(calculated_at),
+            update_time = VALUES(update_time)
+    </insert>
+</mapper>

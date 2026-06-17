@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.SalesCommissionSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.SalesCommissionSnapshot">
+        <id column="id" property="id"/>
+        <result column="recharge_id" property="rechargeId"/>
+        <result column="recharge_no" property="rechargeNo"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_phone" property="shopPhone"/>
+        <result column="power_amount" property="powerAmount"/>
+        <result column="paid_amount_fen" property="paidAmountFen"/>
+        <result column="commission_ratio" property="commissionRatio"/>
+        <result column="commission_amount_fen" property="commissionAmountFen"/>
+        <result column="sales_user_id" property="salesUserId"/>
+        <result column="sales_user_phone" property="salesUserPhone"/>
+        <result column="redemption_code" property="redemptionCode"/>
+        <result column="settlement_status" property="settlementStatus"/>
+        <result column="settled_at" property="settledAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.SalesCommissionSnapshot" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_sales_commission_snapshot (
+            recharge_id, recharge_no, shop_id, poi_id, shop_name, shop_phone, power_amount, paid_amount_fen,
+            commission_ratio, commission_amount_fen, sales_user_id, sales_user_phone, redemption_code,
+            settlement_status, settled_at, create_time, update_time
+        ) VALUES (
+            #{rechargeId}, #{rechargeNo}, #{shopId}, #{poiId}, #{shopName}, #{shopPhone}, #{powerAmount}, #{paidAmountFen},
+            #{commissionRatio}, #{commissionAmountFen}, #{salesUserId}, #{salesUserPhone}, #{redemptionCode},
+            #{settlementStatus}, #{settledAt}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectByRechargeId" resultMap="BaseResultMap">
+        SELECT recharge_id, recharge_no, shop_id, poi_id, shop_name, shop_phone, power_amount, paid_amount_fen,
+               commission_ratio, commission_amount_fen, sales_user_id, sales_user_phone, redemption_code,
+               settlement_status, settled_at, create_time, update_time, id
+        FROM ai_sales_commission_snapshot
+        WHERE recharge_id = #{rechargeId}
+        LIMIT 1
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT recharge_id, recharge_no, shop_id, poi_id, shop_name, shop_phone, power_amount, paid_amount_fen,
+               commission_ratio, commission_amount_fen, sales_user_id, sales_user_phone, redemption_code,
+               settlement_status, settled_at, create_time, update_time, id
+        FROM ai_sales_commission_snapshot
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectList" resultType="com.gogoga.backend.vo.SalesCommissionRowVO">
+        SELECT scs.id,
+               scs.redemption_code AS redemptionCode,
+               scs.recharge_no AS rechargeNo,
+               scs.shop_name AS shopName,
+               scs.poi_id AS poiId,
+               scs.shop_phone AS shopPhone,
+               scs.power_amount AS powerAmount,
+               scs.paid_amount_fen AS paidAmountFen,
+               scs.commission_ratio AS commissionRatio,
+               scs.commission_amount_fen AS commissionAmountFen,
+               scs.sales_user_id AS salesUserId,
+               COALESCE(u.nickname, u.username, scs.sales_user_id) AS salesUserName,
+               scs.sales_user_phone AS salesUserPhone,
+               sup.receipt_code_url AS receiptCodeUrl,
+               sup.receipt_code_object_key AS receiptCodeObjectKey,
+               scs.settlement_status AS settlementStatus,
+               scs.settled_at AS settledAt,
+               scs.create_time AS createTime,
+               mpr.paid_at AS paidAt
+        FROM ai_sales_commission_snapshot scs
+        LEFT JOIN ai_user u ON u.user_id = scs.sales_user_id
+        LEFT JOIN ai_sales_user_profile sup ON sup.user_id = scs.sales_user_id
+        LEFT JOIN mt_power_recharge mpr ON mpr.id = scs.recharge_id
+        WHERE 1 = 1
+        <if test="shopKeyword != null and shopKeyword != ''">
+            AND (
+                scs.shop_name LIKE CONCAT('%', #{shopKeyword}, '%')
+                OR scs.poi_id LIKE CONCAT('%', #{shopKeyword}, '%')
+                OR scs.shop_phone LIKE CONCAT('%', #{shopKeyword}, '%')
+            )
+        </if>
+        <if test="redemptionCode != null and redemptionCode != ''">
+            AND scs.redemption_code LIKE CONCAT('%', #{redemptionCode}, '%')
+        </if>
+        <if test="rechargeNo != null and rechargeNo != ''">
+            AND scs.recharge_no LIKE CONCAT('%', #{rechargeNo}, '%')
+        </if>
+        <if test="salesUserId != null and salesUserId != ''">
+            AND scs.sales_user_id = #{salesUserId}
+        </if>
+        ORDER BY scs.id DESC
+    </select>
+
+    <update id="updateCommissionRatio">
+        UPDATE ai_sales_commission_snapshot
+        SET commission_ratio = #{commissionRatio},
+            commission_amount_fen = #{commissionAmountFen}
+        WHERE id = #{id}
+          AND settlement_status = 'UNSETTLED'
+    </update>
+
+    <update id="updateSettlementStatus">
+        UPDATE ai_sales_commission_snapshot
+        SET settlement_status = #{settlementStatus},
+            settled_at = CASE WHEN #{settlementStatus} = 'SETTLED' THEN NOW() ELSE NULL END
+        WHERE id = #{id}
+    </update>
+</mapper>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.YzAppOrderMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.youzan.YzAppOrder">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="yz_shop_id" property="yzShopId"/>
+        <result column="kdt_id" property="kdtId"/>
+        <result column="root_kdt_id" property="rootKdtId"/>
+        <result column="app_id" property="appId"/>
+        <result column="buyer_id" property="buyerId"/>
+        <result column="buyer_phone" property="buyerPhone"/>
+        <result column="open_id" property="openId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_display_no" property="shopDisplayNo"/>
+        <result column="shop_type" property="shopType"/>
+        <result column="shop_role" property="shopRole"/>
+        <result column="sku_version_text" property="skuVersionText"/>
+        <result column="sku_interval_text" property="skuIntervalText"/>
+        <result column="price" property="price"/>
+        <result column="status" property="status"/>
+        <result column="pay_time" property="payTime"/>
+        <result column="pay_time_at" property="payTimeAt"/>
+        <result column="env" property="env"/>
+        <result column="use_status" property="useStatus"/>
+        <result column="used_mt_shop_id" property="usedMtShopId"/>
+        <result column="used_right_code" property="usedRightCode"/>
+        <result column="used_at" property="usedAt"/>
+        <result column="used_by_user_id" property="usedByUserId"/>
+        <result column="used_by_username" property="usedByUsername"/>
+        <result column="use_remark" property="useRemark"/>
+        <result column="raw_payload_json" property="rawPayloadJson"/>
+        <result column="callback_event_id" property="callbackEventId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="AdminRowResultMap" type="com.gogoga.backend.vo.AdminYouzanAppOrderRowVO">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="kdt_id" property="kdtId"/>
+        <result column="root_kdt_id" property="rootKdtId"/>
+        <result column="app_id" property="appId"/>
+        <result column="buyer_id" property="buyerId"/>
+        <result column="buyer_phone" property="buyerPhone"/>
+        <result column="open_id" property="openId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_display_no" property="shopDisplayNo"/>
+        <result column="sku_version_text" property="skuVersionText"/>
+        <result column="sku_interval_text" property="skuIntervalText"/>
+        <result column="price" property="price"/>
+        <result column="status" property="status"/>
+        <result column="pay_time_at" property="payTime"/>
+        <result column="use_status" property="useStatus"/>
+        <result column="used_mt_shop_id" property="usedMtShopId"/>
+        <result column="used_mt_shop_name" property="usedMtShopName"/>
+        <result column="used_right_code" property="usedRightCode"/>
+        <result column="used_at" property="usedAt"/>
+        <result column="used_by_username" property="usedByUsername"/>
+        <result column="use_remark" property="useRemark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, order_no, yz_shop_id, kdt_id, root_kdt_id, app_id, buyer_id, buyer_phone, open_id,
+        shop_name, shop_display_no, shop_type, shop_role, sku_version_text, sku_interval_text,
+        price, status, pay_time, pay_time_at, env, use_status, used_mt_shop_id, used_right_code,
+        used_at, used_by_user_id, used_by_username, use_remark, raw_payload_json, callback_event_id,
+        create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_order
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_order
+        WHERE id = #{id}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="selectByOrderNo" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM yz_app_order
+        WHERE order_no = #{orderNo}
+        LIMIT 1
+    </select>
+
+    <select id="selectAdminPage" resultMap="AdminRowResultMap">
+        SELECT yao.id,
+               yao.order_no,
+               yao.kdt_id,
+               yao.root_kdt_id,
+               yao.app_id,
+               yao.buyer_id,
+               yao.buyer_phone,
+               yao.open_id,
+               yao.shop_name,
+               yao.shop_display_no,
+               yao.sku_version_text,
+               yao.sku_interval_text,
+               yao.price,
+               yao.status,
+               yao.pay_time_at,
+               yao.use_status,
+               yao.used_mt_shop_id,
+               COALESCE(ms.poi_name, ms.name) AS used_mt_shop_name,
+               yao.used_right_code,
+               yao.used_at,
+               yao.used_by_username,
+               yao.use_remark,
+               yao.create_time,
+               yao.update_time
+        FROM yz_app_order yao
+        LEFT JOIN mt_shop ms ON ms.id = yao.used_mt_shop_id
+        WHERE 1 = 1
+        <if test="orderNo != null and orderNo != ''">
+            AND yao.order_no LIKE CONCAT('%', #{orderNo}, '%')
+        </if>
+        <if test="kdtId != null">
+            AND yao.kdt_id = #{kdtId}
+        </if>
+        <if test="shopName != null and shopName != ''">
+            AND yao.shop_name LIKE CONCAT('%', #{shopName}, '%')
+        </if>
+        <if test="buyerKeyword != null and buyerKeyword != ''">
+            AND (
+                yao.buyer_phone LIKE CONCAT('%', #{buyerKeyword}, '%')
+                OR yao.open_id LIKE CONCAT('%', #{buyerKeyword}, '%')
+                OR CAST(yao.buyer_id AS CHAR) LIKE CONCAT('%', #{buyerKeyword}, '%')
+            )
+        </if>
+        <if test="skuKeyword != null and skuKeyword != ''">
+            AND (
+                yao.sku_version_text LIKE CONCAT('%', #{skuKeyword}, '%')
+                OR yao.sku_interval_text LIKE CONCAT('%', #{skuKeyword}, '%')
+            )
+        </if>
+        <if test="status != null">
+            AND yao.status = #{status}
+        </if>
+        <if test="useStatus != null and useStatus != ''">
+            AND yao.use_status = #{useStatus}
+        </if>
+        <if test="payStartTime != null">
+            AND yao.pay_time_at &gt;= #{payStartTime}
+        </if>
+        <if test="payEndTime != null">
+            AND yao.pay_time_at &lt;= #{payEndTime}
+        </if>
+        ORDER BY yao.pay_time_at DESC, yao.id DESC
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.youzan.YzAppOrder" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO yz_app_order (
+            order_no, yz_shop_id, kdt_id, root_kdt_id, app_id, buyer_id, buyer_phone, open_id,
+            shop_name, shop_display_no, shop_type, shop_role, sku_version_text, sku_interval_text,
+            price, status, pay_time, pay_time_at, env, use_status, used_mt_shop_id, used_right_code,
+            used_at, used_by_user_id, used_by_username, use_remark, raw_payload_json, callback_event_id,
+            create_time, update_time
+        ) VALUES (
+            #{orderNo}, #{yzShopId}, #{kdtId}, #{rootKdtId}, #{appId}, #{buyerId}, #{buyerPhone}, #{openId},
+            #{shopName}, #{shopDisplayNo}, #{shopType}, #{shopRole}, #{skuVersionText}, #{skuIntervalText},
+            #{price}, #{status}, #{payTime}, #{payTimeAt}, #{env}, #{useStatus}, #{usedMtShopId}, #{usedRightCode},
+            #{usedAt}, #{usedByUserId}, #{usedByUsername}, #{useRemark}, #{rawPayloadJson}, #{callbackEventId},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.youzan.YzAppOrder">
+        UPDATE yz_app_order
+        SET yz_shop_id = #{yzShopId},
+            kdt_id = #{kdtId},
+            root_kdt_id = #{rootKdtId},
+            app_id = #{appId},
+            buyer_id = #{buyerId},
+            buyer_phone = #{buyerPhone},
+            open_id = #{openId},
+            shop_name = #{shopName},
+            shop_display_no = #{shopDisplayNo},
+            shop_type = #{shopType},
+            shop_role = #{shopRole},
+            sku_version_text = #{skuVersionText},
+            sku_interval_text = #{skuIntervalText},
+            price = #{price},
+            status = #{status},
+            pay_time = #{payTime},
+            pay_time_at = #{payTimeAt},
+            env = #{env},
+            raw_payload_json = #{rawPayloadJson},
+            callback_event_id = #{callbackEventId},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateUseStatus" parameterType="com.gogoga.backend.entity.youzan.YzAppOrder">
+        UPDATE yz_app_order
+        SET use_status = #{useStatus},
+            used_mt_shop_id = #{usedMtShopId},
+            used_right_code = #{usedRightCode},
+            used_at = #{usedAt},
+            used_by_user_id = #{usedByUserId},
+            used_by_username = #{usedByUsername},
+            use_remark = #{useRemark},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

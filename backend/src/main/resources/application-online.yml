@@ -1,0 +1,12 @@
+mt:
+  promotion:
+    write-dry-run: ${MT_PROMOTION_WRITE_DRY_RUN:false}
+    async-task:
+      enabled: ${MT_PROMOTION_ASYNC_TASK_ENABLED:true}
+      worker-enabled: ${MT_PROMOTION_ASYNC_TASK_WORKER_ENABLED:true}
+
+# power:
+#   recharge:
+#     exact-price-overrides:
+#       - power-amount: 10000000
+#         unit-price-fen: 10

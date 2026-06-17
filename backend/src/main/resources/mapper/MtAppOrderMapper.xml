@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtAppOrderMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtAppOrder">
+        <id column="id" property="id"/>
+        <result column="order_id" property="orderId"/>
+        <result column="order_view_id" property="orderViewId"/>
+        <result column="app_id" property="appId"/>
+        <result column="service_code" property="serviceCode"/>
+        <result column="pay_status" property="payStatus"/>
+        <result column="version" property="version"/>
+        <result column="version_name" property="versionName"/>
+        <result column="days" property="days"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="right_status" property="rightStatus"/>
+        <result column="real_pay_price" property="realPayPrice"/>
+        <result column="order_time" property="orderTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="type" property="type"/>
+        <result column="address" property="address"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="phone" property="phone"/>
+        <result column="shop_id" property="shopId"/>
+    </resultMap>
+
+    <resultMap id="AdminMtAppOrderRowVOResultMap" type="com.gogoga.backend.vo.AdminMtAppOrderRowVO">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="order_id" property="orderId"/>
+        <result column="order_view_id" property="orderViewId"/>
+        <result column="app_id" property="appId"/>
+        <result column="service_code" property="serviceCode"/>
+        <result column="pay_status" property="payStatus"/>
+        <result column="version" property="version"/>
+        <result column="version_name" property="versionName"/>
+        <result column="days" property="days"/>
+        <result column="right_status" property="rightStatus"/>
+        <result column="real_pay_price" property="realPayPrice"/>
+        <result column="type" property="type"/>
+        <result column="address" property="address"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="phone" property="phone"/>
+        <result column="start_time_at" property="startTime"/>
+        <result column="end_time_at" property="endTime"/>
+        <result column="order_time_at" property="orderTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="AdminMtAppOrderSettlementRowVOResultMap" type="com.gogoga.backend.vo.AdminMtAppOrderSettlementRowVO">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="order_id" property="orderId"/>
+        <result column="phone" property="phone"/>
+        <result column="pay_status" property="payStatus"/>
+        <result column="version" property="version"/>
+        <result column="version_name" property="versionName"/>
+        <result column="days" property="days"/>
+        <result column="real_pay_price" property="paidAmountFen"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="start_time_at" property="startTime"/>
+        <result column="end_time_at" property="endTime"/>
+        <result column="order_time_at" property="orderTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, order_id, order_view_id, app_id, service_code, pay_status, version, version_name, days,
+        start_time, end_time, right_status, real_pay_price, order_time, create_time, update_time,
+        type, address, shop_name, phone, shop_id
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_app_order
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByOrderId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_app_order
+        WHERE order_id = #{orderId}
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestOrderTime" resultType="java.lang.Long">
+        SELECT order_time
+        FROM mt_app_order
+        WHERE order_time IS NOT NULL
+        ORDER BY order_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectPendingRightOrders" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_app_order
+        WHERE type = 0
+          AND shop_id IS NOT NULL
+          AND version IS NOT NULL
+          AND version != ''
+          AND end_time IS NOT NULL
+        ORDER BY order_time ASC, id ASC
+    </select>
+
+    <select id="selectAdminPage" resultMap="AdminMtAppOrderRowVOResultMap">
+        SELECT mao.id,
+               mao.shop_id,
+               shop.poi_id,
+               mao.order_id,
+               mao.order_view_id,
+               mao.app_id,
+               mao.service_code,
+               mao.pay_status,
+               mao.version,
+               mao.version_name,
+               mao.days,
+               mao.right_status,
+               mao.real_pay_price,
+               mao.type,
+               mao.address,
+               mao.shop_name,
+               mao.phone,
+               CASE WHEN mao.start_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.start_time) END AS start_time_at,
+               CASE WHEN mao.end_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.end_time) END AS end_time_at,
+               CASE WHEN mao.order_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.order_time) END AS order_time_at,
+               mao.create_time,
+               mao.update_time
+        FROM mt_app_order mao
+        LEFT JOIN mt_shop shop ON shop.id = mao.shop_id
+        WHERE mao.shop_id IS NOT NULL
+        <if test="orderId != null and orderId != ''">
+            AND mao.order_id LIKE CONCAT('%', #{orderId}, '%')
+        </if>
+        <if test="orderViewId != null and orderViewId != ''">
+            AND mao.order_view_id LIKE CONCAT('%', #{orderViewId}, '%')
+        </if>
+        <if test="poiId != null and poiId != ''">
+            AND shop.poi_id LIKE CONCAT('%', #{poiId}, '%')
+        </if>
+        <if test="shopName != null and shopName != ''">
+            AND mao.shop_name LIKE CONCAT('%', #{shopName}, '%')
+        </if>
+        <if test="payStatus != null">
+            AND mao.pay_status = #{payStatus}
+        </if>
+        <if test="rightStatus != null and rightStatus != ''">
+            AND mao.right_status = #{rightStatus}
+        </if>
+        <if test="version != null and version != ''">
+            AND mao.version = #{version}
+        </if>
+        <if test="versionName != null and versionName != ''">
+            AND mao.version_name = #{versionName}
+        </if>
+        <if test="orderStartTime != null">
+            AND mao.order_time &gt;= #{orderStartTime}
+        </if>
+        <if test="orderEndTime != null">
+            AND mao.order_time &lt;= #{orderEndTime}
+        </if>
+        <choose>
+            <when test="targetUserId != null and targetUserId != ''">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id = #{targetUserId}
+                )
+            </when>
+            <when test="scopeType == 'SELF'">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id = #{currentUserId}
+                )
+            </when>
+            <when test="scopeType == 'TEAM' and visibleUserIds != null and visibleUserIds.size() &gt; 0">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id IN
+                      <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+                          #{userId}
+                      </foreach>
+                )
+            </when>
+        </choose>
+        ORDER BY mao.order_time DESC, mao.id DESC
+    </select>
+
+    <select id="selectAdminVersionOptions" resultType="com.gogoga.backend.vo.AdminMtAppOrderVersionOptionVO">
+        SELECT DISTINCT
+               mao.version AS version,
+               mao.version_name AS versionName
+        FROM mt_app_order mao
+        WHERE mao.shop_id IS NOT NULL
+          AND mao.version IS NOT NULL
+          AND mao.version != ''
+        <choose>
+            <when test="scopeType == 'SELF'">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id = #{currentUserId}
+                )
+            </when>
+            <when test="scopeType == 'TEAM' and visibleUserIds != null and visibleUserIds.size() &gt; 0">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id IN
+                      <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+                          #{userId}
+                      </foreach>
+                )
+            </when>
+        </choose>
+        ORDER BY mao.version ASC, mao.version_name ASC
+    </select>
+
+    <select id="selectSettlementCandidates" resultMap="AdminMtAppOrderSettlementRowVOResultMap">
+        SELECT mao.id,
+               mao.shop_id,
+               shop.poi_id,
+               mao.order_id,
+               COALESCE(NULLIF(shop.contact_phone, ''), NULLIF(shop.phone, ''), NULLIF(mao.phone, '')) AS phone,
+               mao.pay_status,
+               mao.version,
+               mao.version_name,
+               mao.days,
+               mao.real_pay_price,
+               mao.shop_name,
+               CASE WHEN mao.start_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.start_time) END AS start_time_at,
+               CASE WHEN mao.end_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.end_time) END AS end_time_at,
+               CASE WHEN mao.order_time IS NULL THEN NULL ELSE FROM_UNIXTIME(mao.order_time) END AS order_time_at
+        FROM mt_app_order mao
+        LEFT JOIN mt_shop shop ON shop.id = mao.shop_id
+        WHERE mao.shop_id IS NOT NULL
+          AND mao.pay_status = #{paidPayStatus}
+          AND mao.real_pay_price > 0
+          AND mao.start_time IS NOT NULL
+          AND mao.end_time IS NOT NULL
+          AND mao.start_time &lt;= #{serviceEndTime}
+          AND mao.end_time &gt;= #{serviceStartTime}
+        <if test="poiId != null and poiId != ''">
+            AND shop.poi_id = #{poiId}
+        </if>
+        <choose>
+            <when test="scopeType == 'SELF'">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id = #{currentUserId}
+                )
+            </when>
+            <when test="scopeType == 'TEAM' and visibleUserIds != null and visibleUserIds.size() &gt; 0">
+                AND EXISTS (
+                    SELECT 1
+                    FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = mao.shop_id
+                      AND usb.user_id IN
+                      <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+                          #{userId}
+                      </foreach>
+                )
+            </when>
+        </choose>
+        ORDER BY mao.order_time DESC, mao.id DESC
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAppOrder" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_app_order (
+            order_id, order_view_id, app_id, service_code, pay_status, version, version_name, days,
+            start_time, end_time, right_status, real_pay_price, order_time, create_time, update_time,
+            type, address, shop_name, phone, shop_id
+        ) VALUES (
+            #{orderId}, #{orderViewId}, #{appId}, #{serviceCode}, #{payStatus}, #{version}, #{versionName},
+            #{days}, #{startTime}, #{endTime}, #{rightStatus}, #{realPayPrice}, #{orderTime}, #{createTime},
+            #{updateTime}, #{type}, #{address}, #{shopName}, #{phone}, #{shopId}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtAppOrder">
+        UPDATE mt_app_order
+        SET order_view_id = #{orderViewId},
+            app_id = #{appId},
+            service_code = #{serviceCode},
+            pay_status = #{payStatus},
+            version = #{version},
+            version_name = #{versionName},
+            days = #{days},
+            start_time = #{startTime},
+            end_time = #{endTime},
+            right_status = #{rightStatus},
+            real_pay_price = #{realPayPrice},
+            order_time = #{orderTime},
+            update_time = #{updateTime},
+            type = #{type},
+            address = #{address},
+            shop_name = #{shopName},
+            phone = #{phone},
+            shop_id = #{shopId}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

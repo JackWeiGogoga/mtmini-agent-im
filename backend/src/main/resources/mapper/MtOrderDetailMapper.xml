@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtOrderDetailMapper">
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtOrderDetail" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_order_detail (
+            app_food_code, food_name, sku_id, quantity, price, box_num, box_price, unit, food_property,
+            spec, mt_sku_id, mt_spu_id, mt_tag_id, tag_name, mtorder_id, create_time, update_time
+        ) VALUES (
+            #{appFoodCode}, #{foodName}, #{skuId}, #{quantity}, #{price}, #{boxNum}, #{boxPrice}, #{unit},
+            #{foodProperty}, #{spec}, #{mtSkuId}, #{mtSpuId}, #{mtTagId}, #{tagName}, #{mtOrderId},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <delete id="deleteByMtOrderId" parameterType="java.lang.String">
+        DELETE FROM mt_order_detail
+        WHERE mtorder_id = #{mtOrderId}
+    </delete>
+
+</mapper>

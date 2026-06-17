@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPromotionAdHourlyDetailMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPromotionAdHourlyDetail">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="biz_date" property="bizDate"/>
+        <result column="channel" property="channel"/>
+        <result column="time_range" property="timeRange"/>
+        <result column="show_count" property="showCount"/>
+        <result column="click_count" property="clickCount"/>
+        <result column="debit_cents" property="debitCents"/>
+        <result column="payload_json" property="payloadJson"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, biz_date, channel, time_range, show_count, click_count, debit_cents, payload_json, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndBizDateAndChannelAndTimeRange" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_promotion_ad_hourly_detail
+        WHERE shop_id = #{shopId}
+          AND biz_date = #{bizDate}
+          AND channel = #{channel}
+          AND time_range = #{timeRange}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopIdAndBizDateAndChannel" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_promotion_ad_hourly_detail
+        WHERE shop_id = #{shopId}
+          AND biz_date = #{bizDate}
+          AND channel = #{channel}
+        ORDER BY time_range ASC
+    </select>
+
+    <insert id="insertOrUpdate" parameterType="com.gogoga.backend.entity.mt.MtPromotionAdHourlyDetail"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_promotion_ad_hourly_detail (
+            shop_id, biz_date, channel, time_range, show_count, click_count, debit_cents, payload_json, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{bizDate}, #{channel}, #{timeRange}, #{showCount}, #{clickCount}, #{debitCents}, #{payloadJson}, #{createTime}, #{updateTime}
+        )
+        ON DUPLICATE KEY UPDATE
+            show_count = VALUES(show_count),
+            click_count = VALUES(click_count),
+            debit_cents = VALUES(debit_cents),
+            payload_json = VALUES(payload_json),
+            update_time = VALUES(update_time)
+    </insert>
+
+    <delete id="deleteByShopIdAndBizDateAndChannel">
+        DELETE FROM mt_promotion_ad_hourly_detail
+        WHERE shop_id = #{shopId}
+          AND biz_date = #{bizDate}
+          AND channel = #{channel}
+    </delete>
+</mapper>

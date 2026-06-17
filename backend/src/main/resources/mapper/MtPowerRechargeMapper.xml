@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtPowerRechargeMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtPowerRecharge">
+        <id column="id" property="id"/>
+        <result column="recharge_no" property="rechargeNo"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="power_amount" property="powerAmount"/>
+        <result column="unit_power" property="unitPower"/>
+        <result column="unit_price_fen" property="unitPriceFen"/>
+        <result column="original_amount_fen" property="originalAmountFen"/>
+        <result column="discount_context_type" property="discountContextType"/>
+        <result column="discount_tag" property="discountTag"/>
+        <result column="discount_rate_basis_points" property="discountRateBasisPoints"/>
+        <result column="total_amount_fen" property="totalAmountFen"/>
+        <result column="redemption_code_id" property="redemptionCodeId"/>
+        <result column="redemption_code" property="redemptionCode"/>
+        <result column="sales_user_id" property="salesUserId"/>
+        <result column="sales_user_phone" property="salesUserPhone"/>
+        <result column="commission_window_start_at" property="commissionWindowStartAt"/>
+        <result column="default_commission_ratio" property="defaultCommissionRatio"/>
+        <result column="pay_channel" property="payChannel"/>
+        <result column="pay_status" property="payStatus"/>
+        <result column="payment_order_no" property="paymentOrderNo"/>
+        <result column="transaction_id" property="transactionId"/>
+        <result column="pay_payload" property="payPayload"/>
+        <result column="notify_payload" property="notifyPayload"/>
+        <result column="paid_at" property="paidAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, recharge_no, shop_id, power_amount, unit_power, unit_price_fen, original_amount_fen, discount_context_type,
+        discount_tag, discount_rate_basis_points, total_amount_fen, redemption_code_id, redemption_code, sales_user_id,
+        sales_user_phone, commission_window_start_at, default_commission_ratio, pay_channel, pay_status, payment_order_no,
+        transaction_id, pay_payload, notify_payload, paid_at, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByRechargeNo" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE recharge_no = #{rechargeNo}
+        LIMIT 1
+    </select>
+
+    <select id="selectByPaymentOrderNo" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE payment_order_no = #{paymentOrderNo}
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE shop_id = #{shopId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectFirstSalesRechargeByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE shop_id = #{shopId}
+          AND sales_user_id IS NOT NULL
+        ORDER BY id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE shop_id = #{shopId}
+        ORDER BY id DESC
+    </select>
+
+    <select id="selectByShopIdAndCreateTimeBetween" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_power_recharge
+        WHERE shop_id = #{shopId}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+        ORDER BY id DESC
+    </select>
+
+    <sql id="AdminRechargeOrderJoinColumns">
+        src.id,
+        src.recharge_no AS rechargeNo,
+        src.shop_id AS shopId,
+        shop.poi_id AS poiId,
+        shop.epoi_id AS epoiId,
+        COALESCE(shop.poi_name, shop.name) AS shopName,
+        src.power_amount AS powerAmount,
+        src.unit_power AS unitPower,
+        src.unit_price_fen AS unitPriceFen,
+        src.original_amount_fen AS originalAmountFen,
+        src.total_amount_fen AS totalAmountFen,
+        src.discount_context_type AS discountContextType,
+        src.discount_tag AS discountTag,
+        src.discount_rate_basis_points AS discountRateBasisPoints,
+        src.redemption_code AS redemptionCode,
+        src.sales_user_id AS salesUserId,
+        COALESCE(u.nickname, u.username, src.sales_user_id) AS salesUserName,
+        src.sales_user_phone AS salesUserPhone,
+        src.commission_window_start_at AS commissionWindowStartAt,
+        src.default_commission_ratio AS defaultCommissionRatio,
+        src.pay_channel AS payChannel,
+        src.pay_status AS payStatus,
+        src.payment_order_no AS paymentOrderNo,
+        src.transaction_id AS transactionId,
+        src.paid_at AS paidAt,
+        src.create_time AS createTime,
+        src.update_time AS updateTime
+    </sql>
+
+    <select id="selectAdminRechargeOrderList" resultType="com.gogoga.backend.vo.AdminPowerRechargeOrderRowVO">
+        SELECT <include refid="AdminRechargeOrderJoinColumns"/>
+        FROM mt_power_recharge src
+        LEFT JOIN mt_shop shop ON shop.id = src.shop_id
+        LEFT JOIN ai_user u ON u.user_id = src.sales_user_id
+        WHERE 1 = 1
+        <if test="keyword != null and keyword != ''">
+            AND (
+                src.recharge_no LIKE CONCAT('%', #{keyword}, '%')
+                OR src.payment_order_no LIKE CONCAT('%', #{keyword}, '%')
+                OR src.transaction_id LIKE CONCAT('%', #{keyword}, '%')
+                OR src.redemption_code LIKE CONCAT('%', #{keyword}, '%')
+                OR src.sales_user_phone LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(u.nickname, u.username, src.sales_user_id) LIKE CONCAT('%', #{keyword}, '%')
+                OR shop.poi_id LIKE CONCAT('%', #{keyword}, '%')
+                OR shop.epoi_id LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(shop.poi_name, shop.name) LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="payStatus != null">
+            AND src.pay_status = #{payStatus}
+        </if>
+        <if test="startTime != null">
+            AND src.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND src.create_time &lt;= #{endTime}
+        </if>
+        ORDER BY src.id DESC
+    </select>
+
+    <select id="selectAdminRechargeOrderDetailById" resultType="com.gogoga.backend.vo.AdminPowerRechargeOrderDetailVO">
+        SELECT <include refid="AdminRechargeOrderJoinColumns"/>
+        FROM mt_power_recharge src
+        LEFT JOIN mt_shop shop ON shop.id = src.shop_id
+        LEFT JOIN ai_user u ON u.user_id = src.sales_user_id
+        WHERE src.id = #{id}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtPowerRecharge" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_power_recharge (
+            recharge_no, shop_id, power_amount, unit_power, unit_price_fen, original_amount_fen, discount_context_type,
+            discount_tag, discount_rate_basis_points, total_amount_fen, redemption_code_id, redemption_code, sales_user_id,
+            sales_user_phone, commission_window_start_at, default_commission_ratio, pay_channel, pay_status, payment_order_no,
+            transaction_id, pay_payload, notify_payload, paid_at, create_time, update_time
+        ) VALUES (
+            #{rechargeNo}, #{shopId}, #{powerAmount}, #{unitPower}, #{unitPriceFen}, #{originalAmountFen},
+            #{discountContextType}, #{discountTag}, #{discountRateBasisPoints}, #{totalAmountFen}, #{redemptionCodeId},
+            #{redemptionCode}, #{salesUserId}, #{salesUserPhone}, #{commissionWindowStartAt}, #{defaultCommissionRatio},
+            #{payChannel}, #{payStatus}, #{paymentOrderNo}, #{transactionId}, #{payPayload}, #{notifyPayload}, #{paidAt},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtPowerRecharge">
+        UPDATE mt_power_recharge
+        SET recharge_no = #{rechargeNo},
+            shop_id = #{shopId},
+            power_amount = #{powerAmount},
+            unit_power = #{unitPower},
+            unit_price_fen = #{unitPriceFen},
+            original_amount_fen = #{originalAmountFen},
+            discount_context_type = #{discountContextType},
+            discount_tag = #{discountTag},
+            discount_rate_basis_points = #{discountRateBasisPoints},
+            total_amount_fen = #{totalAmountFen},
+            redemption_code_id = #{redemptionCodeId},
+            redemption_code = #{redemptionCode},
+            sales_user_id = #{salesUserId},
+            sales_user_phone = #{salesUserPhone},
+            commission_window_start_at = #{commissionWindowStartAt},
+            default_commission_ratio = #{defaultCommissionRatio},
+            pay_channel = #{payChannel},
+            pay_status = #{payStatus},
+            payment_order_no = #{paymentOrderNo},
+            transaction_id = #{transactionId},
+            pay_payload = #{payPayload},
+            notify_payload = #{notifyPayload},
+            paid_at = #{paidAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markSuccess">
+        UPDATE mt_power_recharge
+        SET pay_status = 2,
+            transaction_id = #{transactionId},
+            notify_payload = #{notifyPayload},
+            paid_at = #{paidAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND pay_status != 2
+    </update>
+
+    <update id="updateStatus">
+        UPDATE mt_power_recharge
+        SET pay_status = #{payStatus},
+            transaction_id = #{transactionId},
+            notify_payload = #{notifyPayload},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND pay_status != 2
+    </update>
+</mapper>

@@ -1,0 +1,25 @@
+{
+  "code": "OP_SUCCESS",
+  "msg": "成功",
+  "traceId": "8383799094341940656",
+  "data": {
+    "result": { "success": true, "code": "0", "message": "success" },
+    "adDataInfoList": [
+      {
+        "time": "2026-04-12",
+        "show": "J6Y2V760wnAHXG79UTIe8Q==",
+        "click": "62/SPyGfHfwcl4Nv74ZGNw==",
+        "debit": "7ajzeNT/dpRAgOBlItrmTA=="
+      },
+      {
+        "time": "2026-04-13",
+        "show": "5XmMDSnJWl5fNf65QWAGWw==",
+        "click": "5XmMDSnJWl5fNf65QWAGWw==",
+        "debit": "5XmMDSnJWl5fNf65QWAGWw=="
+      }
+    ],
+    "show": "J6Y2V760wnAHXG79UTIe8Q==",
+    "click": "62/SPyGfHfwcl4Nv74ZGNw==",
+    "debit": "7ajzeNT/dpRAgOBlItrmTA=="
+  }
+}

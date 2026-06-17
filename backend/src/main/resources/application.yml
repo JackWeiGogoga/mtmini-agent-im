@@ -1,0 +1,297 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  servlet:
+    encoding:
+      force: true
+      enabled: true
+      charset: utf-8
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    max-http-form-post-size: -1
+    background-processor-delay: 30
+    redirect-context-root: true
+    uri-encoding: UTF-8
+    basedir: ./
+    accesslog:
+      enabled: true
+      buffered: true
+      directory: logs
+      file-date-format: .yyyy-MM-dd
+      pattern: '%h %l %u %t "%r" %s %b %{ms}Tms "%{Referer}i" "%{User-Agent}i" "%{X-Request-ID}i" "%{X-Forwarded-For}i"'
+      prefix: access_log
+      rename-on-rotate: false
+      request-attributes-enabled: false
+      rotate: true
+      suffix: .log
+
+spring:
+  application:
+    name: backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:60s}
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/project-template?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      database: ${SPRING_DATA_REDIS_DATABASE:0}
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.gogoga.backend.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+pagehelper:
+  helper-dialect: mysql
+  reasonable: true
+  support-methods-arguments: true
+  params: count=countSql
+
+logging:
+  level:
+    root: INFO
+    "[com.gogoga.backend]": INFO
+    "[com.gogoga.backend.mapper]": INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+
+oauth:
+  success-url: ${OAUTH_SUCCESS_URL:http://localhost:5173}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+    client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/oauth/callback/google}
+  github:
+    client-id: ${GITHUB_CLIENT_ID:your-github-client-id}
+    client-secret: ${GITHUB_CLIENT_SECRET:your-github-client-secret}
+    redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:5173/oauth/callback/github}
+
+sms:
+  mock-enabled: ${SMS_MOCK_ENABLED:false}
+  code-expire-seconds: 300
+  send-interval-seconds: 60
+  daily-send-limit: 20
+  verify-fail-limit: 5
+  ip-minute-send-limit: 10
+  ip-daily-send-limit: 100
+  tencent:
+    secret-id: ${TENCENT_SMS_SECRET_ID:your-secret-id}
+    secret-key: ${TENCENT_SMS_SECRET_KEY:your-secret-key}
+    sdk-app-id: ${TENCENT_SMS_SDK_APP_ID:1400000000}
+    sign-name: ${TENCENT_SMS_SIGN_NAME:your-sign-name}
+    login-template-id: ${TENCENT_SMS_LOGIN_TEMPLATE_ID:000000}
+    region: ${TENCENT_SMS_REGION:ap-guangzhou}
+    endpoint: ${TENCENT_SMS_ENDPOINT:sms.tencentcloudapi.com}
+
+cos:
+  enabled: ${COS_ENABLED:true}
+  secret-id: ${COS_SECRET_ID:}
+  secret-key: ${COS_SECRET_KEY:}
+  region: ${COS_REGION:ap-beijing}
+  bucket: ${COS_BUCKET:mtmini-receipt-code-1311487792}
+  public-access-url-base: ${COS_PUBLIC_ACCESS_URL_BASE:}
+  receipt-code:
+    key-prefix: ${COS_RECEIPT_CODE_KEY_PREFIX:sales/receipt-code}
+    private-read: ${COS_RECEIPT_CODE_PRIVATE_READ:true}
+    access-url-expire-seconds: ${COS_RECEIPT_CODE_ACCESS_URL_EXPIRE_SECONDS:1800}
+    max-file-size: ${COS_RECEIPT_CODE_MAX_FILE_SIZE:2MB}
+
+scheduled:
+  enabled: ${SCHEDULED_ENABLED:true}
+
+mt:
+  developer-id: ${MT_DEVELOPER_ID:}
+  sign-key: ${MT_SIGN_KEY:}
+  business-id: ${MT_BUSINESS_ID:16}
+  callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aia.waimaidashi.com/#/}
+  h5:
+    app-key: ${MT_H5_APP_KEY:}
+  token:
+    refresh-cron: ${MT_TOKEN_REFRESH_CRON:0 */10 * * * ?}
+    refresh-before-expiry-seconds: ${MT_TOKEN_REFRESH_BEFORE_EXPIRY_SECONDS:1800}
+    history:
+      encryption-key: ${MT_TOKEN_HISTORY_ENCRYPTION_KEY:local-dev-token-history-key-change-me}
+      fingerprint-key: ${MT_TOKEN_HISTORY_FINGERPRINT_KEY:}
+  app-order:
+    pull-cron: ${MT_APP_ORDER_PULL_CRON:0 0/30 * * * ?}
+    app-id: ${MT_APP_ORDER_APP_ID:111}
+    page-size: ${MT_APP_ORDER_PAGE_SIZE:100}
+    lookback-seconds: ${MT_APP_ORDER_LOOKBACK_SECONDS:172800}
+  promotion-ad-data:
+    pull-cron: ${MT_PROMOTION_AD_DATA_PULL_CRON:0 30 13 * * ?}
+  promotion:
+    auto-bid-cron: ${MT_PROMOTION_AUTO_BID_CRON:0 */10 * * * ?}
+    write-dry-run: ${MT_PROMOTION_WRITE_DRY_RUN:true}
+    async-task:
+      enabled: ${MT_PROMOTION_ASYNC_TASK_ENABLED:false}
+      worker-enabled: ${MT_PROMOTION_ASYNC_TASK_WORKER_ENABLED:false}
+      dispatch-page-size: ${MT_PROMOTION_ASYNC_TASK_DISPATCH_PAGE_SIZE:200}
+      poll-size: ${MT_PROMOTION_ASYNC_TASK_POLL_SIZE:20}
+      poll-delay-ms: ${MT_PROMOTION_ASYNC_TASK_POLL_DELAY_MS:1000}
+      recovery-delay-ms: ${MT_PROMOTION_ASYNC_TASK_RECOVERY_DELAY_MS:30000}
+      recovery-limit: ${MT_PROMOTION_ASYNC_TASK_RECOVERY_LIMIT:20}
+      executor-core-pool-size: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_CORE_POOL_SIZE:4}
+      executor-max-pool-size: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_MAX_POOL_SIZE:8}
+      executor-queue-capacity: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
+      auto-bid-shop-lock-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_SHOP_LOCK_SECONDS:300}
+      order-notify-lock-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_LOCK_SECONDS:60}
+      auto-bid-busy-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_BUSY_BACKOFF_SECONDS:30}
+      order-notify-busy-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_BUSY_BACKOFF_SECONDS:5}
+      order-notify:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_TIMEOUT_SECONDS:180}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_INITIAL_BACKOFF_SECONDS:30}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_MAX_BACKOFF_SECONDS:300}
+      cleanup:
+        enabled: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_ENABLED:false}
+        delay-ms: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
+        batch-size: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_BATCH_SIZE:1000}
+        success-retention-days: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_SUCCESS_RETENTION_DAYS:7}
+        dead-retention-days: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_DEAD_RETENTION_DAYS:30}
+        lock-seconds: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_LOCK_SECONDS:300}
+      auto-bid:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_TIMEOUT_SECONDS:300}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_INITIAL_BACKOFF_SECONDS:60}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_MAX_BACKOFF_SECONDS:1800}
+      log-markdown:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_TIMEOUT_SECONDS:180}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_INITIAL_BACKOFF_SECONDS:60}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_MAX_BACKOFF_SECONDS:600}
+      auth-sync-rights:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
+      auth-backfill-poi-id:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_TIMEOUT_SECONDS:180}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_INITIAL_BACKOFF_SECONDS:60}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_BACKOFF_SECONDS:900}
+      auth-sync-recent-ad-data:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_TIMEOUT_SECONDS:300}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_INITIAL_BACKOFF_SECONDS:120}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_MAX_BACKOFF_SECONDS:1800}
+      auth-historical-order-backfill:
+        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_RETRY_COUNT:3}
+        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_TIMEOUT_SECONDS:600}
+        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_INITIAL_BACKOFF_SECONDS:300}
+        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_BACKOFF_SECONDS:3600}
+    llm:
+      model: ${MT_PROMOTION_LLM_MODEL:deepseek-v3.2}
+      success-log-prompt-resource: ${MT_PROMOTION_LLM_SUCCESS_LOG_PROMPT_RESOURCE:prompts/promotion-log-success-prompt.txt}
+      initial-success-log-prompt-resource: ${MT_PROMOTION_LLM_INITIAL_SUCCESS_LOG_PROMPT_RESOURCE:prompts/promotion-log-initial-success-prompt.txt}
+      exception-log-prompt-resource: ${MT_PROMOTION_LLM_EXCEPTION_LOG_PROMPT_RESOURCE:prompts/promotion-log-exception-prompt.txt}
+
+youzan:
+  client-id: ${YOUZAN_CLIENT_ID:}
+  client-secret: ${YOUZAN_CLIENT_SECRET:}
+  token-url: ${YOUZAN_TOKEN_URL:https://open.youzanyun.com/auth/token}
+  callback:
+    url-charset: ${YOUZAN_CALLBACK_URL_CHARSET:GBK}
+  token:
+    refresh-cron: ${YOUZAN_TOKEN_REFRESH_CRON:0 */10 * * * ?}
+    refresh-before-expiry-seconds: ${YOUZAN_TOKEN_REFRESH_BEFORE_EXPIRY_SECONDS:1800}
+    timeout-millis: ${YOUZAN_TOKEN_TIMEOUT_MILLIS:5000}
+  right:
+    promotion-service-code: ${YOUZAN_RIGHT_PROMOTION_SERVICE_CODE:H5_PROMOTION}
+    app-open-only-service-code: ${YOUZAN_RIGHT_APP_OPEN_ONLY_SERVICE_CODE:MT_APP_OPEN_ONLY}
+
+power:
+  min-purchase-amount: ${POWER_MIN_PURCHASE_AMOUNT:1000000}
+  max-purchase-amount: ${POWER_MAX_PURCHASE_AMOUNT:1000000000}
+  unit-power: ${POWER_UNIT_POWER:100000}
+  unit-price-fen: ${POWER_UNIT_PRICE_FEN:100}
+  new-authorized-shop-grant-amount: ${POWER_NEW_AUTHORIZED_SHOP_GRANT_AMOUNT:800000}
+  recharge:
+    first-recharge-valid-days: ${POWER_RECHARGE_FIRST_RECHARGE_VALID_DAYS:3}
+    first-recharge-recommended-packages:
+      - 6000000
+      - 10000000
+      - 50000000
+      - 100000000
+    regular-recharge-recommended-packages:
+      - 6000000
+      - 10000000
+      - 50000000
+      - 100000000
+    first-recharge-discount-tiers:
+      - min-power-amount: 1000000
+        max-power-amount: 9990000
+        pay-rate: 1
+      - min-power-amount: 10000000
+        max-power-amount: 99990000
+        pay-rate: 0.8
+      - min-power-amount: 100000000
+        pay-rate: 0.7
+    regular-recharge-discount-tiers:
+      - min-power-amount: 1000000
+        max-power-amount: 9990000
+        pay-rate: 1
+      - min-power-amount: 10000000
+        max-power-amount: 49990000
+        pay-rate: 0.95
+      - min-power-amount: 50000000
+        max-power-amount: 99990000
+        pay-rate: 0.85
+      - min-power-amount: 100000000
+        pay-rate: 0.7
+  billing:
+    power-per-yuan: ${POWER_BILLING_POWER_PER_YUAN:100000}
+    meituan-paid-api-price-yuan: ${POWER_BILLING_MEITUAN_PAID_API_PRICE_YUAN:0.015}
+    llm-prompt-price-per-thousand-tokens-yuan: ${POWER_BILLING_LLM_PROMPT_PRICE_PER_THOUSAND_TOKENS_YUAN:0.01}
+    llm-completion-price-per-thousand-tokens-yuan: ${POWER_BILLING_LLM_COMPLETION_PRICE_PER_THOUSAND_TOKENS_YUAN:0.015}
+  wechat-pay:
+    mock-enabled: ${POWER_WECHAT_PAY_MOCK_ENABLED:false}
+    mch-id: ${POWER_WECHAT_PAY_MCH_ID:}
+    merchant-serial-number: ${POWER_WECHAT_PAY_MERCHANT_SERIAL_NUMBER:}
+    private-key-path: ${POWER_WECHAT_PAY_PRIVATE_KEY_PATH:}
+    api-v3-key: ${POWER_WECHAT_PAY_API_V3_KEY:}
+    platform-public-key-path: ${POWER_WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH:}
+    app-id: ${POWER_WECHAT_PAY_APP_ID:}
+    notify-url: ${POWER_WECHAT_PAY_NOTIFY_URL:http://localhost:8080/api/callbacks/wechat/pay}
+    wap-name: ${POWER_WECHAT_PAY_WAP_NAME:算力充值}
+    wap-url: ${POWER_WECHAT_PAY_WAP_URL:http://localhost:5173/#/pages/power/index}
+
+llm:
+  openai-compatible:
+    default-base-url: ${LLM_OPENAI_COMPATIBLE_DEFAULT_BASE_URL:https://api.lkeap.cloud.tencent.com/v1}
+    default-api-key: ${LLM_OPENAI_COMPATIBLE_DEFAULT_API_KEY:}

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtAccessTokenMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtAccessToken">
+        <id column="id" property="id"/>
+        <result column="access_token" property="accessToken"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="op_biz_code" property="opBizCode"/>
+        <result column="refresh_token" property="refreshToken"/>
+        <result column="expires_at" property="expiresAt"/>
+        <result column="auth_status" property="authStatus"/>
+        <result column="auth_status_changed_at" property="authStatusChangedAt"/>
+        <result column="last_auth_failure_at" property="lastAuthFailureAt"/>
+        <result column="order_push_blocked" property="orderPushBlocked"/>
+        <result column="order_push_last_sync_at" property="orderPushLastSyncAt"/>
+        <result column="order_push_last_sync_error" property="orderPushLastSyncError"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, access_token, shop_id, create_time, update_time, op_biz_code, refresh_token, expires_at,
+        auth_status, auth_status_changed_at, last_auth_failure_at,
+        order_push_blocked, order_push_last_sync_at, order_push_last_sync_error
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByOpBizCode" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE op_biz_code = #{opBizCode}
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE shop_id = #{shopId}
+        ORDER BY update_time DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectRefreshCandidates" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE refresh_token IS NOT NULL
+          AND refresh_token != ''
+          AND auth_status = 1
+          AND expires_at IS NOT NULL
+          AND expires_at &lt;= #{refreshBefore}
+    </select>
+
+    <select id="selectTrafficSyncCandidates" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE shop_id IS NOT NULL
+          AND access_token IS NOT NULL
+          AND access_token != ''
+          AND auth_status = 1
+          AND (expires_at IS NULL OR expires_at &gt; #{now})
+          AND EXISTS (
+                SELECT 1
+                FROM mt_shop_right r
+                WHERE r.shop_id = mt_access_token.shop_id
+                  AND r.service_code IN ('H5_PROMOTION', 'VIP_CODE')
+                  AND (
+                        (r.type = 2 AND r.expire_at IS NOT NULL AND r.expire_at &gt; #{now})
+                        OR (r.type != 2 AND r.remaining_times IS NOT NULL AND r.remaining_times &gt; 0)
+                      )
+            )
+        ORDER BY shop_id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAccessToken" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_access_token (
+            access_token, shop_id, create_time, update_time, op_biz_code, refresh_token, expires_at,
+            auth_status, auth_status_changed_at, last_auth_failure_at,
+            order_push_blocked, order_push_last_sync_at, order_push_last_sync_error
+        )
+        VALUES (
+            #{accessToken}, #{shopId}, #{createTime}, #{updateTime}, #{opBizCode}, #{refreshToken}, #{expiresAt},
+            #{authStatus}, #{authStatusChangedAt}, #{lastAuthFailureAt},
+            #{orderPushBlocked}, #{orderPushLastSyncAt}, #{orderPushLastSyncError}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtAccessToken">
+        UPDATE mt_access_token
+        SET access_token = #{accessToken},
+            shop_id = #{shopId},
+            update_time = #{updateTime},
+            op_biz_code = #{opBizCode},
+            refresh_token = #{refreshToken},
+            expires_at = #{expiresAt},
+            auth_status = #{authStatus},
+            auth_status_changed_at = #{authStatusChangedAt},
+            last_auth_failure_at = #{lastAuthFailureAt},
+            order_push_blocked = #{orderPushBlocked},
+            order_push_last_sync_at = #{orderPushLastSyncAt},
+            order_push_last_sync_error = #{orderPushLastSyncError}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateOrderPushSyncState">
+        UPDATE mt_access_token
+        SET order_push_blocked = #{orderPushBlocked},
+            order_push_last_sync_at = #{orderPushLastSyncAt},
+            order_push_last_sync_error = #{orderPushLastSyncError},
+            update_time = #{orderPushLastSyncAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateAuthStatusByShopId">
+        UPDATE mt_access_token
+        SET auth_status = #{authStatus},
+            auth_status_changed_at = #{authStatusChangedAt},
+            last_auth_failure_at = #{lastAuthFailureAt},
+            update_time = #{updateTime}
+        WHERE shop_id = #{shopId}
+    </update>
+
+</mapper>

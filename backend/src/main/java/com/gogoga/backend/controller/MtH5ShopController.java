@@ -1,0 +1,78 @@
+package com.gogoga.backend.controller;
+
+import com.gogoga.backend.annotation.RequiresLogin;
+import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.service.MtH5GuideStateService;
+import com.gogoga.backend.service.MtH5HomeDashboardService;
+import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.vo.MtH5GuideStateVO;
+import com.gogoga.backend.vo.MtH5HomeDashboardVO;
+import com.gogoga.backend.vo.MtH5HomeVO;
+import com.gogoga.backend.vo.MtH5TabStatusVO;
+import com.gogoga.backend.vo.ResultVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 美团 H5 门店接口
+ *
+ * @author system
+ * @since 2026-03-22
+ */
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/h5/shop")
+@RequiresLogin
+public class MtH5ShopController {
+
+    private final MtH5HomeDashboardService mtH5HomeDashboardService;
+    private final MtH5ShopService mtH5ShopService;
+    private final MtH5GuideStateService mtH5GuideStateService;
+
+    /**
+     * 获取 H5 首页门店信息
+     *
+     * @return 首页门店信息
+     */
+    @GetMapping("/home")
+    public ResultVO<MtH5HomeVO> getHomeInfo() {
+        return ResultVO.success(mtH5ShopService.getHomeInfo());
+    }
+
+    /**
+     * 获取 H5 首页聚合看板
+     *
+     * @return 首页聚合看板
+     */
+    @GetMapping("/home/dashboard")
+    public ResultVO<MtH5HomeDashboardVO> getHomeDashboard(
+            @RequestParam(defaultValue = "LAST_7_DAYS") String statsRange) {
+        return ResultVO.success(mtH5HomeDashboardService.getDashboard(DashboardStatsRangeTypeEnum.fromValue(statsRange)));
+    }
+
+    /**
+     * 获取 H5 底部 tab 状态
+     *
+     * @return tab 状态
+     */
+    @GetMapping("/tab-status")
+    public ResultVO<MtH5TabStatusVO> getTabStatus() {
+        return ResultVO.success(mtH5HomeDashboardService.getTabStatus());
+    }
+
+    /**
+     * 标记 H5 引导完成
+     *
+     * @param guideCode 引导编码
+     * @return 引导状态
+     */
+    @PostMapping("/guides/{guideCode}/complete")
+    public ResultVO<MtH5GuideStateVO> completeGuide(@PathVariable String guideCode) {
+        return ResultVO.success(mtH5GuideStateService.completeCurrentGuide(guideCode));
+    }
+}

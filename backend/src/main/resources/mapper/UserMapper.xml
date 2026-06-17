@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.UserMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.User">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="nickname" property="nickname"/>
+        <result column="email" property="email"/>
+        <result column="phone" property="phone"/>
+        <result column="password" property="password"/>
+        <result column="auth_provider" property="authProvider"/>
+        <result column="avatar" property="avatar"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, username, nickname, email, phone, password, auth_provider, avatar, status, create_time, update_time
+    </sql>
+
+    <!-- 插入用户 -->
+    <insert id="insert" parameterType="com.gogoga.backend.entity.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_user (user_id, username, nickname, email, phone, password, auth_provider, avatar, status)
+        VALUES (#{userId}, #{username}, #{nickname}, #{email}, #{phone}, #{password}, #{authProvider}, #{avatar}, #{status})
+    </insert>
+
+    <!-- 根据用户ID更新用户信息 -->
+    <update id="updateByUserId" parameterType="com.gogoga.backend.entity.User">
+        UPDATE ai_user
+        <set>
+            <if test="username != null">username = #{username},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="password != null">password = #{password},</if>
+            <if test="authProvider != null">auth_provider = #{authProvider},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE user_id = #{userId}
+    </update>
+
+    <!-- 根据用户ID查询用户 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 根据用户名查询用户 -->
+    <select id="selectByUsername" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE username = #{username}
+    </select>
+
+    <!-- 根据邮箱查询用户 -->
+    <select id="selectByEmail" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE email = #{email}
+    </select>
+
+    <!-- 根据手机号查询用户 -->
+    <select id="selectByPhone" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE phone = #{phone}
+    </select>
+
+    <!-- 根据主键ID查询用户 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE COALESCE(auth_provider, '') != 'MT_H5'
+          AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByUserIdsAndKeyword" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE COALESCE(auth_provider, '') != 'MT_H5'
+          AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        <if test="keyword != null and keyword != ''">
+            AND (user_id LIKE CONCAT('%', #{keyword}, '%')
+                 OR username LIKE CONCAT('%', #{keyword}, '%')
+                 OR nickname LIKE CONCAT('%', #{keyword}, '%')
+                 OR phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByUserIdsAndRoleCodeAndKeyword" resultMap="BaseResultMap">
+        SELECT DISTINCT u.id, u.user_id, u.username, u.nickname, u.email, u.phone, u.password, u.auth_provider, u.avatar, u.status, u.create_time, u.update_time
+        FROM ai_user u
+        INNER JOIN ai_user_role ur ON ur.user_id = u.user_id
+        INNER JOIN ai_role r ON r.role_id = ur.role_id
+        WHERE COALESCE(u.auth_provider, '') != 'MT_H5'
+          AND r.status = 1
+          AND r.role_code = #{roleCode}
+          AND u.user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        <if test="keyword != null and keyword != ''">
+            AND (u.user_id LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.username LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY u.create_time DESC
+    </select>
+
+    <select id="selectAllBackendUserIds" resultType="string">
+        SELECT user_id
+        FROM ai_user
+        WHERE COALESCE(auth_provider, '') != 'MT_H5'
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectBackendUsersByKeyword" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE COALESCE(auth_provider, '') != 'MT_H5'
+        <if test="keyword != null and keyword != ''">
+            AND (user_id LIKE CONCAT('%', #{keyword}, '%')
+                 OR username LIKE CONCAT('%', #{keyword}, '%')
+                 OR nickname LIKE CONCAT('%', #{keyword}, '%')
+                 OR phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectBackendUsersByRoleCodeAndKeyword" resultMap="BaseResultMap">
+        SELECT DISTINCT u.id, u.user_id, u.username, u.nickname, u.email, u.phone, u.password, u.auth_provider, u.avatar, u.status, u.create_time, u.update_time
+        FROM ai_user u
+        INNER JOIN ai_user_role ur ON ur.user_id = u.user_id
+        INNER JOIN ai_role r ON r.role_id = ur.role_id
+        WHERE COALESCE(u.auth_provider, '') != 'MT_H5'
+          AND r.status = 1
+          AND r.role_code = #{roleCode}
+        <if test="keyword != null and keyword != ''">
+            AND (u.user_id LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.username LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                 OR u.phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY u.create_time DESC
+    </select>
+
+    <!-- 查询用户列表 -->
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_user
+        WHERE 1=1
+        AND (auth_provider IS NULL OR auth_provider != 'MT_H5')
+        <if test="keyword != null and keyword != ''">
+            AND (user_id LIKE CONCAT('%', #{keyword}, '%')
+                 OR username LIKE CONCAT('%', #{keyword}, '%')
+                 OR nickname LIKE CONCAT('%', #{keyword}, '%')
+                 OR phone LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 更新用户状态 -->
+    <update id="updateStatus">
+        UPDATE ai_user
+        SET status = #{status}
+        WHERE user_id = #{userId}
+    </update>
+
+    <!-- 删除用户 -->
+    <delete id="deleteByUserId">
+        DELETE FROM ai_user WHERE user_id = #{userId}
+    </delete>
+
+</mapper>

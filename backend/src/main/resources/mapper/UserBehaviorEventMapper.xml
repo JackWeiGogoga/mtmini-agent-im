@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.UserBehaviorEventMapper">
+
+    <resultMap id="UserBehaviorAnalyticsRowVOResultMap" type="com.gogoga.backend.vo.UserBehaviorAnalyticsRowVO">
+        <id column="shop_id" property="shopId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="shop_name" property="shopName"/>
+        <result column="shop_phone" property="shopPhone"/>
+        <result column="h5_app_open_count" property="h5AppOpenCount"/>
+        <result column="pc_master_console_operation_count" property="pcMasterConsoleOperationCount"/>
+        <result column="h5_promotion_switch_click_count" property="h5PromotionSwitchClickCount"/>
+        <result column="h5_config_button_click_count" property="h5ConfigButtonClickCount"/>
+        <result column="h5_unlock_ai_peak_click_count" property="h5UnlockAiPeakClickCount"/>
+        <result column="h5_config_modal_confirm_click_count" property="h5ConfigModalConfirmClickCount"/>
+        <result column="h5_config_modal_cancel_click_count" property="h5ConfigModalCancelClickCount"/>
+        <result column="h5_manual_bid_edit_open_count" property="h5ManualBidEditOpenCount"/>
+        <result column="h5_manual_bid_submit_click_count" property="h5ManualBidSubmitClickCount"/>
+        <result column="h5_power_tab_click_count" property="h5PowerTabClickCount"/>
+        <result column="h5_log_tab_click_count" property="h5LogTabClickCount"/>
+        <result column="h5_support_tab_click_count" property="h5SupportTabClickCount"/>
+        <result column="h5_recharge_gif_click_count" property="h5RechargeGifClickCount"/>
+        <result column="h5_power_pay_click_count" property="h5PowerPayClickCount"/>
+        <result column="h5_redemption_code_click_count" property="h5RedemptionCodeClickCount"/>
+        <result column="admin_promotion_switch_update_count" property="adminPromotionSwitchUpdateCount"/>
+        <result column="admin_promotion_config_save_count" property="adminPromotionConfigSaveCount"/>
+        <result column="admin_promotion_config_cancel_count" property="adminPromotionConfigCancelCount"/>
+        <result column="admin_promotion_log_view_count" property="adminPromotionLogViewCount"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.UserBehaviorEvent" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_behavior_event (
+            event_source, event_type, shop_id, shop_name_snapshot, shop_phone_snapshot,
+            backend_user_id, h5_epoi_id, event_time, context_json, create_time
+        ) VALUES (
+            #{eventSource}, #{eventType}, #{shopId}, #{shopNameSnapshot}, #{shopPhoneSnapshot},
+            #{backendUserId}, #{h5EpoiId}, #{eventTime}, #{contextJson}, #{createTime}
+        )
+    </insert>
+
+    <select id="selectAnalyticsRows" resultMap="UserBehaviorAnalyticsRowVOResultMap">
+        SELECT *
+        FROM (
+            SELECT
+                e.shop_id,
+                COALESCE(NULLIF(MAX(sh.poi_id), ''), CAST(e.shop_id AS CHAR)) AS poi_id,
+                COALESCE(MAX(sh.poi_name), MAX(sh.name), MAX(e.shop_name_snapshot)) AS shop_name,
+                COALESCE(NULLIF(MAX(sh.contact_phone), ''), NULLIF(MAX(sh.phone), ''), NULLIF(MAX(e.shop_phone_snapshot), '')) AS shop_phone,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_APP_OPEN' THEN 1 ELSE 0 END) AS h5_app_open_count,
+                SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND'
+                    AND e.event_type IN (
+                        'ADMIN_PROMOTION_SWITCH_UPDATE',
+                        'ADMIN_PROMOTION_CONFIG_SAVE',
+                        'ADMIN_PROMOTION_CONFIG_CANCEL',
+                        'ADMIN_PROMOTION_LOG_VIEW'
+                    ) THEN 1 ELSE 0 END) AS pc_master_console_operation_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PROMOTION_SWITCH_CLICK' THEN 1 ELSE 0 END) AS h5_promotion_switch_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_BUTTON_CLICK' THEN 1 ELSE 0 END) AS h5_config_button_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_UNLOCK_AI_PEAK_CLICK' THEN 1 ELSE 0 END) AS h5_unlock_ai_peak_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_MODAL_CONFIRM_CLICK' THEN 1 ELSE 0 END) AS h5_config_modal_confirm_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_MODAL_CANCEL_CLICK' THEN 1 ELSE 0 END) AS h5_config_modal_cancel_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_MANUAL_BID_EDIT_OPEN' THEN 1 ELSE 0 END) AS h5_manual_bid_edit_open_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_MANUAL_BID_SUBMIT_CLICK' THEN 1 ELSE 0 END) AS h5_manual_bid_submit_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_POWER_TAB_CLICK' THEN 1 ELSE 0 END) AS h5_power_tab_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_LOG_TAB_CLICK' THEN 1 ELSE 0 END) AS h5_log_tab_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_SUPPORT_TAB_CLICK' THEN 1 ELSE 0 END) AS h5_support_tab_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_RECHARGE_GIF_CLICK' THEN 1 ELSE 0 END) AS h5_recharge_gif_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_POWER_PAY_CLICK' THEN 1 ELSE 0 END) AS h5_power_pay_click_count,
+                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_REDEMPTION_CODE_CLICK' THEN 1 ELSE 0 END) AS h5_redemption_code_click_count,
+                SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'ADMIN_PROMOTION_SWITCH_UPDATE' THEN 1 ELSE 0 END) AS admin_promotion_switch_update_count,
+                SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'ADMIN_PROMOTION_CONFIG_SAVE' THEN 1 ELSE 0 END) AS admin_promotion_config_save_count,
+                SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'ADMIN_PROMOTION_CONFIG_CANCEL' THEN 1 ELSE 0 END) AS admin_promotion_config_cancel_count,
+                SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'ADMIN_PROMOTION_LOG_VIEW' THEN 1 ELSE 0 END) AS admin_promotion_log_view_count
+            FROM user_behavior_event e
+            LEFT JOIN mt_shop sh ON sh.id = e.shop_id
+            WHERE e.event_time &gt;= #{startAt}
+              AND e.event_time &lt; #{endAt}
+              <include refid="VisibilityWhere"/>
+              <include refid="KeywordWhere"/>
+            GROUP BY e.shop_id
+        ) stats
+        <include refid="OrderBy"/>
+    </select>
+
+    <sql id="VisibilityWhere">
+        <choose>
+            <when test="visibilityMode == 'ADMIN_ALL'">
+            </when>
+            <when test="visibilityMode == 'ORDINARY_ALL'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                )
+            </when>
+            <when test="visibilityMode == 'ORDINARY_SELF'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                      AND usb.user_id = #{currentUserId}
+                )
+            </when>
+            <when test="visibilityMode == 'ORDINARY_VISIBLE'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                      AND usb.user_id IN
+                      <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+                          #{userId}
+                      </foreach>
+                )
+            </when>
+            <when test="visibilityMode == 'SALES_ALL'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_sales_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                )
+            </when>
+            <when test="visibilityMode == 'SALES_SELF'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_sales_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                      AND usb.user_id = #{currentUserId}
+                )
+            </when>
+            <when test="visibilityMode == 'SALES_VISIBLE'">
+                AND EXISTS (
+                    SELECT 1 FROM ai_sales_user_shop_binding usb
+                    WHERE usb.shop_id = e.shop_id
+                      AND usb.user_id IN
+                      <foreach collection="visibleUserIds" item="userId" open="(" separator="," close=")">
+                          #{userId}
+                      </foreach>
+                )
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="KeywordWhere">
+        <if test="keyword != null and keyword != ''">
+            AND (
+                CAST(e.shop_id AS CHAR) LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(sh.poi_id, '') LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(sh.epoi_id, '') LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(sh.poi_name, sh.name, e.shop_name_snapshot, '') LIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(NULLIF(sh.contact_phone, ''), NULLIF(sh.phone, ''), NULLIF(e.shop_phone_snapshot, ''), '') LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <sql id="OrderBy">
+        <choose>
+            <when test="sortColumn != null and sortColumn != '' and sortDirection == 'ASC'">
+                ORDER BY ${sortColumn} ASC, shop_id DESC
+            </when>
+            <when test="sortColumn != null and sortColumn != '' and sortDirection == 'DESC'">
+                ORDER BY ${sortColumn} DESC, shop_id DESC
+            </when>
+            <otherwise>
+                ORDER BY h5_app_open_count DESC, shop_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+</mapper>

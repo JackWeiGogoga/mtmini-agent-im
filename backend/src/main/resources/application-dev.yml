@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/mtmini_ai_agent?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root123456}
+  data:
+    redis:
+      password: ${SPRING_DATA_REDIS_PASSWORD:root123456}
+
+sms:
+  mock-enabled: ${SMS_MOCK_ENABLED:true}
+
+scheduled:
+  enabled: ${SCHEDULED_ENABLED:false}
+
+power:
+  wechat-pay:
+    mock-enabled: ${POWER_WECHAT_PAY_MOCK_ENABLED:true}

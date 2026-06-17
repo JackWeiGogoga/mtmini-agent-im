@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtShopPeakWindowProfileMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtShopPeakWindowProfile">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="day_type" property="dayType"/>
+        <result column="profile_status" property="profileStatus"/>
+        <result column="lookback_days" property="lookbackDays"/>
+        <result column="sample_day_count" property="sampleDayCount"/>
+        <result column="sample_order_count" property="sampleOrderCount"/>
+        <result column="peak_windows_json" property="peakWindowsJson"/>
+        <result column="unavailable_reason" property="unavailableReason"/>
+        <result column="generated_at" property="generatedAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, day_type, profile_status, lookback_days, sample_day_count, sample_order_count,
+        peak_windows_json, unavailable_reason, generated_at, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndDayType" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_shop_peak_window_profile
+        WHERE shop_id = #{shopId}
+          AND day_type = #{dayType}
+        LIMIT 1
+    </select>
+
+    <insert id="upsert" parameterType="com.gogoga.backend.entity.mt.MtShopPeakWindowProfile"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_shop_peak_window_profile (
+            shop_id, day_type, profile_status, lookback_days, sample_day_count, sample_order_count,
+            peak_windows_json, unavailable_reason, generated_at, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{dayType}, #{profileStatus}, #{lookbackDays}, #{sampleDayCount}, #{sampleOrderCount},
+            #{peakWindowsJson}, #{unavailableReason}, #{generatedAt}, #{createTime}, #{updateTime}
+        )
+        ON DUPLICATE KEY UPDATE
+            profile_status = VALUES(profile_status),
+            lookback_days = VALUES(lookback_days),
+            sample_day_count = VALUES(sample_day_count),
+            sample_order_count = VALUES(sample_order_count),
+            peak_windows_json = VALUES(peak_windows_json),
+            unavailable_reason = VALUES(unavailable_reason),
+            generated_at = VALUES(generated_at),
+            update_time = VALUES(update_time)
+    </insert>
+</mapper>
