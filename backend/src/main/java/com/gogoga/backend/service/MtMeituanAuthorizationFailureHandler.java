@@ -16,18 +16,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MtMeituanAuthorizationFailureHandler {
 
-    public static final String CHANGE_REASON_AUTH_FAILURE = "AUTH_FAILURE: 美团接口鉴权失败，系统自动关闭推广";
-
     private final MtAccessTokenService mtAccessTokenService;
-    private final MtPromotionSettingService mtPromotionSettingService;
 
     public void handleConfirmedAuthFailure(Long shopId, String source, String responseCode, String responseMsg) {
         if (shopId == null) {
             return;
         }
         mtAccessTokenService.markReauthRequired(shopId);
-        mtPromotionSettingService.disablePromotionByShopId(shopId, CHANGE_REASON_AUTH_FAILURE);
-        log.warn("美团接口确认鉴权失败，已标记重新授权并关闭推广，shopId={}, source={}, responseCode={}, responseMsg={}",
+        log.warn("美团接口确认鉴权失败，已标记重新授权，shopId={}, source={}, responseCode={}, responseMsg={}",
                 shopId, source, responseCode, responseMsg);
     }
 

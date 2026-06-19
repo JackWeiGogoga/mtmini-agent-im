@@ -149,25 +149,19 @@
         <if test="targetUserId != null and targetUserId != ''">
             AND usb.user_id = #{targetUserId}
         </if>
-        <include refid="SelectBoundShopKeywordWhere"/>
-        <include refid="SelectPromotionStatusWhere"/>
-        <include refid="SelectBoundShopOrderBy"/>
+        <include refid="SelectBoundShopKeywordWhere"/>        <include refid="SelectBoundShopOrderBy"/>
     </select>
 
     <select id="selectBoundShopsByUserId" resultMap="UserShopBindingVOResultMap">
         <include refid="SelectBoundShopColumns"/>
         WHERE usb.user_id = #{userId}
-        <include refid="SelectBoundShopKeywordWhere"/>
-        <include refid="SelectPromotionStatusWhere"/>
-        <include refid="SelectBoundShopOrderBy"/>
+        <include refid="SelectBoundShopKeywordWhere"/>        <include refid="SelectBoundShopOrderBy"/>
     </select>
 
     <select id="selectAllBoundShops" resultMap="UserShopBindingVOResultMap">
         <include refid="SelectBoundShopColumns"/>
         WHERE 1 = 1
-        <include refid="SelectBoundShopKeywordWhere"/>
-        <include refid="SelectPromotionStatusWhere"/>
-        <include refid="SelectBoundShopOrderBy"/>
+        <include refid="SelectBoundShopKeywordWhere"/>        <include refid="SelectBoundShopOrderBy"/>
     </select>
 
     <select id="selectAdminBoundShops" resultMap="UserShopBindingVOResultMap">
@@ -178,9 +172,7 @@
                 <if test="targetUserId != null and targetUserId != ''">
                     AND usb.user_id = #{targetUserId}
                 </if>
-                <include refid="SelectBoundShopKeywordWhere"/>
-                <include refid="SelectPromotionStatusWhere"/>
-                <include refid="SelectAdminBoundShopOrderBy"/>
+                <include refid="SelectBoundShopKeywordWhere"/>                <include refid="SelectAdminBoundShopOrderBy"/>
             </when>
             <when test="bindingDomain == 'SALES'">
                 <include refid="SelectSalesBoundShopColumns"/>
@@ -188,9 +180,7 @@
                 <if test="targetUserId != null and targetUserId != ''">
                     AND usb.user_id = #{targetUserId}
                 </if>
-                <include refid="SelectBoundShopKeywordWhere"/>
-                <include refid="SelectPromotionStatusWhere"/>
-                <include refid="SelectAdminBoundShopOrderBy"/>
+                <include refid="SelectBoundShopKeywordWhere"/>                <include refid="SelectAdminBoundShopOrderBy"/>
             </when>
             <otherwise>
                 SELECT *
@@ -200,17 +190,13 @@
                     <if test="targetUserId != null and targetUserId != ''">
                         AND usb.user_id = #{targetUserId}
                     </if>
-                    <include refid="SelectBoundShopKeywordWhere"/>
-                    <include refid="SelectPromotionStatusWhere"/>
-                    UNION ALL
+                    <include refid="SelectBoundShopKeywordWhere"/>                    UNION ALL
                     <include refid="SelectSalesBoundShopColumns"/>
                     WHERE 1 = 1
                     <if test="targetUserId != null and targetUserId != ''">
                         AND usb.user_id = #{targetUserId}
                     </if>
-                    <include refid="SelectBoundShopKeywordWhere"/>
-                    <include refid="SelectPromotionStatusWhere"/>
-                ) merged
+                    <include refid="SelectBoundShopKeywordWhere"/>                ) merged
                 <include refid="SelectAdminBoundShopOrderBy"/>
             </otherwise>
         </choose>
@@ -222,9 +208,7 @@
         <include refid="SelectAdminMerchantBindingDomainWhere"/>
         <include refid="SelectAdminMerchantBindingStatusWhere"/>
         <include refid="SelectAdminMerchantTargetUserWhere"/>
-        <include refid="SelectAdminMerchantKeywordWhere"/>
-        <include refid="SelectPromotionStatusWhere"/>
-        <include refid="SelectAdminMerchantShopOrderBy"/>
+        <include refid="SelectAdminMerchantKeywordWhere"/>        <include refid="SelectAdminMerchantShopOrderBy"/>
     </select>
 
     <select id="selectAllPowerManagedShops" resultMap="AdminPowerManagementRowVOResultMap">
@@ -341,7 +325,6 @@
         FROM mt_shop sh
         <include refid="SelectAdminMerchantBindingJoins"/>
         LEFT JOIN mt_power_account pa ON pa.shop_id = sh.id
-        <include refid="SelectPromotionSettingJoinByShop"/>
         LEFT JOIN (
             SELECT shop_id, MAX(expire_at) AS right_expire_at
             FROM mt_shop_right
@@ -671,9 +654,7 @@
         FROM ai_user_shop_binding usb
         INNER JOIN mt_shop sh ON sh.id = usb.shop_id
         LEFT JOIN ai_user u ON u.user_id = usb.user_id
-        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
-        <include refid="SelectPromotionSettingJoinByBindingShop"/>
-        LEFT JOIN (
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id        LEFT JOIN (
             SELECT shop_id, MAX(expire_at) AS right_expire_at
             FROM mt_shop_right
             WHERE expire_at IS NOT NULL
@@ -703,9 +684,7 @@
         FROM ai_sales_user_shop_binding usb
         INNER JOIN mt_shop sh ON sh.id = usb.shop_id
         LEFT JOIN ai_user u ON u.user_id = usb.user_id
-        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id
-        <include refid="SelectPromotionSettingJoinByBindingShop"/>
-        LEFT JOIN (
+        LEFT JOIN mt_power_account pa ON pa.shop_id = usb.shop_id        LEFT JOIN (
             SELECT shop_id, MAX(expire_at) AS right_expire_at
             FROM mt_shop_right
             WHERE expire_at IS NOT NULL
@@ -721,27 +700,6 @@
                 OR COALESCE(sh.poi_name, sh.name) LIKE CONCAT('%', #{keyword}, '%')
                 OR COALESCE(u.nickname, u.username, usb.user_id) LIKE CONCAT('%', #{keyword}, '%')
             )
-        </if>
-    </sql>
-
-    <sql id="SelectPromotionStatusWhere">
-        <if test="promotionStatus == 'ENABLED'">
-            AND ps.promotion_enabled = 1
-        </if>
-        <if test="promotionStatus == 'DISABLED'">
-            AND (ps.id IS NULL OR ps.promotion_enabled = 0)
-        </if>
-    </sql>
-
-    <sql id="SelectPromotionSettingJoinByBindingShop">
-        <if test="promotionStatus == 'ENABLED' or promotionStatus == 'DISABLED'">
-            LEFT JOIN mt_promotion_setting ps ON ps.shop_id = usb.shop_id
-        </if>
-    </sql>
-
-    <sql id="SelectPromotionSettingJoinByShop">
-        <if test="promotionStatus == 'ENABLED' or promotionStatus == 'DISABLED'">
-            LEFT JOIN mt_promotion_setting ps ON ps.shop_id = sh.id
         </if>
     </sql>
 

@@ -16,23 +16,16 @@ export interface UserBehaviorAnalyticsRow {
   shopPhone?: string;
   h5AppOpenCount: number;
   pcMasterConsoleOperationCount: number;
-  h5PromotionSwitchClickCount: number;
   h5ConfigButtonClickCount: number;
   h5UnlockAiPeakClickCount: number;
   h5ConfigModalConfirmClickCount: number;
   h5ConfigModalCancelClickCount: number;
-  h5ManualBidEditOpenCount: number;
-  h5ManualBidSubmitClickCount: number;
   h5PowerTabClickCount: number;
   h5LogTabClickCount: number;
   h5SupportTabClickCount: number;
   h5RechargeGifClickCount: number;
   h5PowerPayClickCount: number;
   h5RedemptionCodeClickCount: number;
-  adminPromotionSwitchUpdateCount: number;
-  adminPromotionConfigSaveCount: number;
-  adminPromotionConfigCancelCount: number;
-  adminPromotionLogViewCount: number;
 }
 
 export interface UserBehaviorAnalyticsPage {
@@ -43,8 +36,4 @@ export interface UserBehaviorAnalyticsPage {
   pages: number;
 }
 
-export type AdminBehaviorEventType =
-  | "ADMIN_PROMOTION_SWITCH_UPDATE"
-  | "ADMIN_PROMOTION_CONFIG_SAVE"
-  | "ADMIN_PROMOTION_CONFIG_CANCEL"
-  | "ADMIN_PROMOTION_LOG_VIEW";
+export type AdminBehaviorEventType = string;

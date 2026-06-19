@@ -51,9 +51,14 @@ public class MtProperties {
     private AppOrder appOrder = new AppOrder();
 
     /**
-     * 推广配置
+     * 数据库异步任务配置
      */
-    private Promotion promotion = new Promotion();
+    private AsyncTask asyncTask = new AsyncTask();
+
+    /**
+     * 评价自动回复配置
+     */
+    private Comment comment = new Comment();
 
     @Data
     public static class Token {
@@ -122,25 +127,6 @@ public class MtProperties {
     }
 
     @Data
-    public static class Promotion {
-
-        /**
-         * 自动调价 cron
-         */
-        private String autoBidCron = "0 */10 * * * ?";
-
-        /**
-         * 推广写接口是否仅 dry run，不真实调用美团
-         */
-        private boolean writeDryRun = true;
-
-        /**
-         * 数据库异步任务配置
-         */
-        private AsyncTask asyncTask = new AsyncTask();
-    }
-
-    @Data
     public static class AsyncTask {
 
         /**
@@ -152,11 +138,6 @@ public class MtProperties {
          * 是否启用异步 worker 轮询
          */
         private boolean workerEnabled = false;
-
-        /**
-         * 调价候选分页大小
-         */
-        private int dispatchPageSize = 200;
 
         /**
          * 单次轮询任务数
@@ -194,19 +175,9 @@ public class MtProperties {
         private int executorQueueCapacity = 200;
 
         /**
-         * 自动调价任务策略
-         */
-        private TaskPolicy autoBid = new TaskPolicy();
-
-        /**
          * 订单回调任务策略
          */
         private TaskPolicy orderNotify = new TaskPolicy();
-
-        /**
-         * 日志 Markdown 任务策略
-         */
-        private TaskPolicy logMarkdown = new TaskPolicy();
 
         /**
          * 授权后同步权益任务策略
@@ -219,29 +190,14 @@ public class MtProperties {
         private TaskPolicy authBackfillPoiId = new TaskPolicy();
 
         /**
-         * 授权后同步广告数据任务策略
-         */
-        private TaskPolicy authSyncRecentAdData = new TaskPolicy();
-
-        /**
          * 授权后历史订单补数任务策略
          */
         private TaskPolicy authHistoricalOrderBackfill = new TaskPolicy();
 
         /**
-         * 同店自动调价锁定秒数
-         */
-        private long autoBidShopLockSeconds = 300L;
-
-        /**
          * 同订单回调锁定秒数
          */
         private long orderNotifyLockSeconds = 60L;
-
-        /**
-         * 同店锁冲突退避秒数
-         */
-        private long autoBidBusyBackoffSeconds = 30L;
 
         /**
          * 同订单回调锁冲突退避秒数
@@ -310,5 +266,29 @@ public class MtProperties {
          * 最大退避秒数
          */
         private long maxBackoffSeconds = 1800L;
+    }
+
+    @Data
+    public static class Comment {
+
+        /**
+         * 评价拉取 cron。默认每天早中晚各一次。
+         */
+        private String pullCron = "0 0 8,13,19 * * ?";
+
+        /**
+         * 查询窗口回看天数。
+         */
+        private int lookbackDays = 7;
+
+        /**
+         * 查询分页大小，美团最大 20。
+         */
+        private int pageSize = 20;
+
+        /**
+         * 自动回复固定文案。
+         */
+        private String defaultReply = "很好";
     }
 }

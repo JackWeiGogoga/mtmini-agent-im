@@ -170,16 +170,6 @@ public class MtShop {
     private String shippingTime;
 
     /**
-     * 推广广告明细历史补偿状态
-     */
-    private String promotionAdBackfillStatus;
-
-    /**
-     * 推广广告明细历史补偿最近一次处理时间
-     */
-    private LocalDateTime promotionAdBackfillAt;
-
-    /**
      * 历史订单补数状态
      */
     private String historicalOrderBackfillStatus;

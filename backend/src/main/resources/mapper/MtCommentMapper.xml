@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtCommentMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtComment">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="epoi_id" property="epoiId"/>
+        <result column="poi_id" property="poiId"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="result" property="result"/>
+        <result column="comment_content" property="commentContent"/>
+        <result column="order_comment_score" property="orderCommentScore"/>
+        <result column="food_comment_score" property="foodCommentScore"/>
+        <result column="delivery_comment_score" property="deliveryCommentScore"/>
+        <result column="add_comment" property="addComment"/>
+        <result column="add_comment_time" property="addCommentTime"/>
+        <result column="packing_score" property="packingScore"/>
+        <result column="comment_time" property="commentTime"/>
+        <result column="comment_lables" property="commentLables"/>
+        <result column="ship_time" property="shipTime"/>
+        <result column="comment_pictures" property="commentPictures"/>
+        <result column="praise_food_list" property="praiseFoodList"/>
+        <result column="critic_food_list" property="criticFoodList"/>
+        <result column="reply_status" property="replyStatus"/>
+        <result column="comment_order_detail_json" property="commentOrderDetailJson"/>
+        <result column="e_reply_content" property="eReplyContent"/>
+        <result column="e_reply_time" property="eReplyTime"/>
+        <result column="comment_type" property="commentType"/>
+        <result column="valid" property="valid"/>
+        <result column="user_id" property="userId"/>
+        <result column="over_delivery_time_desc" property="overDeliveryTimeDesc"/>
+        <result column="comment_score_type" property="commentScoreType"/>
+        <result column="product_score" property="productScore"/>
+        <result column="biz_code" property="bizCode"/>
+        <result column="query_start_time" property="queryStartTime"/>
+        <result column="query_end_time" property="queryEndTime"/>
+        <result column="raw_payload_json" property="rawPayloadJson"/>
+        <result column="auto_reply_status" property="autoReplyStatus"/>
+        <result column="auto_reply_content" property="autoReplyContent"/>
+        <result column="auto_reply_at" property="autoReplyAt"/>
+        <result column="auto_reply_error" property="autoReplyError"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, epoi_id, poi_id, comment_id, result, comment_content, order_comment_score,
+        food_comment_score, delivery_comment_score, add_comment, add_comment_time, packing_score,
+        comment_time, comment_lables, ship_time, comment_pictures, praise_food_list,
+        critic_food_list, reply_status, comment_order_detail_json, e_reply_content, e_reply_time,
+        comment_type, valid, user_id, over_delivery_time_desc, comment_score_type, product_score,
+        biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
+        auto_reply_content, auto_reply_at, auto_reply_error, create_time, update_time
+    </sql>
+
+    <select id="selectByCommentId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_comment
+        WHERE comment_id = #{commentId}
+        LIMIT 1
+    </select>
+
+    <select id="selectPendingAutoReplyByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_comment
+        WHERE shop_id = #{shopId}
+          AND reply_status = 0
+          AND auto_reply_status IN ('PENDING', 'FAILED')
+        ORDER BY comment_time ASC, id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtComment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_comment (
+            shop_id, epoi_id, poi_id, comment_id, result, comment_content, order_comment_score,
+            food_comment_score, delivery_comment_score, add_comment, add_comment_time, packing_score,
+            comment_time, comment_lables, ship_time, comment_pictures, praise_food_list,
+            critic_food_list, reply_status, comment_order_detail_json, e_reply_content, e_reply_time,
+            comment_type, valid, user_id, over_delivery_time_desc, comment_score_type, product_score,
+            biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
+            auto_reply_content, auto_reply_at, auto_reply_error, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{epoiId}, #{poiId}, #{commentId}, #{result}, #{commentContent}, #{orderCommentScore},
+            #{foodCommentScore}, #{deliveryCommentScore}, #{addComment}, #{addCommentTime}, #{packingScore},
+            #{commentTime}, #{commentLables}, #{shipTime}, #{commentPictures}, #{praiseFoodList},
+            #{criticFoodList}, #{replyStatus}, #{commentOrderDetailJson}, #{eReplyContent}, #{eReplyTime},
+            #{commentType}, #{valid}, #{userId}, #{overDeliveryTimeDesc}, #{commentScoreType}, #{productScore},
+            #{bizCode}, #{queryStartTime}, #{queryEndTime}, #{rawPayloadJson}, #{autoReplyStatus},
+            #{autoReplyContent}, #{autoReplyAt}, #{autoReplyError}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateFromQuery" parameterType="com.gogoga.backend.entity.mt.MtComment">
+        UPDATE mt_comment
+        SET result = #{result},
+            comment_content = #{commentContent},
+            order_comment_score = #{orderCommentScore},
+            food_comment_score = #{foodCommentScore},
+            delivery_comment_score = #{deliveryCommentScore},
+            add_comment = #{addComment},
+            add_comment_time = #{addCommentTime},
+            packing_score = #{packingScore},
+            comment_time = #{commentTime},
+            comment_lables = #{commentLables},
+            ship_time = #{shipTime},
+            comment_pictures = #{commentPictures},
+            praise_food_list = #{praiseFoodList},
+            critic_food_list = #{criticFoodList},
+            reply_status = #{replyStatus},
+            comment_order_detail_json = #{commentOrderDetailJson},
+            e_reply_content = #{eReplyContent},
+            e_reply_time = #{eReplyTime},
+            comment_type = #{commentType},
+            valid = #{valid},
+            user_id = #{userId},
+            over_delivery_time_desc = #{overDeliveryTimeDesc},
+            comment_score_type = #{commentScoreType},
+            product_score = #{productScore},
+            biz_code = #{bizCode},
+            query_start_time = #{queryStartTime},
+            query_end_time = #{queryEndTime},
+            raw_payload_json = #{rawPayloadJson},
+            update_time = #{updateTime}
+        WHERE comment_id = #{commentId}
+    </update>
+
+    <update id="markAutoReplySuccess">
+        UPDATE mt_comment
+        SET reply_status = 1,
+            auto_reply_status = 'SUCCESS',
+            auto_reply_content = #{replyContent},
+            auto_reply_at = #{autoReplyAt},
+            auto_reply_error = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markAutoReplyFailed">
+        UPDATE mt_comment
+        SET auto_reply_status = 'FAILED',
+            auto_reply_error = #{error},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

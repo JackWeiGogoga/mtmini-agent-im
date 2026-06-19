@@ -32,7 +32,6 @@ const STAT_COLUMNS: {
     dataIndex: "pcMasterConsoleOperationCount",
     width: 160,
   },
-  { title: "推广开关点击数", dataIndex: "h5PromotionSwitchClickCount" },
   { title: "配置按钮点击数", dataIndex: "h5ConfigButtonClickCount" },
   {
     title: "解锁AI高峰点击数",
@@ -47,16 +46,6 @@ const STAT_COLUMNS: {
   {
     title: "配置弹窗取消数",
     dataIndex: "h5ConfigModalCancelClickCount",
-    width: 150,
-  },
-  {
-    title: "手动出价打开数",
-    dataIndex: "h5ManualBidEditOpenCount",
-    width: 150,
-  },
-  {
-    title: "手动出价提交数",
-    dataIndex: "h5ManualBidSubmitClickCount",
     width: 150,
   },
   { title: "算力tab点击数", dataIndex: "h5PowerTabClickCount" },
@@ -76,26 +65,6 @@ const STAT_COLUMNS: {
     title: "兑换码点击数",
     dataIndex: "h5RedemptionCodeClickCount",
     width: 140,
-  },
-  {
-    title: "后台推广开关修改数",
-    dataIndex: "adminPromotionSwitchUpdateCount",
-    width: 170,
-  },
-  {
-    title: "后台配置保存数",
-    dataIndex: "adminPromotionConfigSaveCount",
-    width: 150,
-  },
-  {
-    title: "后台配置取消数",
-    dataIndex: "adminPromotionConfigCancelCount",
-    width: 150,
-  },
-  {
-    title: "后台查看日志数",
-    dataIndex: "adminPromotionLogViewCount",
-    width: 150,
   },
 ];
 

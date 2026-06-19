@@ -244,12 +244,12 @@ class AdminPowerManagementServiceTest {
         consume.setId(11L);
         consume.setConsumeNo("PC-001");
         consume.setShopId(101L);
-        consume.setSourceType(PromotionPowerConsumeService.CONSUME_SOURCE_LLM);
+        consume.setSourceType(MtPaidApiPowerConsumeService.CONSUME_SOURCE_ORDER_DETAIL);
         consume.setSourceId("source-1");
         consume.setPowerAmount(30);
         consume.setBalanceBefore(120);
         consume.setBalanceAfter(90);
-        consume.setRemark("推广费用 LLM 计算算力消耗，tokens=2100");
+        consume.setRemark("订单详情收费接口算力消耗");
         consume.setCreateTime(LocalDateTime.of(2026, 4, 12, 10, 0));
         when(mtPowerConsumeMapper.selectByShopIdAndCreateTimeBetween(101L, null, null))
                 .thenReturn(List.of(consume));
@@ -275,7 +275,7 @@ class AdminPowerManagementServiceTest {
                 .listConsumeRecords(101L, null, null, 1, 10);
 
         assertEquals(1, records.getList().size());
-        assertEquals("LLM 计算", records.getList().get(0).getSourceTypeText());
+        assertEquals("订单详情", records.getList().get(0).getSourceTypeText());
         assertEquals(2, records.getList().get(0).getDetails().size());
         assertEquals("赠送算力", records.getList().get(0).getDetails().get(0).getSourceBalanceTypeText());
         assertEquals("实充算力", records.getList().get(0).getDetails().get(1).getSourceBalanceTypeText());

@@ -8,13 +8,11 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.MtOrderStatusEnum;
 import com.gogoga.backend.mapper.MtOrderDetailMapper;
 import com.gogoga.backend.mapper.MtOrderMapper;
-import com.gogoga.backend.service.promotion.PromotionRecentOrderStatisticService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,12 +43,6 @@ public class MtOrderService {
     private final MtShopService mtShopService;
     private final MtShopPoiIdBackfillService mtShopPoiIdBackfillService;
     private final ObjectMapper objectMapper;
-    private PromotionRecentOrderStatisticService promotionRecentOrderStatisticService;
-
-    @Autowired(required = false)
-    public void setPromotionRecentOrderStatisticService(PromotionRecentOrderStatisticService promotionRecentOrderStatisticService) {
-        this.promotionRecentOrderStatisticService = promotionRecentOrderStatisticService;
-    }
 
     /**
      * 处理订单通知
@@ -137,7 +129,6 @@ public class MtOrderService {
         MtOrder existing = mtOrderMapper.selectByOrderIdForUpdate(order.getOrderId());
         LocalDateTime now = LocalDateTime.now();
         MtOrder persistedOrder = saveOrUpdateOrder(order, existing, now);
-        invalidateRecentOrderStatistic(persistedOrder);
 
         JsonNode details;
         try {
@@ -160,21 +151,6 @@ public class MtOrderService {
             MtOrderDetail detail = buildOrderDetail(detailNode, persistedOrder.getOrderId(), now);
             mtOrderDetailMapper.insert(detail);
         }
-    }
-
-    private void invalidateRecentOrderStatistic(MtOrder order) {
-        if (promotionRecentOrderStatisticService == null
-                || order == null
-                || order.getShopId() == null
-                || order.getOrderSendTime() == null) {
-            return;
-        }
-        LocalDate orderDate = LocalDateTime.ofInstant(
-                java.time.Instant.ofEpochSecond(order.getOrderSendTime()),
-                DEFAULT_ZONE_ID
-        ).toLocalDate();
-        // Today's statistic intentionally excludes today; future business dates can include this order date.
-        promotionRecentOrderStatisticService.invalidateByShopIdAndBizDateOnOrAfter(order.getShopId(), orderDate.plusDays(1));
     }
 
     private MtOrder buildOrder(JsonNode root, String ePoiId, MtShop shop) {

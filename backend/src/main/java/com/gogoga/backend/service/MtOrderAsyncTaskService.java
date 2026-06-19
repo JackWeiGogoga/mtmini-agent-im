@@ -30,7 +30,7 @@ public class MtOrderAsyncTaskService {
     private final MtProperties mtProperties;
 
     public void acceptOrderNotify(Map<String, String[]> parameterMap) {
-        if (!mtProperties.getPromotion().getAsyncTask().isEnabled()) {
+        if (!mtProperties.getAsyncTask().isEnabled()) {
             TransientDatabaseRetrySupport.run(
                     "ORDER_NOTIFY_SYNC",
                     extractOrderId(firstValue(parameterMap, "message")),
@@ -57,7 +57,7 @@ public class MtOrderAsyncTaskService {
                 scopeKey,
                 payload,
                 LocalDateTime.now(),
-                mtProperties.getPromotion().getAsyncTask().getOrderNotify().getMaxRetryCount()
+                mtProperties.getAsyncTask().getOrderNotify().getMaxRetryCount()
         );
         log.info("订单回调异步任务入队完成，orderId={}, ePoiId={}, msgId={}, taskId={}, created={}",
                 payload.getOrderId(), payload.getEPoiId(), payload.getMsgId(),

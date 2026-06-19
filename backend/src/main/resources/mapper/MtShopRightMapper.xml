@@ -41,17 +41,6 @@
         ORDER BY service_code ASC, id ASC
     </select>
 
-    <select id="existsActivePromotionRight" resultType="boolean">
-        SELECT COUNT(1) > 0
-        FROM mt_shop_right
-        WHERE shop_id = #{shopId}
-          AND service_code IN ('H5_PROMOTION', 'VIP_CODE')
-          AND (
-                (type = 2 AND expire_at IS NOT NULL AND expire_at &gt; #{now})
-                OR (type != 2 AND remaining_times IS NOT NULL AND remaining_times &gt; 0)
-              )
-    </select>
-
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtShopRight" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_shop_right (
             shop_id, service_code, type, expire_at, remaining_times, source_version, last_order_id, create_time, update_time

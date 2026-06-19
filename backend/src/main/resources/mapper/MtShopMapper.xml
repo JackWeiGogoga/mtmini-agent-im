@@ -34,8 +34,6 @@
         <result column="logo" property="logo"/>
         <result column="phone" property="phone"/>
         <result column="shipping_time" property="shippingTime"/>
-        <result column="promotion_ad_backfill_status" property="promotionAdBackfillStatus"/>
-        <result column="promotion_ad_backfill_at" property="promotionAdBackfillAt"/>
         <result column="historical_order_backfill_status" property="historicalOrderBackfillStatus"/>
         <result column="historical_order_backfill_at" property="historicalOrderBackfillAt"/>
     </resultMap>
@@ -45,7 +43,6 @@
         category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
         guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
         door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
-        promotion_ad_backfill_status, promotion_ad_backfill_at,
         historical_order_backfill_status, historical_order_backfill_at
     </sql>
 
@@ -76,7 +73,6 @@
             category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
             guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
             door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
-            promotion_ad_backfill_status, promotion_ad_backfill_at,
             historical_order_backfill_status, historical_order_backfill_at
         ) VALUES (
             #{name}, #{contactName}, #{contactPhone}, #{lessDeliveryPrice}, #{memberPrice}, #{newPersonPrice},
@@ -84,18 +80,9 @@
             #{epoiId}, #{poiId}, #{poiName}, #{sendPrice}, #{guaranteedPrice}, #{createTime}, #{promotionInfo},
             #{doorHeadPosters}, #{promoteImg}, #{updateTime}, #{doorHeadPostersCode}, #{promoteImgCode},
             #{miniPoiId}, #{laberName}, #{logo}, #{phone}, #{shippingTime},
-            #{promotionAdBackfillStatus}, #{promotionAdBackfillAt},
             #{historicalOrderBackfillStatus}, #{historicalOrderBackfillAt}
         )
     </insert>
-
-    <update id="updatePromotionAdBackfillState">
-        UPDATE mt_shop
-        SET promotion_ad_backfill_status = #{status},
-            promotion_ad_backfill_at = #{backfillAt},
-            update_time = #{updateTime}
-        WHERE id = #{id}
-    </update>
 
     <update id="markHistoricalOrderBackfillProcessing">
         UPDATE mt_shop
@@ -154,8 +141,6 @@
             logo = #{logo},
             phone = #{phone},
             shipping_time = #{shippingTime},
-            promotion_ad_backfill_status = #{promotionAdBackfillStatus},
-            promotion_ad_backfill_at = #{promotionAdBackfillAt},
             historical_order_backfill_status = #{historicalOrderBackfillStatus},
             historical_order_backfill_at = #{historicalOrderBackfillAt}
         WHERE id = #{id}

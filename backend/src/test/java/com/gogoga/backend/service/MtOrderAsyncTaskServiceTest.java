@@ -41,7 +41,7 @@ class MtOrderAsyncTaskServiceTest {
 
     @Test
     void shouldEnqueueOrderNotifyTaskWhenAsyncEnabled() {
-        mtProperties.getPromotion().getAsyncTask().setEnabled(true);
+        mtProperties.getAsyncTask().setEnabled(true);
         when(mtAsyncTaskService.enqueueTask(eq(MtAsyncTaskTypeEnum.ORDER_NOTIFY), any(), any(), any(), any(), eq(3)))
                 .thenReturn(new MtAsyncTaskEnqueueResult(1L, true));
 
@@ -66,7 +66,7 @@ class MtOrderAsyncTaskServiceTest {
 
     @Test
     void shouldFallbackToSyncWhenAsyncDisabled() {
-        mtProperties.getPromotion().getAsyncTask().setEnabled(false);
+        mtProperties.getAsyncTask().setEnabled(false);
         Map<String, String[]> parameterMap = Map.of(
                 "ePoiId", new String[]{"shop-001"},
                 "message", new String[]{"{\"order_id\":\"order-001\",\"status\":\"2\"}"}

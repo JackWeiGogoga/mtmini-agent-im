@@ -59,30 +59,6 @@ export function getMtH5HomeDashboard(statsRange = 'TODAY') {
   return request('/api/h5/shop/home/dashboard', 'GET', { statsRange })
 }
 
-export function getMtH5PromotionSettings() {
-  return request('/api/h5/promotion/settings', 'GET')
-}
-
-export function updateMtH5PromotionSettings(data) {
-  return request('/api/h5/promotion/settings', 'PUT', data)
-}
-
-export function unlockMtH5AutoTimeMode() {
-  return request('/api/h5/promotion/settings/auto-time-mode/unlock', 'POST')
-}
-
-export function updateMtH5ManualPromotionBid(bidAmount) {
-  return request('/api/h5/promotion/settings/manual-bid', 'POST', { bidAmount })
-}
-
-export function getMtH5PromotionLogs(pageNum = 1, pageSize = 20) {
-  return request('/api/h5/promotion/logs', 'GET', { pageNum, pageSize })
-}
-
-export function markMtH5PromotionLogsRead() {
-  return request('/api/h5/promotion/logs/read', 'POST')
-}
-
 export function reportMtH5BehaviorEvent(eventType, context = undefined) {
   const payload = {
     eventType,

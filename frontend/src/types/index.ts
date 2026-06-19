@@ -29,9 +29,6 @@ export * from "./power-recharge-order-types";
 // 美团订单类型
 export * from "./mt-app-order-types";
 
-// 定价分析类型
-export * from "./pricing-analysis-types";
-
 // 有赞订单类型
 export * from "./youzan-app-order-types";
 

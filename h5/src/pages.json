@@ -5,15 +5,7 @@
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "AI智能推广"
-      }
-    },
-    {
-      "path": "pages/log/index",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTitleText": "日志",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "评价自动回复"
       }
     },
     {
@@ -40,7 +32,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "AI智能推广",
+    "navigationBarTitleText": "评价自动回复",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
   }

@@ -30,8 +30,6 @@ CREATE TABLE IF NOT EXISTS `mt_shop` (
   `logo` varchar(1000) DEFAULT NULL COMMENT '店铺logo',
   `phone` varchar(255) DEFAULT NULL COMMENT '通知手机号',
   `shipping_time` varchar(255) DEFAULT NULL COMMENT '营业时间',
-  `promotion_ad_backfill_status` varchar(32) NOT NULL DEFAULT 'INIT' COMMENT '推广广告明细历史补偿状态',
-  `promotion_ad_backfill_at` datetime DEFAULT NULL COMMENT '推广广告明细历史补偿最近一次处理时间',
   `historical_order_backfill_status` varchar(32) NOT NULL DEFAULT 'INIT' COMMENT '历史订单补数状态',
   `historical_order_backfill_at` datetime DEFAULT NULL COMMENT '历史订单补数最近一次处理时间',
   PRIMARY KEY (`id`) USING BTREE,
@@ -142,59 +140,6 @@ CREATE TABLE IF NOT EXISTS `mt_shop_right` (
   KEY `idx_mt_shop_right_expire_at` (`expire_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店权益表';
 
-CREATE TABLE IF NOT EXISTS `mt_promotion_bid_record` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `slot_time` datetime NOT NULL COMMENT '时段时间',
-  `record_source` varchar(32) NOT NULL DEFAULT 'AUTO' COMMENT '记录来源 AUTO/MANUAL',
-  `attributed_slot_time` datetime DEFAULT NULL COMMENT '归属标准10分钟槽位',
-  `operated_at` datetime DEFAULT NULL COMMENT '实际操作时间',
-  `window_key` varchar(64) DEFAULT NULL COMMENT '窗口唯一标识',
-  `window_start_at` datetime DEFAULT NULL COMMENT '窗口开始时间',
-  `window_end_at` datetime DEFAULT NULL COMMENT '窗口结束时间',
-  `request_no` varchar(64) NOT NULL COMMENT '请求号',
-  `cost_counter_value` decimal(10,2) DEFAULT NULL COMMENT '广告累计花费计数器',
-  `previous_bid_amount` decimal(10,2) DEFAULT NULL COMMENT '上一次出价',
-  `next_bid_amount` decimal(10,2) DEFAULT NULL COMMENT '下一次出价',
-  `decision_action` varchar(32) DEFAULT NULL COMMENT '决策动作',
-  `decision_reason` varchar(255) DEFAULT NULL COMMENT '决策原因',
-  `total_cost` decimal(10,2) DEFAULT NULL COMMENT '最近一个窗口花费',
-  `total_income` decimal(10,2) DEFAULT NULL COMMENT '最近一个窗口实收',
-  `total_cost_ratio` decimal(10,6) DEFAULT NULL COMMENT '最近一个窗口费用率',
-  `cost_delta` decimal(10,2) DEFAULT NULL COMMENT '最近一个窗口花费',
-  `execute_status` varchar(32) NOT NULL COMMENT '执行状态',
-  `metrics_payload_json` longtext COMMENT '指标原始内容',
-  `update_payload_json` longtext COMMENT '更新原始内容',
-  `error_msg` varchar(1000) DEFAULT NULL COMMENT '错误信息',
-  `markdown_message` longtext COMMENT '商家可读Markdown日志',
-  `log_markdown_status` varchar(32) DEFAULT NULL COMMENT '日志Markdown状态 PENDING/READY/FALLBACK',
-  `log_task_id` bigint DEFAULT NULL COMMENT '日志异步任务ID',
-  `decision_detail_json` longtext COMMENT '决策扩展详情JSON',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_bid_record_shop_slot` (`shop_id`, `biz_date`, `slot_time`),
-  UNIQUE KEY `uk_mt_promotion_bid_record_request_no` (`request_no`),
-  KEY `idx_mt_promotion_bid_record_biz_date` (`biz_date`),
-  KEY `idx_mt_promotion_bid_record_shop_status` (`shop_id`, `execute_status`),
-  KEY `idx_mt_promotion_bid_record_shop_window_status_slot` (`shop_id`, `window_key`, `execute_status`, `slot_time`),
-  KEY `idx_mt_promotion_bid_record_shop_biz_reason_slot` (`shop_id`, `biz_date`, `decision_reason`, `slot_time`),
-  KEY `idx_mt_promotion_bid_record_shop_visible_id` (`shop_id`, `log_markdown_status`, `id`),
-  KEY `idx_mt_promotion_bid_record_slot_id` (`slot_time` DESC, `id` DESC)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店自动调价执行记录表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_log_read_state` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `last_read_record_id` bigint DEFAULT NULL COMMENT '最近已读推广日志记录ID',
-  `last_read_at` datetime DEFAULT NULL COMMENT '最近已读时间',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_log_read_state_shop` (`shop_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广日志已读状态表';
-
 CREATE TABLE IF NOT EXISTS `mt_h5_guide_state` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `shop_id` bigint NOT NULL COMMENT '店铺ID',
@@ -207,67 +152,6 @@ CREATE TABLE IF NOT EXISTS `mt_h5_guide_state` (
   UNIQUE KEY `uk_mt_h5_guide_state_shop_guide` (`shop_id`, `guide_code`),
   KEY `idx_mt_h5_guide_state_guide_code` (`guide_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='H5门店引导状态表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_bid_constraint` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `poi_id` varchar(64) DEFAULT NULL COMMENT '美团门店ID',
-  `max_bid_amount` decimal(10,2) NOT NULL COMMENT '推广出价上限',
-  `source` varchar(32) NOT NULL COMMENT '来源',
-  `raw_message` varchar(1000) DEFAULT NULL COMMENT '来源原始信息',
-  `observed_at` datetime NOT NULL COMMENT '观测时间',
-  `expire_at` datetime NOT NULL COMMENT '过期时间',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_bid_constraint_shop` (`shop_id`),
-  KEY `idx_mt_promotion_bid_constraint_expire` (`expire_at`),
-  KEY `idx_mt_promotion_bid_constraint_poi` (`poi_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广出价约束表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_recent_order_statistic` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '统计业务日期',
-  `lookback_start_date` date DEFAULT NULL COMMENT '回看开始日期，含',
-  `lookback_end_date` date DEFAULT NULL COMMENT '回看结束日期，含',
-  `sample_dates_json` longtext COMMENT '最近7个有订单日JSON',
-  `trusted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '统计是否可信',
-  `untrusted_reason` varchar(128) DEFAULT NULL COMMENT '不可信原因',
-  `total_order_count` int DEFAULT NULL COMMENT '样本总单量',
-  `average_daily_order_count` decimal(10,2) DEFAULT NULL COMMENT '固定分母7计算的日均单量',
-  `low_peak_order_count` int DEFAULT NULL COMMENT '低峰订单量',
-  `low_peak_order_share` decimal(10,6) DEFAULT NULL COMMENT '低峰订单占比',
-  `peak_window_profile_day_type` varchar(32) DEFAULT NULL COMMENT '使用的高峰画像日型',
-  `peak_window_profile_generated_at` datetime DEFAULT NULL COMMENT '使用的高峰画像生成时间',
-  `peak_windows_json` longtext COMMENT '使用的高峰窗口JSON',
-  `generated_at` datetime NOT NULL COMMENT '统计生成时间',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_recent_order_stat_shop_biz` (`shop_id`, `biz_date`),
-  KEY `idx_mt_promotion_recent_order_stat_generated` (`generated_at`),
-  KEY `idx_mt_promotion_recent_order_stat_biz_date` (`biz_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店核心定价最近订单统计表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_metric_snapshot` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `slot_time` datetime NOT NULL COMMENT '时段时间',
-  `primary_balance` decimal(10,2) DEFAULT NULL COMMENT '主推广余额',
-  `common_balance` decimal(10,2) DEFAULT NULL COMMENT '通用推广余额',
-  `promotion_balance` decimal(10,2) DEFAULT NULL COMMENT '推广总余额',
-  `cost_counter_value` decimal(10,2) DEFAULT NULL COMMENT '广告累计花费计数器',
-  `metrics_trusted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '指标是否可信',
-  `untrusted_reason` varchar(255) DEFAULT NULL COMMENT '指标不可信原因',
-  `payload_json` longtext COMMENT '指标原始内容',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_metric_snapshot_shop_slot` (`shop_id`, `biz_date`, `slot_time`),
-  KEY `idx_mt_promotion_metric_snapshot_shop_time` (`shop_id`, `slot_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广指标快照表';
 
 CREATE TABLE IF NOT EXISTS `mt_version_service_mapping` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -350,42 +234,51 @@ CREATE TABLE IF NOT EXISTS `mt_order_detail` (
   KEY `idx_mt_order_detail_mtorder_id` (`mtorder_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团订单详情';
 
-CREATE TABLE IF NOT EXISTS `mt_promotion_setting` (
+CREATE TABLE IF NOT EXISTS `mt_comment` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `promotion_enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否开启推广',
-  `balance_reminder_enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否开启余额提醒',
-  `strategy_config_json` longtext COMMENT '策略配置JSON',
-  `strategy_configured` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否已配置策略',
+  `epoi_id` varchar(100) NOT NULL COMMENT 'ERP方门店ID',
+  `poi_id` varchar(64) DEFAULT NULL COMMENT '美团门店ID',
+  `comment_id` bigint NOT NULL COMMENT '外卖评价ID',
+  `result` varchar(64) DEFAULT NULL COMMENT '评价结果',
+  `comment_content` longtext COMMENT '评价内容',
+  `order_comment_score` int DEFAULT NULL COMMENT '订单评价分',
+  `food_comment_score` int DEFAULT NULL COMMENT '商品评价分',
+  `delivery_comment_score` int DEFAULT NULL COMMENT '配送评价分',
+  `add_comment` longtext COMMENT '追加评价内容',
+  `add_comment_time` varchar(64) DEFAULT NULL COMMENT '追加评价时间',
+  `packing_score` int DEFAULT NULL COMMENT '包装评价分数',
+  `comment_time` varchar(64) DEFAULT NULL COMMENT '评价时间',
+  `comment_lables` longtext COMMENT '评价标签',
+  `ship_time` int DEFAULT NULL COMMENT '配送时长',
+  `comment_pictures` longtext COMMENT '评价图片',
+  `praise_food_list` longtext COMMENT '点赞菜品列表',
+  `critic_food_list` longtext COMMENT '差评菜品列表',
+  `reply_status` int DEFAULT NULL COMMENT '商家回复状态 0未回复 1已回复',
+  `comment_order_detail_json` longtext COMMENT '评价订单商品明细JSON',
+  `e_reply_content` longtext COMMENT '商家回复内容',
+  `e_reply_time` varchar(64) DEFAULT NULL COMMENT '商家回复时间',
+  `comment_type` int DEFAULT NULL COMMENT '评价类型',
+  `valid` int DEFAULT NULL COMMENT '是否有效',
+  `user_id` bigint DEFAULT NULL COMMENT '用户ID',
+  `over_delivery_time_desc` varchar(255) DEFAULT NULL COMMENT '超时配送描述',
+  `comment_score_type` int DEFAULT NULL COMMENT '评分类型',
+  `product_score` int DEFAULT NULL COMMENT '商品满意度',
+  `biz_code` int DEFAULT NULL COMMENT '业务编码',
+  `query_start_time` varchar(16) DEFAULT NULL COMMENT '本次查询起始时间',
+  `query_end_time` varchar(16) DEFAULT NULL COMMENT '本次查询结束时间',
+  `raw_payload_json` longtext COMMENT '评价原始响应JSON',
+  `auto_reply_status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '自动回复状态 PENDING/SUCCESS/FAILED',
+  `auto_reply_content` varchar(1000) DEFAULT NULL COMMENT '自动回复内容',
+  `auto_reply_at` datetime DEFAULT NULL COMMENT '自动回复时间',
+  `auto_reply_error` varchar(1000) DEFAULT NULL COMMENT '自动回复错误',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_setting_shop_id` (`shop_id`),
-  KEY `idx_mt_promotion_setting_promotion_enabled` (`promotion_enabled`),
-  KEY `idx_mt_promotion_setting_enabled_configured_shop` (`promotion_enabled`, `strategy_configured`, `shop_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广配置表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_setting_history` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `setting_id` bigint DEFAULT NULL COMMENT '推广配置ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `version_no` int NOT NULL COMMENT '门店内递增版本号',
-  `promotion_enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否开启推广',
-  `strategy_configured` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已配置策略',
-  `strategy_config_json` longtext COMMENT '策略配置JSON',
-  `strategy_config_hash` varchar(64) DEFAULT NULL COMMENT '策略配置Hash',
-  `change_source` varchar(64) NOT NULL COMMENT '变更来源 H5/ADMIN/SYSTEM',
-  `operator_user_id` varchar(64) DEFAULT NULL COMMENT '操作人用户ID',
-  `operator_name` varchar(128) DEFAULT NULL COMMENT '操作人名称',
-  `change_reason` varchar(255) DEFAULT NULL COMMENT '变更原因',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_setting_history_shop_version` (`shop_id`, `version_no`),
-  KEY `idx_mt_promotion_setting_history_shop_time` (`shop_id`, `create_time`),
-  KEY `idx_mt_promotion_setting_history_shop_time_enabled` (`shop_id`, `create_time`, `promotion_enabled`),
-  KEY `idx_mt_promotion_setting_history_setting_id` (`setting_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广配置历史表';
+  UNIQUE KEY `uk_mt_comment_comment_id` (`comment_id`),
+  KEY `idx_mt_comment_shop_reply_status` (`shop_id`, `reply_status`, `auto_reply_status`),
+  KEY `idx_mt_comment_shop_comment_time` (`shop_id`, `comment_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团门店评价表';
 
 CREATE TABLE IF NOT EXISTS `mt_power_account` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -582,79 +475,6 @@ CREATE TABLE IF NOT EXISTS `mt_poi_traffic_daily` (
   UNIQUE KEY `uk_mt_poi_traffic_daily_shop_date_flow` (`shop_id`, `biz_date`, `flow_prop`),
   KEY `idx_mt_poi_traffic_daily_shop_date` (`shop_id`, `biz_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店营业分析日流量数据表';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_ad_daily` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `channel` int NOT NULL COMMENT '推广渠道，1=点金推广',
-  `show_count` int NOT NULL DEFAULT 0 COMMENT '曝光量',
-  `click_count` int NOT NULL DEFAULT 0 COMMENT '点击量',
-  `debit_cents` bigint NOT NULL DEFAULT 0 COMMENT '推广消耗，单位分',
-  `payload_json` longtext COMMENT '原始响应及解密结果',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_ad_daily_shop_date_channel` (`shop_id`, `biz_date`, `channel`),
-  KEY `idx_mt_promotion_ad_daily_shop_date` (`shop_id`, `biz_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广广告日汇总数据';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_ad_hourly_detail` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `channel` int NOT NULL COMMENT '推广渠道，1=点金推广',
-  `time_range` varchar(32) NOT NULL COMMENT '时间段，例如 10:00-11:00',
-  `show_count` int NOT NULL DEFAULT 0 COMMENT '曝光量',
-  `click_count` int NOT NULL DEFAULT 0 COMMENT '点击量',
-  `debit_cents` bigint NOT NULL DEFAULT 0 COMMENT '推广消耗，单位分',
-  `payload_json` longtext COMMENT '原始响应及解密结果',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_ad_hourly_shop_date_channel_time` (`shop_id`, `biz_date`, `channel`, `time_range`),
-  KEY `idx_mt_promotion_ad_hourly_shop_date` (`shop_id`, `biz_date`),
-  KEY `idx_mt_promotion_ad_hourly_shop_date_channel` (`shop_id`, `biz_date`, `channel`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广广告分时明细数据';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_ad_realtime_snapshot` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `slot_time` datetime NOT NULL COMMENT '10分钟槽位时间',
-  `channel` int NOT NULL COMMENT '推广渠道，1=点金推广',
-  `current_hour_range` varchar(32) DEFAULT NULL COMMENT '当前小时区间，例如 10:00-11:00',
-  `hour_show_count` int NOT NULL DEFAULT 0 COMMENT '当前小时累计曝光量',
-  `hour_click_count` int NOT NULL DEFAULT 0 COMMENT '当前小时累计点击量',
-  `hour_debit_cents` bigint NOT NULL DEFAULT 0 COMMENT '当前小时累计消耗，单位分',
-  `day_show_count` int NOT NULL DEFAULT 0 COMMENT '当日累计曝光量',
-  `day_click_count` int NOT NULL DEFAULT 0 COMMENT '当日累计点击量',
-  `day_debit_cents` bigint NOT NULL DEFAULT 0 COMMENT '当日累计消耗，单位分',
-  `payload_json` longtext COMMENT '原始响应及解密结果',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_ad_realtime_shop_slot` (`shop_id`, `biz_date`, `slot_time`),
-  KEY `idx_mt_promotion_ad_realtime_shop_time` (`shop_id`, `slot_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广广告实时快照';
-
-CREATE TABLE IF NOT EXISTS `mt_promotion_period_metric_daily` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `shop_id` bigint NOT NULL COMMENT '店铺ID',
-  `biz_date` date NOT NULL COMMENT '业务日期',
-  `show_count` int NOT NULL DEFAULT 0 COMMENT '推广期开启区间曝光量',
-  `debit_cents` bigint NOT NULL DEFAULT 0 COMMENT '推广期开启区间推广消耗，单位分',
-  `income` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '推广期开启区间订单实收',
-  `order_count` int NOT NULL DEFAULT 0 COMMENT '推广期开启区间订单量',
-  `source_hash` varchar(64) DEFAULT NULL COMMENT '源数据版本摘要',
-  `calculated_at` datetime NOT NULL COMMENT '计算时间',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_promotion_period_metric_shop_date` (`shop_id`, `biz_date`),
-  KEY `idx_mt_promotion_period_metric_date_shop` (`biz_date`, `shop_id`),
-  KEY `idx_mt_promotion_period_metric_calculated_at` (`calculated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店推广期日统计预聚合表';
 
 CREATE TABLE IF NOT EXISTS `mt_async_task` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

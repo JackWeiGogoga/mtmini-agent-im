@@ -22,13 +22,11 @@
 import { buildTabbarItems } from "../constants/tabbar";
 import {
   getMtH5TabStatus,
-  markMtH5PromotionLogsRead,
   reportMtH5BehaviorEvent,
 } from "../utils/mt-auth";
 
 const TAB_BEHAVIOR_EVENTS = {
   power: "H5_POWER_TAB_CLICK",
-  log: "H5_LOG_TAB_CLICK",
   support: "H5_SUPPORT_TAB_CLICK",
 };
 
@@ -52,7 +50,7 @@ export default {
     tabItems() {
       return buildTabbarItems(this.activeTab).map((item) => ({
         ...item,
-        dot: item.key === "log" && Boolean(this.tabStatus.logUnread),
+        dot: false,
         badgeText:
           item.key === "power" && this.tabStatus.powerInsufficient
             ? this.tabStatus.powerStatusText || "不足"
@@ -62,16 +60,10 @@ export default {
   },
   mounted() {
     this.refreshTabStatus();
-    if (this.activeTab === "log") {
-      this.markLogsRead();
-    }
   },
   watch: {
-    activeTab(nextValue) {
+    activeTab() {
       this.refreshTabStatus();
-      if (nextValue === "log") {
-        this.markLogsRead();
-      }
     },
   },
   methods: {
@@ -87,17 +79,6 @@ export default {
         // Tab 状态是轻量提醒，失败时不阻断页面主流程。
       }
     },
-    async markLogsRead() {
-      this.tabStatus = {
-        ...this.tabStatus,
-        logUnread: false,
-      };
-      try {
-        await markMtH5PromotionLogsRead();
-      } catch (error) {
-        // 已读同步失败后等待下次刷新恢复服务端状态。
-      }
-    },
     async handleTabClick(item) {
       const eventType = TAB_BEHAVIOR_EVENTS[item.key];
       if (eventType) {
@@ -106,10 +87,6 @@ export default {
       if (!item.path || item.active) {
         return;
       }
-      if (item.key === "log") {
-        await this.markLogsRead();
-      }
-
       uni.redirectTo({
         url: item.path,
       });

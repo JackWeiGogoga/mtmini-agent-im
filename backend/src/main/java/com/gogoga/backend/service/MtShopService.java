@@ -9,7 +9,6 @@ import com.gogoga.backend.mapper.MtShopMapper;
 import com.meituan.sdk.auth.MeituanTokenData;
 import com.meituan.sdk.model.wmoperNg.poi.wmoperngQueryPoiDetail.Data;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,20 +36,17 @@ public class MtShopService {
     private static final String AUTHORIZED_SHOP_GRANT_OPERATOR = "system";
 
     private final MtShopMapper mtShopMapper;
-    private final MtPromotionSettingService mtPromotionSettingService;
     private final MtPowerGrantMapper mtPowerGrantMapper;
     private final MtPowerAccountService mtPowerAccountService;
     private final PowerProperties powerProperties;
 
     public MtShopService(
             MtShopMapper mtShopMapper,
-            @Lazy MtPromotionSettingService mtPromotionSettingService,
             MtPowerGrantMapper mtPowerGrantMapper,
             MtPowerAccountService mtPowerAccountService,
             PowerProperties powerProperties
     ) {
         this.mtShopMapper = mtShopMapper;
-        this.mtPromotionSettingService = mtPromotionSettingService;
         this.mtPowerGrantMapper = mtPowerGrantMapper;
         this.mtPowerAccountService = mtPowerAccountService;
         this.powerProperties = powerProperties;
@@ -121,8 +117,6 @@ public class MtShopService {
 
         if (isNew) {
             shop.setCreateTime(now);
-            shop.setPromotionAdBackfillStatus(MtPromotionAdDataService.BACKFILL_STATUS_INIT);
-            shop.setPromotionAdBackfillAt(null);
             shop.setHistoricalOrderBackfillStatus(HISTORICAL_ORDER_BACKFILL_STATUS_INIT);
             shop.setHistoricalOrderBackfillAt(null);
         }
@@ -150,7 +144,6 @@ public class MtShopService {
 
         if (isNew) {
             mtShopMapper.insert(shop);
-            mtPromotionSettingService.initDefaultForShopId(shop.getId());
             grantPowerForNewAuthorizedShop(shop.getId(), now);
             return shop;
         }
@@ -253,13 +246,6 @@ public class MtShopService {
         shop.setUpdateTime(LocalDateTime.now());
         mtShopMapper.updateById(shop);
         return shop;
-    }
-
-    public void updatePromotionAdBackfillState(Long shopId, String status, LocalDateTime backfillAt) {
-        if (shopId == null || StringUtils.isBlank(status)) {
-            return;
-        }
-        mtShopMapper.updatePromotionAdBackfillState(shopId, status, backfillAt, LocalDateTime.now());
     }
 
     public boolean tryMarkHistoricalOrderBackfillProcessing(Long shopId) {

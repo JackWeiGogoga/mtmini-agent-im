@@ -17,8 +17,6 @@ public class UserBehaviorAnalyticsRowVO {
 
     private Long pcMasterConsoleOperationCount;
 
-    private Long h5PromotionSwitchClickCount;
-
     private Long h5ConfigButtonClickCount;
 
     private Long h5UnlockAiPeakClickCount;
@@ -26,10 +24,6 @@ public class UserBehaviorAnalyticsRowVO {
     private Long h5ConfigModalConfirmClickCount;
 
     private Long h5ConfigModalCancelClickCount;
-
-    private Long h5ManualBidEditOpenCount;
-
-    private Long h5ManualBidSubmitClickCount;
 
     private Long h5PowerTabClickCount;
 
@@ -43,11 +37,4 @@ public class UserBehaviorAnalyticsRowVO {
 
     private Long h5RedemptionCodeClickCount;
 
-    private Long adminPromotionSwitchUpdateCount;
-
-    private Long adminPromotionConfigSaveCount;
-
-    private Long adminPromotionConfigCancelCount;
-
-    private Long adminPromotionLogViewCount;
 }

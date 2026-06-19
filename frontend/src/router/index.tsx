@@ -12,7 +12,6 @@ import { BASE_PATH } from "@/utils/env";
 const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
 const OAuthCallback = lazy(() => import("@/pages/oauth"));
-const MasterConsole = lazy(() => import("@/pages/master-console"));
 const MtAppOrderManage = lazy(() => import("@/pages/mt-app-order-manage"));
 const YouzanAppOrderManage = lazy(
   () => import("@/pages/youzan-app-order-manage"),
@@ -22,7 +21,6 @@ const PowerManage = lazy(() => import("@/pages/power-manage"));
 const PowerRechargeOrderManage = lazy(
   () => import("@/pages/power-recharge-order-manage"),
 );
-const PricingAnalysis = lazy(() => import("@/pages/pricing-analysis"));
 const UserBehaviorAnalytics = lazy(
   () => import("@/pages/user-behavior-analytics"),
 );
@@ -111,27 +109,11 @@ const router = createBrowserRouter(
       children: [
         {
           path: "/",
-          element: <Navigate to="/master-console" replace />,
+          element: <Navigate to="/shops" replace />,
         },
         {
           path: "/welcome",
-          element: <Navigate to="/master-console" replace />,
-        },
-        {
-          path: "/master-console",
-          element: (
-            <AuthLayout
-              anyPermissions={[
-                "shop:master-console:list",
-                "sales:master-console:list",
-                "youzan:master-console:list",
-              ]}
-            >
-              <LazyWrapper>
-                <MasterConsole />
-              </LazyWrapper>
-            </AuthLayout>
-          ),
+          element: <Navigate to="/shops" replace />,
         },
         {
           path: "/mt-app-orders",
@@ -185,16 +167,6 @@ const router = createBrowserRouter(
             <AuthLayout permission="system:power-recharge-order:list">
               <LazyWrapper>
                 <PowerRechargeOrderManage />
-              </LazyWrapper>
-            </AuthLayout>
-          ),
-        },
-        {
-          path: "/pricing-analysis",
-          element: (
-            <AuthLayout permission="system:pricing-analysis:list">
-              <LazyWrapper>
-                <PricingAnalysis />
               </LazyWrapper>
             </AuthLayout>
           ),

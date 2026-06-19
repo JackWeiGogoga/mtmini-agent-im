@@ -19,6 +19,8 @@ class AdminPowerManagementControllerTest {
                 String.class,
                 String.class,
                 String.class,
+                String.class,
+                String.class,
                 Integer.class,
                 Integer.class
         );

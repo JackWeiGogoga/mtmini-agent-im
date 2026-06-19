@@ -78,6 +78,27 @@
         ORDER BY shop_id ASC
     </select>
 
+    <select id="selectCommentAutoReplyCandidates" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_access_token
+        WHERE shop_id IS NOT NULL
+          AND access_token IS NOT NULL
+          AND access_token != ''
+          AND auth_status = 1
+          AND (expires_at IS NULL OR expires_at &gt; #{now})
+          AND EXISTS (
+                SELECT 1
+                FROM mt_shop_right r
+                WHERE r.shop_id = mt_access_token.shop_id
+                  AND r.service_code IN ('H5_PROMOTION', 'VIP_CODE')
+                  AND (
+                        (r.type = 2 AND r.expire_at IS NOT NULL AND r.expire_at &gt; #{now})
+                        OR (r.type != 2 AND r.remaining_times IS NOT NULL AND r.remaining_times &gt; 0)
+                      )
+            )
+        ORDER BY shop_id ASC
+    </select>
+
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAccessToken" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_access_token (
             access_token, shop_id, create_time, update_time, op_biz_code, refresh_token, expires_at,

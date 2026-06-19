@@ -20,26 +20,20 @@ import java.util.concurrent.ThreadPoolExecutor;
 @EnableAsync
 public class AsyncConfig {
 
-    /**
-     * 推广异步任务执行器
-     *
-     * @param mtProperties 美团配置
-     * @return 线程池执行器
-     */
-    @Bean("mtPromotionAsyncTaskExecutor")
-    public Executor mtPromotionAsyncTaskExecutor(MtProperties mtProperties) {
-        MtProperties.AsyncTask asyncTask = mtProperties.getPromotion().getAsyncTask();
+    @Bean("mtAsyncTaskExecutor")
+    public Executor mtAsyncTaskExecutor(MtProperties mtProperties) {
+        MtProperties.AsyncTask asyncTask = mtProperties.getAsyncTask();
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(asyncTask.getExecutorCorePoolSize());
         executor.setMaxPoolSize(asyncTask.getExecutorMaxPoolSize());
         executor.setQueueCapacity(asyncTask.getExecutorQueueCapacity());
-        executor.setThreadNamePrefix("mt-promotion-async-");
+        executor.setThreadNamePrefix("mt-async-");
         executor.setKeepAliveSeconds(60);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(60);
         executor.initialize();
-        log.info("Async executor initialized, name=mtPromotionAsyncTaskExecutor, corePoolSize={}, maxPoolSize={}, queueCapacity={}",
+        log.info("Async executor initialized, name=mtAsyncTaskExecutor, corePoolSize={}, maxPoolSize={}, queueCapacity={}",
                 executor.getCorePoolSize(), executor.getMaxPoolSize(), asyncTask.getExecutorQueueCapacity());
         return executor;
     }

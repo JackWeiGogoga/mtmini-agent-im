@@ -2,6 +2,7 @@ package com.gogoga.backend.service;
 
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>mvn -Dtest=OpenAiCompatibleManualTest test</p>
  */
 @SpringBootTest
+@Disabled("手动联调测试，按需单独移除 Disabled 后执行")
 class OpenAiCompatibleManualTest {
 
     @Autowired

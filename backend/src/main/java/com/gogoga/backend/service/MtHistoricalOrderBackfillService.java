@@ -2,8 +2,6 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.client.MtOrderOpenApiClient;
 import com.gogoga.backend.entity.mt.MtShop;
-import com.gogoga.backend.service.promotion.ShopPeakWindowProfileLookupResult;
-import com.gogoga.backend.service.promotion.ShopPeakWindowProfileService;
 import com.meituan.sdk.model.wmoperNg.order.wmoperOrderQueryOrderDetail.WmoperOrderQueryOrderDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,10 +32,9 @@ public class MtHistoricalOrderBackfillService {
     static final int PAGE_SIZE_MAX = 20;
 
     public static final String TRIGGER_MANUAL_UNLOCK = "MANUAL_UNLOCK";
-    public static final String TRIGGER_ENABLE_PROMOTION = "ENABLE_PROMOTION";
     public static final String TRIGGER_AUTH_ASYNC_TASK = "AUTH_ASYNC_TASK";
-    public static final String UNLOCK_INSUFFICIENT_MESSAGE = "数据不足，功能开启5天后解锁！";
-    public static final String UNLOCK_SUCCESS_MESSAGE = "AI识别高峰期已解锁";
+    public static final String UNLOCK_INSUFFICIENT_MESSAGE = "历史订单补数未完成";
+    public static final String UNLOCK_SUCCESS_MESSAGE = "历史订单补数已完成";
 
     private static final ZoneId DEFAULT_ZONE_ID = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DAY_INT_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
@@ -49,10 +46,9 @@ public class MtHistoricalOrderBackfillService {
     private final MtOrderOpenApiClient mtOrderOpenApiClient;
     private final MtOrderService mtOrderService;
     private final MtShopService mtShopService;
-    private final ShopPeakWindowProfileService shopPeakWindowProfileService;
 
     public void backfillAfterAuthorization(MtShop shop, String accessToken) {
-        BackfillUnlockResult result = backfillRecentOrdersAndRefreshPeakProfile(
+        BackfillUnlockResult result = backfillRecentOrders(
                 shop,
                 accessToken,
                 TRIGGER_AUTH_ASYNC_TASK,
@@ -75,24 +71,21 @@ public class MtHistoricalOrderBackfillService {
                     trigger, shop == null ? null : shop.getId(), StringUtils.isNotBlank(accessToken));
             return BackfillUnlockResult.skipped(false, UNAVAILABLE_REASON_CONTEXT_INCOMPLETE, UNLOCK_INSUFFICIENT_MESSAGE);
         }
-        if (isPeakProfileUsable(shop.getId())) {
-            return BackfillUnlockResult.skipped(true, null, UNLOCK_SUCCESS_MESSAGE);
-        }
         if (StringUtils.equals(shop.getHistoricalOrderBackfillStatus(), MtShopService.HISTORICAL_ORDER_BACKFILL_STATUS_SUCCESS)) {
-            return buildResultFromCurrentProfile(shop.getId(), false, UNAVAILABLE_REASON_ALREADY_BACKFILLED);
+            return BackfillUnlockResult.skipped(true, UNAVAILABLE_REASON_ALREADY_BACKFILLED, UNLOCK_SUCCESS_MESSAGE);
         }
         if (!tryClaimBackfillProcessing(shop, trigger)) {
             MtShop latestShop = mtShopService.findById(shop.getId());
             if (latestShop != null
                     && StringUtils.equals(latestShop.getHistoricalOrderBackfillStatus(), MtShopService.HISTORICAL_ORDER_BACKFILL_STATUS_SUCCESS)) {
-                return buildResultFromCurrentProfile(shop.getId(), false, UNAVAILABLE_REASON_ALREADY_BACKFILLED);
+                return BackfillUnlockResult.skipped(true, UNAVAILABLE_REASON_ALREADY_BACKFILLED, UNLOCK_SUCCESS_MESSAGE);
             }
             log.info("跳过近期历史订单补数，原因=门店补数正在处理或状态不可重试, trigger={}, shopId={}, status={}",
                     trigger, shop.getId(), latestShop == null ? shop.getHistoricalOrderBackfillStatus() : latestShop.getHistoricalOrderBackfillStatus());
             return BackfillUnlockResult.skipped(false, UNAVAILABLE_REASON_ALREADY_PROCESSING, UNLOCK_INSUFFICIENT_MESSAGE);
         }
         try {
-            return backfillRecentOrdersAndRefreshPeakProfile(shop, accessToken, trigger, false);
+            return backfillRecentOrders(shop, accessToken, trigger, false);
         } catch (RuntimeException e) {
             log.warn("近期历史订单补数失败，trigger={}, shopId={}", trigger, shop.getId(), e);
             return BackfillUnlockResult.failed(UNAVAILABLE_REASON_BACKFILL_FAILED, UNLOCK_INSUFFICIENT_MESSAGE, e);
@@ -109,7 +102,7 @@ public class MtHistoricalOrderBackfillService {
         }
     }
 
-    private BackfillUnlockResult backfillRecentOrdersAndRefreshPeakProfile(
+    private BackfillUnlockResult backfillRecentOrders(
             MtShop shop,
             String accessToken,
             String trigger,
@@ -138,19 +131,17 @@ public class MtHistoricalOrderBackfillService {
             }
 
             LocalDateTime now = LocalDateTime.now();
-            shopPeakWindowProfileService.refreshProfilesForShop(shop.getId(), now);
-            boolean autoTimeModeAvailable = isPeakProfileUsable(shop.getId());
             mtShopService.updateHistoricalOrderBackfillState(
                     shop.getId(),
                     MtShopService.HISTORICAL_ORDER_BACKFILL_STATUS_SUCCESS,
                     now
             );
-            log.info("近期历史订单补数完成，trigger={}, shopId={}, lookbackDays={}, orderIdCount={}, syncedOrderCount={}, autoTimeModeAvailable={}",
-                    trigger, shop.getId(), AUTH_LOOKBACK_DAYS, orderIds.size(), syncedOrderCount, autoTimeModeAvailable);
+            log.info("近期历史订单补数完成，trigger={}, shopId={}, lookbackDays={}, orderIdCount={}, syncedOrderCount={}",
+                    trigger, shop.getId(), AUTH_LOOKBACK_DAYS, orderIds.size(), syncedOrderCount);
             return BackfillUnlockResult.completed(
-                    autoTimeModeAvailable,
-                    autoTimeModeAvailable ? null : resolveCurrentUnavailableReason(shop.getId()),
-                    autoTimeModeAvailable ? UNLOCK_SUCCESS_MESSAGE : UNLOCK_INSUFFICIENT_MESSAGE,
+                    true,
+                    null,
+                    UNLOCK_SUCCESS_MESSAGE,
                     orderIds.size(),
                     syncedOrderCount
             );
@@ -168,33 +159,6 @@ public class MtHistoricalOrderBackfillService {
             }
             return BackfillUnlockResult.failed(UNAVAILABLE_REASON_BACKFILL_FAILED, UNLOCK_INSUFFICIENT_MESSAGE, e);
         }
-    }
-
-    private BackfillUnlockResult buildResultFromCurrentProfile(Long shopId, boolean completed, String fallbackReason) {
-        ShopPeakWindowProfileLookupResult lookupResult = shopPeakWindowProfileService.lookup(shopId, LocalDateTime.now());
-        boolean autoTimeModeAvailable = isLookupUsable(lookupResult);
-        String unavailableReason = autoTimeModeAvailable
-                ? null
-                : StringUtils.defaultIfBlank(lookupResult == null ? null : lookupResult.getUnavailableReason(), fallbackReason);
-        return completed
-                ? BackfillUnlockResult.completed(autoTimeModeAvailable, unavailableReason,
-                autoTimeModeAvailable ? UNLOCK_SUCCESS_MESSAGE : UNLOCK_INSUFFICIENT_MESSAGE, 0, 0)
-                : BackfillUnlockResult.skipped(autoTimeModeAvailable, unavailableReason,
-                autoTimeModeAvailable ? UNLOCK_SUCCESS_MESSAGE : UNLOCK_INSUFFICIENT_MESSAGE);
-    }
-
-    private boolean isPeakProfileUsable(Long shopId) {
-        return isLookupUsable(shopPeakWindowProfileService.lookup(shopId, LocalDateTime.now()));
-    }
-
-    private boolean isLookupUsable(ShopPeakWindowProfileLookupResult lookupResult) {
-        return lookupResult != null
-                && StringUtils.equals(lookupResult.getProfileStatus(), ShopPeakWindowProfileLookupResult.STATUS_USABLE);
-    }
-
-    private String resolveCurrentUnavailableReason(Long shopId) {
-        ShopPeakWindowProfileLookupResult lookupResult = shopPeakWindowProfileService.lookup(shopId, LocalDateTime.now());
-        return lookupResult == null ? null : lookupResult.getUnavailableReason();
     }
 
     private Set<String> collectRecentCompletedOrderIds(Long shopId, String accessToken) {

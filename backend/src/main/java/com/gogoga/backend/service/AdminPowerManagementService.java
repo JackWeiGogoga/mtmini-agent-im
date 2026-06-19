@@ -7,7 +7,7 @@ import com.gogoga.backend.entity.mt.MtPowerConsume;
 import com.gogoga.backend.entity.mt.MtPowerConsumeDetail;
 import com.gogoga.backend.entity.mt.MtPowerRecharge;
 import com.gogoga.backend.entity.mt.MtShop;
-import com.gogoga.backend.constant.PromotionPowerThresholdConstant;
+import com.gogoga.backend.constant.PowerThresholdConstant;
 import com.gogoga.backend.enums.ShopBindingDomainEnum;
 import com.gogoga.backend.enums.ShopBindingStatusEnum;
 import com.gogoga.backend.enums.PowerRechargeStatusEnum;
@@ -319,10 +319,10 @@ public class AdminPowerManagementService {
 
     private String resolveRiskStatus(Integer balance) {
         int currentBalance = defaultInt(balance);
-        if (currentBalance < PromotionPowerThresholdConstant.MIN_PROMOTION_EXECUTION_POWER) {
+        if (currentBalance < PowerThresholdConstant.CRITICAL_POWER_BALANCE) {
             return RISK_STATUS_CRITICAL;
         }
-        if (currentBalance < PromotionPowerThresholdConstant.PROMOTION_POWER_WARNING_THRESHOLD) {
+        if (currentBalance < PowerThresholdConstant.WARNING_POWER_BALANCE) {
             return RISK_STATUS_WARNING;
         }
         return RISK_STATUS_NORMAL;
@@ -343,15 +343,6 @@ public class AdminPowerManagementService {
     private String resolveConsumeSourceTypeText(String sourceType) {
         if (StringUtils.isBlank(sourceType)) {
             return "";
-        }
-        if (PromotionPowerConsumeService.CONSUME_SOURCE_RULE.equals(sourceType)) {
-            return "规则计算";
-        }
-        if (PromotionPowerConsumeService.CONSUME_SOURCE_LLM.equals(sourceType)) {
-            return "LLM 计算";
-        }
-        if (PromotionPowerConsumeService.CONSUME_SOURCE_LOG_LLM.equals(sourceType)) {
-            return "日志 LLM";
         }
         if (MtPaidApiPowerConsumeService.CONSUME_SOURCE_AUTHORIZED_SHOP.equals(sourceType)) {
             return "授权门店详情";

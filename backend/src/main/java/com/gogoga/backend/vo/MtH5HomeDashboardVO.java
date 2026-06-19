@@ -21,13 +21,9 @@ public class MtH5HomeDashboardVO implements Serializable {
 
     private MembershipSummary membership;
 
-    private PromotionSummary promotion;
-
     private MarketingStatsSummary marketingStats;
 
     private PowerStatsSummary powerStats;
-
-    private CurrentBidSummary currentBid;
 
     private MtH5TabStatusVO tabStatus;
 
@@ -55,28 +51,6 @@ public class MtH5HomeDashboardVO implements Serializable {
         private Boolean active;
 
         private LocalDateTime expireAt;
-    }
-
-    @Data
-    public static class PromotionSummary implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        private Boolean promotionEnabled;
-
-        private Boolean balanceReminderEnabled;
-
-        private Boolean strategyConfigured;
-
-        private Boolean strategyEntryVisible;
-
-        private String strategyConfigJson;
-
-        private String promotionDisabledReasonText;
-
-        private Boolean autoTimeModeAvailable;
-
-        private String autoTimeModeHintText;
     }
 
     @Data
@@ -123,38 +97,6 @@ public class MtH5HomeDashboardVO implements Serializable {
         private Boolean insufficient;
 
         private String statusText;
-    }
-
-    @Data
-    public static class CurrentBidSummary implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        private Boolean inPromotionWindow;
-
-        private Boolean editable;
-
-        private String disabledReason;
-
-        private BigDecimal currentBidAmount;
-
-        private BigDecimal previousBidAmount;
-
-        private String latestExecuteStatus;
-
-        private String displayStatusText;
-
-        private BigDecimal minBidAmount;
-
-        private BigDecimal maxBidAmount;
-
-        private String windowKey;
-
-        private LocalDateTime windowStartAt;
-
-        private LocalDateTime windowEndAt;
-
-        private LocalDateTime latestSuccessSlotTime;
     }
 
     @Data

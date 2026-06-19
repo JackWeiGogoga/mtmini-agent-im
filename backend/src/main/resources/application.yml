@@ -153,73 +153,50 @@ mt:
     app-id: ${MT_APP_ORDER_APP_ID:111}
     page-size: ${MT_APP_ORDER_PAGE_SIZE:100}
     lookback-seconds: ${MT_APP_ORDER_LOOKBACK_SECONDS:172800}
-  promotion-ad-data:
-    pull-cron: ${MT_PROMOTION_AD_DATA_PULL_CRON:0 30 13 * * ?}
-  promotion:
-    auto-bid-cron: ${MT_PROMOTION_AUTO_BID_CRON:0 */10 * * * ?}
-    write-dry-run: ${MT_PROMOTION_WRITE_DRY_RUN:true}
-    async-task:
-      enabled: ${MT_PROMOTION_ASYNC_TASK_ENABLED:false}
-      worker-enabled: ${MT_PROMOTION_ASYNC_TASK_WORKER_ENABLED:false}
-      dispatch-page-size: ${MT_PROMOTION_ASYNC_TASK_DISPATCH_PAGE_SIZE:200}
-      poll-size: ${MT_PROMOTION_ASYNC_TASK_POLL_SIZE:20}
-      poll-delay-ms: ${MT_PROMOTION_ASYNC_TASK_POLL_DELAY_MS:1000}
-      recovery-delay-ms: ${MT_PROMOTION_ASYNC_TASK_RECOVERY_DELAY_MS:30000}
-      recovery-limit: ${MT_PROMOTION_ASYNC_TASK_RECOVERY_LIMIT:20}
-      executor-core-pool-size: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_CORE_POOL_SIZE:4}
-      executor-max-pool-size: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_MAX_POOL_SIZE:8}
-      executor-queue-capacity: ${MT_PROMOTION_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
-      auto-bid-shop-lock-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_SHOP_LOCK_SECONDS:300}
-      order-notify-lock-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_LOCK_SECONDS:60}
-      auto-bid-busy-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_BUSY_BACKOFF_SECONDS:30}
-      order-notify-busy-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_BUSY_BACKOFF_SECONDS:5}
-      order-notify:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_TIMEOUT_SECONDS:180}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_INITIAL_BACKOFF_SECONDS:30}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_ORDER_NOTIFY_MAX_BACKOFF_SECONDS:300}
-      cleanup:
-        enabled: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_ENABLED:false}
-        delay-ms: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
-        batch-size: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_BATCH_SIZE:1000}
-        success-retention-days: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_SUCCESS_RETENTION_DAYS:7}
-        dead-retention-days: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_DEAD_RETENTION_DAYS:30}
-        lock-seconds: ${MT_PROMOTION_ASYNC_TASK_CLEANUP_LOCK_SECONDS:300}
-      auto-bid:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_TIMEOUT_SECONDS:300}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_INITIAL_BACKOFF_SECONDS:60}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTO_BID_MAX_BACKOFF_SECONDS:1800}
-      log-markdown:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_TIMEOUT_SECONDS:180}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_INITIAL_BACKOFF_SECONDS:60}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_LOG_MARKDOWN_MAX_BACKOFF_SECONDS:600}
-      auth-sync-rights:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
-      auth-backfill-poi-id:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_TIMEOUT_SECONDS:180}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_INITIAL_BACKOFF_SECONDS:60}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_BACKOFF_SECONDS:900}
-      auth-sync-recent-ad-data:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_TIMEOUT_SECONDS:300}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_INITIAL_BACKOFF_SECONDS:120}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_SYNC_RECENT_AD_DATA_MAX_BACKOFF_SECONDS:1800}
-      auth-historical-order-backfill:
-        max-retry-count: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_RETRY_COUNT:3}
-        timeout-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_TIMEOUT_SECONDS:600}
-        initial-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_INITIAL_BACKOFF_SECONDS:300}
-        max-backoff-seconds: ${MT_PROMOTION_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_BACKOFF_SECONDS:3600}
-    llm:
-      model: ${MT_PROMOTION_LLM_MODEL:deepseek-v3.2}
-      success-log-prompt-resource: ${MT_PROMOTION_LLM_SUCCESS_LOG_PROMPT_RESOURCE:prompts/promotion-log-success-prompt.txt}
-      initial-success-log-prompt-resource: ${MT_PROMOTION_LLM_INITIAL_SUCCESS_LOG_PROMPT_RESOURCE:prompts/promotion-log-initial-success-prompt.txt}
-      exception-log-prompt-resource: ${MT_PROMOTION_LLM_EXCEPTION_LOG_PROMPT_RESOURCE:prompts/promotion-log-exception-prompt.txt}
+  async-task:
+    enabled: ${MT_ASYNC_TASK_ENABLED:false}
+    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:false}
+    poll-size: ${MT_ASYNC_TASK_POLL_SIZE:20}
+    poll-delay-ms: ${MT_ASYNC_TASK_POLL_DELAY_MS:1000}
+    recovery-delay-ms: ${MT_ASYNC_TASK_RECOVERY_DELAY_MS:30000}
+    recovery-limit: ${MT_ASYNC_TASK_RECOVERY_LIMIT:20}
+    executor-core-pool-size: ${MT_ASYNC_TASK_EXECUTOR_CORE_POOL_SIZE:4}
+    executor-max-pool-size: ${MT_ASYNC_TASK_EXECUTOR_MAX_POOL_SIZE:8}
+    executor-queue-capacity: ${MT_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
+    order-notify-lock-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_LOCK_SECONDS:60}
+    order-notify-busy-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_BUSY_BACKOFF_SECONDS:5}
+    order-notify:
+      max-retry-count: ${MT_ASYNC_TASK_ORDER_NOTIFY_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_INITIAL_BACKOFF_SECONDS:30}
+      max-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_MAX_BACKOFF_SECONDS:300}
+    cleanup:
+      enabled: ${MT_ASYNC_TASK_CLEANUP_ENABLED:false}
+      delay-ms: ${MT_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
+      batch-size: ${MT_ASYNC_TASK_CLEANUP_BATCH_SIZE:1000}
+      success-retention-days: ${MT_ASYNC_TASK_CLEANUP_SUCCESS_RETENTION_DAYS:7}
+      dead-retention-days: ${MT_ASYNC_TASK_CLEANUP_DEAD_RETENTION_DAYS:30}
+      lock-seconds: ${MT_ASYNC_TASK_CLEANUP_LOCK_SECONDS:300}
+    auth-sync-rights:
+      max-retry-count: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
+    auth-backfill-poi-id:
+      max-retry-count: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_BACKOFF_SECONDS:900}
+    auth-historical-order-backfill:
+      max-retry-count: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_TIMEOUT_SECONDS:600}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_INITIAL_BACKOFF_SECONDS:300}
+      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_BACKOFF_SECONDS:3600}
+  comment:
+    pull-cron: ${MT_COMMENT_PULL_CRON:0 0 8,13,19 * * ?}
+    lookback-days: ${MT_COMMENT_LOOKBACK_DAYS:7}
+    page-size: ${MT_COMMENT_PAGE_SIZE:20}
+    default-reply: ${MT_COMMENT_DEFAULT_REPLY:很好}
 
 youzan:
   client-id: ${YOUZAN_CLIENT_ID:}

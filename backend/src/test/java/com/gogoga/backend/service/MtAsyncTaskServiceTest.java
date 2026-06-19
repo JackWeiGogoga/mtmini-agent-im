@@ -43,11 +43,11 @@ class MtAsyncTaskServiceTest {
         doThrow(new DuplicateKeyException("duplicate")).when(mtAsyncTaskMapper).insert(any(MtAsyncTask.class));
         MtAsyncTask existingTask = new MtAsyncTask();
         existingTask.setId(99L);
-        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey(MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID.name(), "1#2026-04-18T12:00"))
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(), "1#2026-04-18T12:00"))
                 .thenReturn(existingTask);
 
         MtAsyncTaskEnqueueResult enqueueResult = mtAsyncTaskService.enqueueTask(
-                MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID,
+                MtAsyncTaskTypeEnum.ORDER_NOTIFY,
                 "1#2026-04-18T12:00",
                 "1",
                 java.util.Map.of("shopId", 1L),
@@ -76,7 +76,7 @@ class MtAsyncTaskServiceTest {
         ArgumentCaptor<LocalDateTime> availableAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(mtAsyncTaskMapper).rescheduleFromProcessing(
                 eq(1L),
-                eq(MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID.name()),
+                eq(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name()),
                 retryCaptor.capture(),
                 availableAtCaptor.capture(),
                 eq("REMOTE_TIMEOUT"),
@@ -102,7 +102,7 @@ class MtAsyncTaskServiceTest {
 
         verify(mtAsyncTaskMapper).markDead(
                 1L,
-                MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID.name(),
+                MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(),
                 4,
                 now,
                 "STALE_TASK_TIMEOUT"
@@ -120,7 +120,7 @@ class MtAsyncTaskServiceTest {
 
         verify(mtAsyncTaskMapper).rescheduleFromProcessing(
                 2L,
-                MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID.name(),
+                MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(),
                 2,
                 nextAvailableAt,
                 "SHOP_EXECUTION_BUSY",
@@ -131,10 +131,10 @@ class MtAsyncTaskServiceTest {
     @Test
     void shouldRecoverStaleTasksForRetry() {
         MtAsyncTask task = buildProcessingTask(5L, 0, 3);
-        task.setTaskType(MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN.name());
+        task.setTaskType(MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name());
         task.setClaimedAt(LocalDateTime.of(2026, 4, 18, 11, 40));
         when(mtAsyncTaskMapper.selectStaleProcessingTasks(
-                eq(MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN.name()),
+                eq(MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name()),
                 eq(LocalDateTime.of(2026, 4, 18, 11, 55)),
                 eq(10)
         )).thenReturn(java.util.List.of(task));
@@ -147,7 +147,7 @@ class MtAsyncTaskServiceTest {
                 .build();
 
         int recovered = mtAsyncTaskService.recoverStaleTasks(
-                MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN,
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
                 policy,
                 10,
                 LocalDateTime.of(2026, 4, 18, 12, 0)
@@ -156,7 +156,7 @@ class MtAsyncTaskServiceTest {
         assertEquals(1, recovered);
         verify(mtAsyncTaskMapper).rescheduleFromProcessing(
                 5L,
-                MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN.name(),
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),
                 1,
                 LocalDateTime.of(2026, 4, 18, 12, 1),
                 "STALE_TASK_TIMEOUT",
@@ -167,7 +167,7 @@ class MtAsyncTaskServiceTest {
     @Test
     void shouldEnqueueTaskWithPendingStatus() {
         MtAsyncTaskEnqueueResult enqueueResult = mtAsyncTaskService.enqueueTask(
-                MtAsyncTaskTypeEnum.PROMOTION_LOG_MARKDOWN,
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
                 "record#1",
                 "1",
                 java.util.Map.of("recordId", 1L),
@@ -203,7 +203,7 @@ class MtAsyncTaskServiceTest {
     private MtAsyncTask buildProcessingTask(Long id, int retryCount, int maxRetryCount) {
         MtAsyncTask task = new MtAsyncTask();
         task.setId(id);
-        task.setTaskType(MtAsyncTaskTypeEnum.PROMOTION_AUTO_BID.name());
+        task.setTaskType(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name());
         task.setStatus("PROCESSING");
         task.setRetryCount(retryCount);
         task.setMaxRetryCount(maxRetryCount);

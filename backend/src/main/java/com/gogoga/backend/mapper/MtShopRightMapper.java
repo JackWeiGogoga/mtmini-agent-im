@@ -4,7 +4,6 @@ import com.gogoga.backend.entity.mt.MtShopRight;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -40,15 +39,6 @@ public interface MtShopRightMapper {
      * @return 权益列表
      */
     List<MtShopRight> selectByShopId(@Param("shopId") Long shopId);
-
-    /**
-     * 判断门店是否有有效推广功能权益。
-     *
-     * @param shopId 店铺 ID
-     * @param now 当前时间
-     * @return 是否有有效权益
-     */
-    boolean existsActivePromotionRight(@Param("shopId") Long shopId, @Param("now") LocalDateTime now);
 
     /**
      * 新增权益

@@ -45,11 +45,6 @@ public interface MtShopMapper {
      */
     int insert(MtShop shop);
 
-    int updatePromotionAdBackfillState(@Param("id") Long id,
-                                       @Param("status") String status,
-                                       @Param("backfillAt") java.time.LocalDateTime backfillAt,
-                                       @Param("updateTime") java.time.LocalDateTime updateTime);
-
     int markHistoricalOrderBackfillProcessing(@Param("id") Long id,
                                               @Param("expectedStatus") String expectedStatus,
                                               @Param("processingStatus") String processingStatus,

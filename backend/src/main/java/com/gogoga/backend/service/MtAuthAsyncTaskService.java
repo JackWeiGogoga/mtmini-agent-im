@@ -2,10 +2,8 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtAccessToken;
-import com.gogoga.backend.entity.mt.MtPromotionSetting;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
-import com.gogoga.backend.mapper.MtPromotionSettingMapper;
 import com.gogoga.backend.service.async.MtAsyncTaskEnqueueResult;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +29,8 @@ public class MtAuthAsyncTaskService {
     private final MtShopService mtShopService;
     private final MtShopRightService mtShopRightService;
     private final MtShopPoiIdBackfillService mtShopPoiIdBackfillService;
-    private final MtPromotionAdDataService mtPromotionAdDataService;
     private final MtHistoricalOrderBackfillService mtHistoricalOrderBackfillService;
     private final MtOrderPushControlService mtOrderPushControlService;
-    private final MtPromotionSettingMapper mtPromotionSettingMapper;
 
     public void enqueuePostAuthorizationTasks(Long shopId, String accessToken, boolean newlyCreatedToken) {
         if (shopId == null || StringUtils.isBlank(accessToken)) {
@@ -48,8 +44,7 @@ public class MtAuthAsyncTaskService {
         }
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID, payload, false);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload, false);
-        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RECENT_AD_DATA, payload, false);
-        log.info("跳过授权后历史订单补数任务入队，原因=历史订单补数改为商家手动识别或开启推广时触发, shopId={}", shopId);
+        log.info("跳过授权后历史订单补数任务入队，原因=新评论回复服务不依赖订单历史补数, shopId={}", shopId);
     }
 
     public void executeAuthSyncRightsTask(MtAuthPostProcessTaskPayload payload) {
@@ -62,11 +57,6 @@ public class MtAuthAsyncTaskService {
         mtShopPoiIdBackfillService.tryBackfillAfterAuthorization(context.shop(), context.token().getAccessToken());
     }
 
-    public void executeAuthSyncRecentAdDataTask(MtAuthPostProcessTaskPayload payload) {
-        ShopContext context = loadContext(payload);
-        mtPromotionAdDataService.syncRecentAdDataAfterAuthorization(context.shop().getId(), context.token().getAccessToken());
-    }
-
     public void executeAuthHistoricalOrderBackfillTask(MtAuthPostProcessTaskPayload payload) {
         ShopContext context = loadContext(payload);
         mtHistoricalOrderBackfillService.backfillAfterAuthorization(context.shop(), context.token().getAccessToken());
@@ -74,11 +64,6 @@ public class MtAuthAsyncTaskService {
 
     public void executeAuthBlockOrderPushTask(MtAuthPostProcessTaskPayload payload) {
         ShopContext context = loadContext(payload);
-        MtPromotionSetting setting = mtPromotionSettingMapper.selectByShopId(context.shop().getId());
-        if (setting != null && Boolean.TRUE.equals(setting.getPromotionEnabled())) {
-            log.info("跳过授权后停止订单推送任务，原因=推广总开关已开启, shopId={}", context.shop().getId());
-            return;
-        }
         MtOrderPushControlService.OrderPushSyncResult result =
                 mtOrderPushControlService.blockOrderPush(context.token(), "INITIAL_AUTH");
         if (!result.success()) {
@@ -127,10 +112,9 @@ public class MtAuthAsyncTaskService {
     private int resolveMaxRetryCount(MtAsyncTaskTypeEnum taskType) {
         return switch (taskType) {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
-            case AUTH_SYNC_RIGHTS -> mtProperties.getPromotion().getAsyncTask().getAuthSyncRights().getMaxRetryCount();
-            case AUTH_BACKFILL_POI_ID -> mtProperties.getPromotion().getAsyncTask().getAuthBackfillPoiId().getMaxRetryCount();
-            case AUTH_SYNC_RECENT_AD_DATA -> mtProperties.getPromotion().getAsyncTask().getAuthSyncRecentAdData().getMaxRetryCount();
-            case AUTH_HISTORICAL_ORDER_BACKFILL -> mtProperties.getPromotion().getAsyncTask().getAuthHistoricalOrderBackfill().getMaxRetryCount();
+            case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
+            case AUTH_BACKFILL_POI_ID -> mtProperties.getAsyncTask().getAuthBackfillPoiId().getMaxRetryCount();
+            case AUTH_HISTORICAL_ORDER_BACKFILL -> mtProperties.getAsyncTask().getAuthHistoricalOrderBackfill().getMaxRetryCount();
             default -> 0;
         };
     }
