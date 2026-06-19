@@ -10,7 +10,6 @@
         <result column="h5_app_open_count" property="h5AppOpenCount"/>
         <result column="pc_master_console_operation_count" property="pcMasterConsoleOperationCount"/>
         <result column="h5_config_button_click_count" property="h5ConfigButtonClickCount"/>
-        <result column="h5_unlock_ai_peak_click_count" property="h5UnlockAiPeakClickCount"/>
         <result column="h5_config_modal_confirm_click_count" property="h5ConfigModalConfirmClickCount"/>
         <result column="h5_config_modal_cancel_click_count" property="h5ConfigModalCancelClickCount"/>
         <result column="h5_power_tab_click_count" property="h5PowerTabClickCount"/>
@@ -42,7 +41,6 @@
                 SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_APP_OPEN' THEN 1 ELSE 0 END) AS h5_app_open_count,
                 SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' THEN 1 ELSE 0 END) AS pc_master_console_operation_count,
                 SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_BUTTON_CLICK' THEN 1 ELSE 0 END) AS h5_config_button_click_count,
-                SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_UNLOCK_AI_PEAK_CLICK' THEN 1 ELSE 0 END) AS h5_unlock_ai_peak_click_count,
                 SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_MODAL_CONFIRM_CLICK' THEN 1 ELSE 0 END) AS h5_config_modal_confirm_click_count,
                 SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_CONFIG_MODAL_CANCEL_CLICK' THEN 1 ELSE 0 END) AS h5_config_modal_cancel_click_count,
                 SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_POWER_TAB_CLICK' THEN 1 ELSE 0 END) AS h5_power_tab_click_count,

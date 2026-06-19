@@ -43,7 +43,7 @@ public class MtH5HomeDashboardService {
         MtH5HomeDashboardVO dashboard = new MtH5HomeDashboardVO();
         dashboard.setShop(buildShopSummary(shop));
         dashboard.setMembership(buildMembershipSummary(shop.getId()));
-        dashboard.setMarketingStats(buildMarketingStats(shop.getId(), statsRange));
+        dashboard.setCommentStats(buildCommentStats(shop.getId(), statsRange));
         dashboard.setTabStatus(buildTabStatus(powerAccount, hidePower));
         dashboard.setGuide(buildGuideSummary(shop.getId()));
         dashboard.setAuthorization(buildLocalAuthorizationStatus(shop.getId()));
@@ -94,13 +94,19 @@ public class MtH5HomeDashboardService {
         return summary;
     }
 
-    private MtH5HomeDashboardVO.MarketingStatsSummary buildMarketingStats(Long shopId,
-                                                                          DashboardStatsRangeTypeEnum statsRange) {
-        ShopDashboardMetricsService.MarketingStatsSnapshot snapshot =
-                shopDashboardMetricsService.buildMarketingStats(shopId, statsRange);
-        MtH5HomeDashboardVO.MarketingStatsSummary summary = new MtH5HomeDashboardVO.MarketingStatsSummary();
-        summary.setCurrentIncome(snapshot.getCurrentIncome());
-        summary.setPreviousIncome(snapshot.getPreviousIncome());
+    private MtH5HomeDashboardVO.CommentStatsSummary buildCommentStats(Long shopId,
+                                                                      DashboardStatsRangeTypeEnum statsRange) {
+        ShopDashboardMetricsService.CommentStatsSnapshot snapshot =
+                shopDashboardMetricsService.buildCommentStats(shopId, statsRange);
+        MtH5HomeDashboardVO.CommentStatsSummary summary = new MtH5HomeDashboardVO.CommentStatsSummary();
+        summary.setGoodCommentCount(snapshot.getGoodCommentCount());
+        summary.setNeutralCommentCount(snapshot.getNeutralCommentCount());
+        summary.setBadCommentCount(snapshot.getBadCommentCount());
+        summary.setRepliedBadCommentCount(snapshot.getRepliedBadCommentCount());
+        summary.setBadCommentReplyRate(snapshot.getBadCommentReplyRate());
+        summary.setPreviousGoodCommentCount(snapshot.getPreviousGoodCommentCount());
+        summary.setPreviousBadCommentCount(snapshot.getPreviousBadCommentCount());
+        summary.setPreviousBadCommentReplyRate(snapshot.getPreviousBadCommentReplyRate());
         return summary;
     }
 

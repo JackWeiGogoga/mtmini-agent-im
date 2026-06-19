@@ -1,6 +1,7 @@
 package com.gogoga.backend.mapper;
 
 import com.gogoga.backend.entity.mt.MtComment;
+import com.gogoga.backend.entity.mt.MtCommentStatsAggregate;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -16,6 +17,12 @@ public interface MtCommentMapper {
     MtComment selectByCommentId(@Param("commentId") Long commentId);
 
     List<MtComment> selectPendingAutoReplyByShopId(@Param("shopId") Long shopId);
+
+    MtCommentStatsAggregate selectStatsByShopIdAndCreateTimeBetween(
+            @Param("shopId") Long shopId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 
     int insert(MtComment comment);
 

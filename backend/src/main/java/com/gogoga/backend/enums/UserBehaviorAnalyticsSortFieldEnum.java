@@ -12,7 +12,6 @@ public enum UserBehaviorAnalyticsSortFieldEnum {
     H5_APP_OPEN_COUNT("h5AppOpenCount", "h5_app_open_count"),
     PC_MASTER_CONSOLE_OPERATION_COUNT("pcMasterConsoleOperationCount", "pc_master_console_operation_count"),
     H5_CONFIG_BUTTON_CLICK_COUNT("h5ConfigButtonClickCount", "h5_config_button_click_count"),
-    H5_UNLOCK_AI_PEAK_CLICK_COUNT("h5UnlockAiPeakClickCount", "h5_unlock_ai_peak_click_count"),
     H5_CONFIG_MODAL_CONFIRM_CLICK_COUNT("h5ConfigModalConfirmClickCount", "h5_config_modal_confirm_click_count"),
     H5_CONFIG_MODAL_CANCEL_CLICK_COUNT("h5ConfigModalCancelClickCount", "h5_config_modal_cancel_click_count"),
     H5_POWER_TAB_CLICK_COUNT("h5PowerTabClickCount", "h5_power_tab_click_count"),

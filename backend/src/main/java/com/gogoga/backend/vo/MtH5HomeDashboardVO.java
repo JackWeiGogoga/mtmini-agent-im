@@ -21,7 +21,7 @@ public class MtH5HomeDashboardVO implements Serializable {
 
     private MembershipSummary membership;
 
-    private MarketingStatsSummary marketingStats;
+    private CommentStatsSummary commentStats;
 
     private PowerStatsSummary powerStats;
 
@@ -54,25 +54,25 @@ public class MtH5HomeDashboardVO implements Serializable {
     }
 
     @Data
-    public static class MarketingStatsSummary implements Serializable {
+    public static class CommentStatsSummary implements Serializable {
 
         private static final long serialVersionUID = 1L;
 
-        private Integer currentExposure;
+        private Integer goodCommentCount;
 
-        private Integer previousExposure;
+        private Integer neutralCommentCount;
 
-        private BigDecimal currentCost;
+        private Integer badCommentCount;
 
-        private BigDecimal previousCost;
+        private Integer repliedBadCommentCount;
 
-        private BigDecimal currentCostRatio;
+        private BigDecimal badCommentReplyRate;
 
-        private BigDecimal previousCostRatio;
+        private Integer previousGoodCommentCount;
 
-        private BigDecimal currentIncome;
+        private Integer previousBadCommentCount;
 
-        private BigDecimal previousIncome;
+        private BigDecimal previousBadCommentReplyRate;
     }
 
     @Data

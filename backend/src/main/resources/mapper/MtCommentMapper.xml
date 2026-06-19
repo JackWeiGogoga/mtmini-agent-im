@@ -70,6 +70,19 @@
         ORDER BY comment_time ASC, id ASC
     </select>
 
+    <select id="selectStatsByShopIdAndCreateTimeBetween"
+            resultType="com.gogoga.backend.entity.mt.MtCommentStatsAggregate">
+        SELECT
+            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 4 AND 5 THEN 1 ELSE 0 END), 0) AS goodCommentCount,
+            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 2 AND 3 THEN 1 ELSE 0 END), 0) AS neutralCommentCount,
+            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 0 AND 1 THEN 1 ELSE 0 END), 0) AS badCommentCount,
+            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 0 AND 1 AND reply_status = 1 THEN 1 ELSE 0 END), 0) AS repliedBadCommentCount
+        FROM mt_comment
+        WHERE shop_id = #{shopId}
+          AND create_time &gt;= #{from}
+          AND create_time &lt; #{to}
+    </select>
+
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtComment" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_comment (
             shop_id, epoi_id, poi_id, comment_id, result, comment_content, order_comment_score,

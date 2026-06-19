@@ -19,8 +19,6 @@ public class UserBehaviorAnalyticsRowVO {
 
     private Long h5ConfigButtonClickCount;
 
-    private Long h5UnlockAiPeakClickCount;
-
     private Long h5ConfigModalConfirmClickCount;
 
     private Long h5ConfigModalCancelClickCount;

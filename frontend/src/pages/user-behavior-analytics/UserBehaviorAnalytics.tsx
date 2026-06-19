@@ -34,11 +34,6 @@ const STAT_COLUMNS: {
   },
   { title: "配置按钮点击数", dataIndex: "h5ConfigButtonClickCount" },
   {
-    title: "解锁AI高峰点击数",
-    dataIndex: "h5UnlockAiPeakClickCount",
-    width: 150,
-  },
-  {
     title: "配置弹窗确认数",
     dataIndex: "h5ConfigModalConfirmClickCount",
     width: 150,

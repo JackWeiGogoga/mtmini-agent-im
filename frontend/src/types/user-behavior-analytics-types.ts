@@ -17,7 +17,6 @@ export interface UserBehaviorAnalyticsRow {
   h5AppOpenCount: number;
   pcMasterConsoleOperationCount: number;
   h5ConfigButtonClickCount: number;
-  h5UnlockAiPeakClickCount: number;
   h5ConfigModalConfirmClickCount: number;
   h5ConfigModalCancelClickCount: number;
   h5PowerTabClickCount: number;

@@ -2,13 +2,15 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
-import com.gogoga.backend.mapper.MtPoiTrafficDailyMapper;
+import com.gogoga.backend.entity.mt.MtCommentStatsAggregate;
+import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -25,52 +27,33 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ShopDashboardMetricsService {
 
-    private static final BigDecimal ZERO_MONEY = new BigDecimal("0.00");
     private static final BigDecimal ZERO_RATIO = new BigDecimal("0.000000");
     private static final ZoneId DEFAULT_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
-    private final MtPoiTrafficDailyMapper mtPoiTrafficDailyMapper;
+    private final MtCommentMapper mtCommentMapper;
     private final MtPowerConsumeMapper mtPowerConsumeMapper;
 
-    public MarketingStatsSnapshot buildMarketingStats(Long shopId) {
-        return buildMarketingStats(shopId, DashboardStatsRangeTypeEnum.LAST_7_DAYS);
+    public CommentStatsSnapshot buildCommentStats(Long shopId) {
+        return buildCommentStats(shopId, DashboardStatsRangeTypeEnum.LAST_7_DAYS);
     }
 
-    public MarketingStatsSnapshot buildMarketingStats(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
-        return buildDashboardStats(shopId, statsRange).getMarketingStats();
-    }
-
-    public OrderStatsSnapshot buildOrderStats(Long shopId) {
-        return buildOrderStats(shopId, DashboardStatsRangeTypeEnum.LAST_7_DAYS);
-    }
-
-    public OrderStatsSnapshot buildOrderStats(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
-        return buildDashboardStats(shopId, statsRange).getOrderStats();
+    public CommentStatsSnapshot buildCommentStats(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
+        return buildDashboardStats(shopId, statsRange).getCommentStats();
     }
 
     public DashboardStatsSnapshot buildDashboardStats(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
         TimeRange range = buildTimeRange(statsRange);
-        MarketingStatsSnapshot marketing = new MarketingStatsSnapshot();
-        marketing.setCurrentExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_ALL,
-                range.currentFrom().toLocalDate(), range.currentTo().toLocalDate().plusDays(1)));
-        marketing.setPreviousExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_ALL,
-                range.previousFrom().toLocalDate(), range.previousTo().toLocalDate().plusDays(1)));
-        marketing.setCurrentIncome(ZERO_MONEY);
-        marketing.setPreviousIncome(ZERO_MONEY);
-        marketing.setCurrentCost(ZERO_MONEY);
-        marketing.setPreviousCost(ZERO_MONEY);
-        marketing.setCurrentCostRatio(ZERO_RATIO);
-        marketing.setPreviousCostRatio(ZERO_RATIO);
-
-        OrderStatsSnapshot orderStats = new OrderStatsSnapshot();
-        orderStats.setCurrentCompletedIncome(ZERO_MONEY);
-        orderStats.setPreviousCompletedIncome(ZERO_MONEY);
-        orderStats.setCurrentCompletedOrderCount(0);
-        orderStats.setPreviousCompletedOrderCount(0);
+        CommentStatsSnapshot commentStats = buildCommentStatsSnapshot(shopId, range.currentFrom(), range.currentTo());
+        MtCommentStatsAggregate previous = selectCommentStats(shopId, range.previousFrom(), range.previousTo());
+        commentStats.setPreviousGoodCommentCount(defaultInteger(previous.getGoodCommentCount()));
+        commentStats.setPreviousBadCommentCount(defaultInteger(previous.getBadCommentCount()));
+        commentStats.setPreviousBadCommentReplyRate(calculateReplyRate(
+                previous.getBadCommentCount(),
+                previous.getRepliedBadCommentCount()
+        ));
 
         DashboardStatsSnapshot snapshot = new DashboardStatsSnapshot();
-        snapshot.setMarketingStats(marketing);
-        snapshot.setOrderStats(orderStats);
+        snapshot.setCommentStats(commentStats);
         return snapshot;
     }
 
@@ -109,36 +92,42 @@ public class ShopDashboardMetricsService {
         return snapshot;
     }
 
-    public ExposureBreakdownSnapshot buildExposureBreakdown(Long shopId) {
-        return buildExposureBreakdown(shopId, DashboardStatsRangeTypeEnum.LAST_7_DAYS);
-    }
-
-    public ExposureBreakdownSnapshot buildExposureBreakdown(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
-        TimeRange range = buildTimeRange(statsRange);
-        ExposureBreakdownSnapshot snapshot = new ExposureBreakdownSnapshot();
-        snapshot.setCurrentFreeExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_NATURAL,
-                range.currentFrom().toLocalDate(), range.currentTo().toLocalDate().plusDays(1)));
-        snapshot.setPreviousFreeExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_NATURAL,
-                range.previousFrom().toLocalDate(), range.previousTo().toLocalDate().plusDays(1)));
-        snapshot.setCurrentPaidExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_PAID,
-                range.currentFrom().toLocalDate(), range.currentTo().toLocalDate().plusDays(1)));
-        snapshot.setPreviousPaidExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_PAID,
-                range.previousFrom().toLocalDate(), range.previousTo().toLocalDate().plusDays(1)));
-        return snapshot;
-    }
-
-    private Integer sumExposure(Long shopId, Integer flowProp, LocalDate from, LocalDate to) {
-        return defaultInteger(mtPoiTrafficDailyMapper.sumExposureCountByShopIdAndBizDateBetween(shopId, flowProp, from, to));
-    }
-
     private TimeRange buildTimeRange(DashboardStatsRangeTypeEnum statsRange) {
         DashboardStatsRangeTypeEnum range = statsRange == null ? DashboardStatsRangeTypeEnum.LAST_7_DAYS : statsRange;
         LocalDate today = LocalDate.now(DEFAULT_ZONE_ID);
         LocalDateTime currentFrom = today.minusDays(range.getDays() - 1L).atStartOfDay();
-        LocalDateTime currentTo = LocalDateTime.of(today, LocalTime.MAX);
+        LocalDateTime currentTo = LocalDateTime.of(today.plusDays(1), LocalTime.MIDNIGHT);
         LocalDateTime previousTo = currentFrom;
         LocalDateTime previousFrom = previousTo.minusDays(range.getDays());
         return new TimeRange(currentFrom, currentTo, previousFrom, previousTo);
+    }
+
+    private CommentStatsSnapshot buildCommentStatsSnapshot(Long shopId, LocalDateTime from, LocalDateTime to) {
+        MtCommentStatsAggregate current = selectCommentStats(shopId, from, to);
+        CommentStatsSnapshot snapshot = new CommentStatsSnapshot();
+        snapshot.setGoodCommentCount(defaultInteger(current.getGoodCommentCount()));
+        snapshot.setNeutralCommentCount(defaultInteger(current.getNeutralCommentCount()));
+        snapshot.setBadCommentCount(defaultInteger(current.getBadCommentCount()));
+        snapshot.setRepliedBadCommentCount(defaultInteger(current.getRepliedBadCommentCount()));
+        snapshot.setBadCommentReplyRate(calculateReplyRate(
+                current.getBadCommentCount(),
+                current.getRepliedBadCommentCount()
+        ));
+        return snapshot;
+    }
+
+    private MtCommentStatsAggregate selectCommentStats(Long shopId, LocalDateTime from, LocalDateTime to) {
+        MtCommentStatsAggregate aggregate = mtCommentMapper.selectStatsByShopIdAndCreateTimeBetween(shopId, from, to);
+        return aggregate == null ? new MtCommentStatsAggregate() : aggregate;
+    }
+
+    private BigDecimal calculateReplyRate(Integer badCommentCount, Integer repliedBadCommentCount) {
+        int total = defaultInteger(badCommentCount);
+        if (total <= 0) {
+            return ZERO_RATIO;
+        }
+        return BigDecimal.valueOf(defaultInteger(repliedBadCommentCount))
+                .divide(BigDecimal.valueOf(total), 6, RoundingMode.HALF_UP);
     }
 
     private Integer defaultInteger(Integer value) {
@@ -154,23 +143,15 @@ public class ShopDashboardMetricsService {
     }
 
     @Data
-    public static class MarketingStatsSnapshot {
-        private Integer currentExposure;
-        private Integer previousExposure;
-        private BigDecimal currentIncome = ZERO_MONEY;
-        private BigDecimal previousIncome = ZERO_MONEY;
-        private BigDecimal currentCost = ZERO_MONEY;
-        private BigDecimal previousCost = ZERO_MONEY;
-        private BigDecimal currentCostRatio = ZERO_RATIO;
-        private BigDecimal previousCostRatio = ZERO_RATIO;
-    }
-
-    @Data
-    public static class OrderStatsSnapshot {
-        private BigDecimal currentCompletedIncome = ZERO_MONEY;
-        private BigDecimal previousCompletedIncome = ZERO_MONEY;
-        private Integer currentCompletedOrderCount = 0;
-        private Integer previousCompletedOrderCount = 0;
+    public static class CommentStatsSnapshot {
+        private Integer goodCommentCount = 0;
+        private Integer neutralCommentCount = 0;
+        private Integer badCommentCount = 0;
+        private Integer repliedBadCommentCount = 0;
+        private BigDecimal badCommentReplyRate = ZERO_RATIO;
+        private Integer previousGoodCommentCount = 0;
+        private Integer previousBadCommentCount = 0;
+        private BigDecimal previousBadCommentReplyRate = ZERO_RATIO;
     }
 
     @Data
@@ -185,16 +166,7 @@ public class ShopDashboardMetricsService {
     }
 
     @Data
-    public static class ExposureBreakdownSnapshot {
-        private Integer currentFreeExposure = 0;
-        private Integer previousFreeExposure = 0;
-        private Integer currentPaidExposure = 0;
-        private Integer previousPaidExposure = 0;
-    }
-
-    @Data
     public static class DashboardStatsSnapshot {
-        private MarketingStatsSnapshot marketingStats = new MarketingStatsSnapshot();
-        private OrderStatsSnapshot orderStats = new OrderStatsSnapshot();
+        private CommentStatsSnapshot commentStats = new CommentStatsSnapshot();
     }
 }

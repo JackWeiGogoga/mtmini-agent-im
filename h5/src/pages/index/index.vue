@@ -19,12 +19,23 @@
 
     <view class="stats">
       <view class="stat">
-        <text class="stat-label">近7天实收</text>
-        <text class="stat-value">¥{{ incomeText }}</text>
+        <text class="stat-label">近7天好评数</text>
+        <text class="stat-value">{{ goodCommentCount }}</text>
       </view>
       <view class="stat">
-        <text class="stat-label">算力余额</text>
-        <text class="stat-value">{{ powerBalance }}</text>
+        <text class="stat-label">近7天差评数</text>
+        <text class="stat-value">{{ badCommentCount }}</text>
+      </view>
+      <view class="stat">
+        <text class="stat-label">差评回复率</text>
+        <text class="stat-value">{{ badReplyRateText }}</text>
+      </view>
+    </view>
+
+    <view class="section compact">
+      <view class="status-row">
+        <text class="status-label">算力余额</text>
+        <text class="status-value">{{ powerBalance }}</text>
       </view>
     </view>
 
@@ -42,7 +53,9 @@ export default {
     return {
       shopName: "美团门店",
       reauthRequired: false,
-      incomeText: "0.00",
+      goodCommentCount: 0,
+      badCommentCount: 0,
+      badReplyRateText: "0%",
       powerBalance: 0,
     };
   },
@@ -55,13 +68,22 @@ export default {
         const dashboard = await getMtH5HomeDashboard("LAST_7_DAYS");
         this.shopName = dashboard?.shop?.shopName || "美团门店";
         this.reauthRequired = Boolean(dashboard?.authorization?.reauthRequired);
-        this.incomeText = Number(
-          dashboard?.marketingStats?.currentIncome || 0,
-        ).toFixed(2);
+        this.goodCommentCount = dashboard?.commentStats?.goodCommentCount || 0;
+        this.badCommentCount = dashboard?.commentStats?.badCommentCount || 0;
+        this.badReplyRateText = this.formatRate(
+          dashboard?.commentStats?.badCommentReplyRate,
+        );
         this.powerBalance = dashboard?.powerStats?.balance || 0;
       } catch (error) {
         uni.showToast({ title: error.message || "加载失败", icon: "none" });
       }
+    },
+    formatRate(value) {
+      const numeric = Number(value || 0);
+      if (!Number.isFinite(numeric)) {
+        return "0%";
+      }
+      return `${Math.round(numeric * 100)}%`;
     },
   },
 };
@@ -96,6 +118,9 @@ export default {
   padding: 28rpx;
   box-shadow: 0 10rpx 30rpx rgba(15, 23, 42, 0.06);
 }
+.section.compact {
+  margin-top: 24rpx;
+}
 .status-row {
   display: flex;
   align-items: center;
@@ -123,7 +148,7 @@ export default {
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20rpx;
   margin-top: 24rpx;
 }
@@ -133,5 +158,10 @@ export default {
   font-size: 38rpx;
   font-weight: 700;
   color: #15181f;
+}
+@media (max-width: 360px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
