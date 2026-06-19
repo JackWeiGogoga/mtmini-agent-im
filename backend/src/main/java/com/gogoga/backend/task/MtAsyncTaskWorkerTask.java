@@ -5,7 +5,9 @@ import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
+import com.gogoga.backend.service.MtCommentAutoReplyService;
 import com.gogoga.backend.service.RedisDistributedLockService;
+import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
@@ -31,11 +33,13 @@ public class MtAsyncTaskWorkerTask {
 
     private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
-            MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH
+            MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
+            MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY
     );
 
     private final MtAsyncTaskService mtAsyncTaskService;
     private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
+    private final MtCommentAutoReplyService mtCommentAutoReplyService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
 
@@ -47,12 +51,14 @@ public class MtAsyncTaskWorkerTask {
     public MtAsyncTaskWorkerTask(
             MtAsyncTaskService mtAsyncTaskService,
             MtAuthAsyncTaskService mtAuthAsyncTaskService,
+            MtCommentAutoReplyService mtCommentAutoReplyService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
             @Qualifier("mtAsyncTaskExecutor") Executor mtAsyncTaskExecutor
     ) {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
+        this.mtCommentAutoReplyService = mtCommentAutoReplyService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
         this.mtAsyncTaskExecutor = mtAsyncTaskExecutor;
@@ -121,6 +127,7 @@ public class MtAsyncTaskWorkerTask {
             switch (taskType) {
                 case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
+                case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
@@ -136,6 +143,11 @@ public class MtAsyncTaskWorkerTask {
 
     private void executeAuthBlockOrderPushTask(MtAsyncTask task) {
         mtAuthAsyncTaskService.executeAuthBlockOrderPushTask(parseAuthPayload(task));
+    }
+
+    private void executeCommentAutoReplyTask(MtAsyncTask task) {
+        MtCommentAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtCommentAutoReplyTaskPayload.class);
+        mtCommentAutoReplyService.executeCommentAutoReplyTask(payload);
     }
 
     private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
@@ -156,6 +168,7 @@ public class MtAsyncTaskWorkerTask {
                     .initialBackoff(Duration.ofSeconds(60))
                     .maxBackoff(Duration.ofSeconds(60))
                     .build();
+            case COMMENT_AUTO_REPLY -> resolvePolicy(asyncTask.getCommentAutoReply());
         };
     }
 

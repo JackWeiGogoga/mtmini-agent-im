@@ -16,6 +16,8 @@ public interface MtCommentMapper {
 
     MtComment selectByCommentId(@Param("commentId") Long commentId);
 
+    MtComment selectById(@Param("id") Long id);
+
     List<MtComment> selectPendingAutoReplyByShopId(@Param("shopId") Long shopId);
 
     MtCommentStatsAggregate selectStatsByShopIdAndCreateTimeBetween(

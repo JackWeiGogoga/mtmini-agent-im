@@ -4,9 +4,11 @@ import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
 import com.meituan.sdk.internal.exceptions.MtSdkException;
@@ -28,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +45,8 @@ class MtCommentAutoReplyServiceTest {
     private MtCommentMapper mtCommentMapper;
     @Mock
     private MeituanClient meituanClient;
+    @Mock
+    private MtAsyncTaskService mtAsyncTaskService;
 
     private final MtProperties mtProperties = new MtProperties();
 
@@ -49,13 +54,14 @@ class MtCommentAutoReplyServiceTest {
     private MtCommentAutoReplyService service;
 
     @Test
-    void syncAndReplyShopSavesCommentAndReplies() throws MtSdkException {
+    void syncAndReplyShopSavesCommentAndEnqueuesReplyTask() throws MtSdkException {
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,
                 mtShopMapper,
                 mtCommentMapper,
                 meituanClient,
-                mtProperties
+                mtProperties,
+                mtAsyncTaskService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -77,10 +83,6 @@ class MtCommentAutoReplyServiceTest {
         MeituanResponse<List<QueryCommentListResponse>> emptyResponse = new MeituanResponse<>();
         emptyResponse.setCode("OP_SUCCESS");
         emptyResponse.setData(List.of());
-        MeituanResponse<String> replyResponse = new MeituanResponse<>();
-        replyResponse.setCode("OP_SUCCESS");
-        replyResponse.setData("ok");
-
         when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token")))
                 .thenReturn(queryResponse)
                 .thenReturn(emptyResponse);
@@ -89,7 +91,6 @@ class MtCommentAutoReplyServiceTest {
         pending.setId(9L);
         pending.setCommentId(542543250001L);
         when(mtCommentMapper.selectPendingAutoReplyByShopId(100L)).thenReturn(List.of(pending));
-        when(meituanClient.invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"))).thenReturn(replyResponse);
 
         service.syncAndReplyShop(token, LocalDate.of(2026, 6, 19));
 
@@ -103,6 +104,59 @@ class MtCommentAutoReplyServiceTest {
         assertEquals("20260619", saved.getQueryEndTime());
         assertEquals("PENDING", saved.getAutoReplyStatus());
         assertNotNull(saved.getRawPayloadJson());
+
+        ArgumentCaptor<MtCommentAutoReplyTaskPayload> payloadCaptor =
+                ArgumentCaptor.forClass(MtCommentAutoReplyTaskPayload.class);
+        verify(mtAsyncTaskService).enqueueTask(
+                eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY),
+                eq("comment:542543250001"),
+                eq("100"),
+                payloadCaptor.capture(),
+                any(LocalDateTime.class),
+                eq(3)
+        );
+        assertEquals(100L, payloadCaptor.getValue().getShopId());
+        assertEquals(542543250001L, payloadCaptor.getValue().getCommentId());
+        verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
+        verify(mtCommentMapper, never()).markAutoReplySuccess(any(), any(), any(), any());
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskRepliesSingleComment() throws MtSdkException {
+        service = new MtCommentAutoReplyService(
+                mtAccessTokenMapper,
+                mtShopMapper,
+                mtCommentMapper,
+                meituanClient,
+                mtProperties,
+                mtAsyncTaskService
+        );
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        MeituanResponse<String> replyResponse = new MeituanResponse<>();
+        replyResponse.setCode("OP_SUCCESS");
+        replyResponse.setData("ok");
+        when(meituanClient.invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"))).thenReturn(replyResponse);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        service.executeCommentAutoReplyTask(payload);
 
         ArgumentCaptor<WmoperCommentAddReplyRequest> replyCaptor =
                 ArgumentCaptor.forClass(WmoperCommentAddReplyRequest.class);

@@ -4,9 +4,11 @@ import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -41,6 +43,7 @@ public class MtCommentAutoReplyService {
     private final MtCommentMapper mtCommentMapper;
     private final MeituanClient meituanClient;
     private final MtProperties mtProperties;
+    private final MtAsyncTaskService mtAsyncTaskService;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -68,7 +71,7 @@ public class MtCommentAutoReplyService {
         LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
         LocalDate startDate = endDate.minusDays(Math.max(mtProperties.getComment().getLookbackDays(), 1));
         syncUnrepliedComments(token, shop, startDate, endDate);
-        replyPendingComments(token, shop);
+        enqueuePendingCommentReplyTasks(shop);
     }
 
     private void syncUnrepliedComments(MtAccessToken token, MtShop shop, LocalDate startDate, LocalDate endDate) {
@@ -83,7 +86,6 @@ public class MtCommentAutoReplyService {
             request.setOffset(offset);
             request.setLimit(pageSize);
             request.setReplyStatus(REPLY_STATUS_UNREPLIED);
-            request.setBizKey(buildBizKey(shop));
             MeituanResponse<List<QueryCommentListResponse>> response;
             try {
                 response = meituanClient.invokeApi(request, token.getAccessToken());
@@ -122,27 +124,67 @@ public class MtCommentAutoReplyService {
         mtCommentMapper.updateFromQuery(comment);
     }
 
-    private void replyPendingComments(MtAccessToken token, MtShop shop) {
+    private void enqueuePendingCommentReplyTasks(MtShop shop) {
         List<MtComment> comments = mtCommentMapper.selectPendingAutoReplyByShopId(shop.getId());
         for (MtComment comment : comments) {
-            String reply = StringUtils.defaultIfBlank(mtProperties.getComment().getDefaultReply(), "很好");
-            try {
-                WmoperCommentAddReplyRequest request = new WmoperCommentAddReplyRequest();
-                request.setCommentId(comment.getCommentId());
-                request.setEPoiId(shop.getEpoiId());
-                request.setReply(reply);
-                MeituanResponse<String> response = meituanClient.invokeApi(request, token.getAccessToken());
-                if (response == null || !response.isSuccess()) {
-                    String error = response == null ? "EMPTY_RESPONSE" : response.getMsg();
-                    mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(error, 1000), LocalDateTime.now());
-                    continue;
-                }
-                LocalDateTime now = LocalDateTime.now();
-                mtCommentMapper.markAutoReplySuccess(comment.getId(), reply, now, now);
-            } catch (MtSdkException | RuntimeException e) {
-                mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
-                log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+            if (comment == null || comment.getCommentId() == null) {
+                continue;
             }
+            MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+            payload.setShopId(shop.getId());
+            payload.setCommentId(comment.getCommentId());
+            mtAsyncTaskService.enqueueTask(
+                    MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+                    buildCommentReplyTaskBizKey(comment.getCommentId()),
+                    String.valueOf(shop.getId()),
+                    payload,
+                    LocalDateTime.now(),
+                    mtProperties.getAsyncTask().getCommentAutoReply().getMaxRetryCount()
+            );
+        }
+    }
+
+    public void executeCommentAutoReplyTask(MtCommentAutoReplyTaskPayload payload) {
+        if (payload == null || payload.getShopId() == null || payload.getCommentId() == null) {
+            throw new IllegalArgumentException("COMMENT_AUTO_REPLY_PAYLOAD_INVALID");
+        }
+        MtComment comment = mtCommentMapper.selectByCommentId(payload.getCommentId());
+        if (comment == null) {
+            log.warn("评价自动回复任务跳过，原因=评价不存在，shopId={}, commentId={}",
+                    payload.getShopId(), payload.getCommentId());
+            return;
+        }
+        if (Integer.valueOf(1).equals(comment.getReplyStatus()) || StringUtils.equals(comment.getAutoReplyStatus(), "SUCCESS")) {
+            log.info("评价自动回复任务跳过，原因=评价已回复，shopId={}, commentId={}",
+                    payload.getShopId(), payload.getCommentId());
+            return;
+        }
+        MtShop shop = mtShopMapper.selectById(payload.getShopId());
+        if (shop == null || StringUtils.isBlank(shop.getEpoiId())) {
+            throw new IllegalStateException("COMMENT_AUTO_REPLY_SHOP_INVALID");
+        }
+        MtAccessToken token = mtAccessTokenMapper.selectByShopId(payload.getShopId());
+        if (token == null || StringUtils.isBlank(token.getAccessToken())) {
+            throw new IllegalStateException("COMMENT_AUTO_REPLY_TOKEN_MISSING");
+        }
+        String reply = StringUtils.defaultIfBlank(mtProperties.getComment().getDefaultReply(), "很好");
+        try {
+            WmoperCommentAddReplyRequest request = new WmoperCommentAddReplyRequest();
+            request.setCommentId(comment.getCommentId());
+            request.setEPoiId(shop.getEpoiId());
+            request.setReply(reply);
+            MeituanResponse<String> response = meituanClient.invokeApi(request, token.getAccessToken());
+            if (response == null || !response.isSuccess()) {
+                String error = response == null ? "EMPTY_RESPONSE" : response.getMsg();
+                mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(error, 1000), LocalDateTime.now());
+                throw new IllegalStateException("评价自动回复失败：" + error);
+            }
+            LocalDateTime now = LocalDateTime.now();
+            mtCommentMapper.markAutoReplySuccess(comment.getId(), reply, now, now);
+        } catch (MtSdkException e) {
+            mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
+            log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+            throw new IllegalStateException("评价自动回复失败：" + e.getMessage(), e);
         }
     }
 
@@ -190,7 +232,7 @@ public class MtCommentAutoReplyService {
         return comment;
     }
 
-    private String buildBizKey(MtShop shop) {
-        return "biz~1002~Waimai~" + shop.getEpoiId();
+    private String buildCommentReplyTaskBizKey(Long commentId) {
+        return "comment:" + commentId;
     }
 }

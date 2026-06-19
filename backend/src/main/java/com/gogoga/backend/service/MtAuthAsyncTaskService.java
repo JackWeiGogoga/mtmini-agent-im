@@ -89,6 +89,7 @@ public class MtAuthAsyncTaskService {
         return switch (taskType) {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
             case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
+            default -> throw new IllegalArgumentException("不支持的授权后任务类型: " + taskType);
         };
     }
 

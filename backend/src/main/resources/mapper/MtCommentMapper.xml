@@ -61,6 +61,13 @@
         LIMIT 1
     </select>
 
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_comment
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
     <select id="selectPendingAutoReplyByShopId" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
         FROM mt_comment

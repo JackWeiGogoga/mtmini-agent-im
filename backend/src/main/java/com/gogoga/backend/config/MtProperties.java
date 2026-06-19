@@ -132,12 +132,12 @@ public class MtProperties {
         /**
          * 是否启用数据库异步任务模式
          */
-        private boolean enabled = false;
+        private boolean enabled = true;
 
         /**
          * 是否启用异步 worker 轮询
          */
-        private boolean workerEnabled = false;
+        private boolean workerEnabled = true;
 
         /**
          * 单次轮询任务数
@@ -178,6 +178,11 @@ public class MtProperties {
          * 授权后同步权益任务策略
          */
         private TaskPolicy authSyncRights = new TaskPolicy();
+
+        /**
+         * 评价自动回复任务策略
+         */
+        private TaskPolicy commentAutoReply = new TaskPolicy();
 
         /**
          * 历史终态任务清理配置

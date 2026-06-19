@@ -154,8 +154,8 @@ mt:
     page-size: ${MT_APP_ORDER_PAGE_SIZE:100}
     lookback-seconds: ${MT_APP_ORDER_LOOKBACK_SECONDS:172800}
   async-task:
-    enabled: ${MT_ASYNC_TASK_ENABLED:false}
-    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:false}
+    enabled: ${MT_ASYNC_TASK_ENABLED:true}
+    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:true}
     poll-size: ${MT_ASYNC_TASK_POLL_SIZE:20}
     poll-delay-ms: ${MT_ASYNC_TASK_POLL_DELAY_MS:1000}
     recovery-delay-ms: ${MT_ASYNC_TASK_RECOVERY_DELAY_MS:30000}
@@ -175,6 +175,11 @@ mt:
       timeout-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
       initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
+    comment-auto-reply:
+      max-retry-count: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_BACKOFF_SECONDS:900}
   comment:
     pull-cron: ${MT_COMMENT_PULL_CRON:0 0 8,13,19 * * ?}
     lookback-days: ${MT_COMMENT_LOOKBACK_DAYS:7}
