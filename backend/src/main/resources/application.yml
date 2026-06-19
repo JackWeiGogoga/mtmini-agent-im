@@ -175,6 +175,11 @@ mt:
       timeout-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
       initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
+    auth-comment-backfill:
+      max-retry-count: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_TIMEOUT_SECONDS:300}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_MAX_BACKOFF_SECONDS:900}
     comment-auto-reply:
       max-retry-count: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_RETRY_COUNT:3}
       timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_TIMEOUT_SECONDS:180}

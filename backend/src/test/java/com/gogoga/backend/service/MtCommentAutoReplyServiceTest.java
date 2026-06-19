@@ -8,6 +8,7 @@ import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -92,7 +93,7 @@ class MtCommentAutoReplyServiceTest {
         pending.setCommentId(542543250001L);
         when(mtCommentMapper.selectPendingAutoReplyByShopId(100L)).thenReturn(List.of(pending));
 
-        service.syncAndReplyShop(token, LocalDate.of(2026, 6, 19));
+        service.syncAndReplyShopForAuthBackfill(token, LocalDate.of(2026, 6, 19));
 
         ArgumentCaptor<MtComment> commentCaptor = ArgumentCaptor.forClass(MtComment.class);
         verify(mtCommentMapper).insert(commentCaptor.capture());
@@ -119,6 +120,84 @@ class MtCommentAutoReplyServiceTest {
         assertEquals(542543250001L, payloadCaptor.getValue().getCommentId());
         verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
         verify(mtCommentMapper, never()).markAutoReplySuccess(any(), any(), any(), any());
+    }
+
+    @Test
+    void scheduledSyncUsesPreviousOneDayWindow() throws MtSdkException {
+        service = new MtCommentAutoReplyService(
+                mtAccessTokenMapper,
+                mtShopMapper,
+                mtCommentMapper,
+                meituanClient,
+                mtProperties,
+                mtAsyncTaskService
+        );
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        token.setOpBizCode("op-100");
+        when(mtAccessTokenMapper.selectCommentAutoReplyCandidates(any(LocalDateTime.class))).thenReturn(List.of(token));
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MeituanResponse<List<QueryCommentListResponse>> emptyResponse = new MeituanResponse<>();
+        emptyResponse.setCode("OP_SUCCESS");
+        emptyResponse.setData(List.of());
+        when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token"))).thenReturn(emptyResponse);
+        when(mtCommentMapper.selectPendingAutoReplyByShopId(100L)).thenReturn(List.of());
+
+        service.syncAndReplyRecentUnrepliedComments();
+
+        ArgumentCaptor<QueryCommentListRequest> requestCaptor = ArgumentCaptor.forClass(QueryCommentListRequest.class);
+        verify(meituanClient).invokeApi(requestCaptor.capture(), eq("token"));
+        LocalDate today = LocalDate.now();
+        assertEquals(today.minusDays(1).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+                requestCaptor.getValue().getStartTime());
+        assertEquals(today.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+                requestCaptor.getValue().getEndTime());
+    }
+
+    @Test
+    void authBackfillUsesConfiguredSevenDayWindow() throws MtSdkException {
+        service = new MtCommentAutoReplyService(
+                mtAccessTokenMapper,
+                mtShopMapper,
+                mtCommentMapper,
+                meituanClient,
+                mtProperties,
+                mtAsyncTaskService
+        );
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MeituanResponse<List<QueryCommentListResponse>> emptyResponse = new MeituanResponse<>();
+        emptyResponse.setCode("OP_SUCCESS");
+        emptyResponse.setData(List.of());
+        when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token"))).thenReturn(emptyResponse);
+        when(mtCommentMapper.selectPendingAutoReplyByShopId(100L)).thenReturn(List.of());
+
+        MtAuthPostProcessTaskPayload payload = new MtAuthPostProcessTaskPayload();
+        payload.setShopId(100L);
+
+        service.executeAuthCommentBackfillTask(payload);
+
+        ArgumentCaptor<QueryCommentListRequest> requestCaptor = ArgumentCaptor.forClass(QueryCommentListRequest.class);
+        verify(meituanClient).invokeApi(requestCaptor.capture(), eq("token"));
+        LocalDate today = LocalDate.now();
+        assertEquals(today.minusDays(7).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+                requestCaptor.getValue().getStartTime());
+        assertEquals(today.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+                requestCaptor.getValue().getEndTime());
     }
 
     @Test

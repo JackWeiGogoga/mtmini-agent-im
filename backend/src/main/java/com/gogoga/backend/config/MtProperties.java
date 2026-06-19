@@ -180,6 +180,11 @@ public class MtProperties {
         private TaskPolicy authSyncRights = new TaskPolicy();
 
         /**
+         * 授权后评价回补任务策略
+         */
+        private TaskPolicy authCommentBackfill = new TaskPolicy();
+
+        /**
          * 评价自动回复任务策略
          */
         private TaskPolicy commentAutoReply = new TaskPolicy();

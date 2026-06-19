@@ -8,6 +8,7 @@ import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
@@ -36,6 +37,7 @@ public class MtCommentAutoReplyService {
 
     private static final int REPLY_STATUS_UNREPLIED = 0;
     private static final int MAX_PAGE_SIZE = 20;
+    private static final int DAILY_INCREMENTAL_LOOKBACK_DAYS = 1;
     private static final DateTimeFormatter COMMENT_QUERY_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final MtAccessTokenMapper mtAccessTokenMapper;
@@ -51,7 +53,7 @@ public class MtCommentAutoReplyService {
         log.info("评价自动回复任务开始，candidateCount={}", candidates.size());
         for (MtAccessToken token : candidates) {
             try {
-                syncAndReplyShop(token, now.toLocalDate());
+                syncAndReplyShop(token, now.toLocalDate(), DAILY_INCREMENTAL_LOOKBACK_DAYS, "DAILY_INCREMENTAL");
             } catch (RuntimeException e) {
                 log.error("评价自动回复门店处理失败，shopId={}, opBizCode={}", token.getShopId(), token.getOpBizCode(), e);
             }
@@ -59,7 +61,22 @@ public class MtCommentAutoReplyService {
         log.info("评价自动回复任务完成，candidateCount={}", candidates.size());
     }
 
-    void syncAndReplyShop(MtAccessToken token, LocalDate currentDate) {
+    void syncAndReplyShopForAuthBackfill(MtAccessToken token, LocalDate currentDate) {
+        syncAndReplyShop(token, currentDate, Math.max(mtProperties.getComment().getLookbackDays(), 1), "AUTH_BACKFILL");
+    }
+
+    public void executeAuthCommentBackfillTask(MtAuthPostProcessTaskPayload payload) {
+        if (payload == null || payload.getShopId() == null) {
+            throw new IllegalArgumentException("AUTH_COMMENT_BACKFILL_PAYLOAD_INVALID");
+        }
+        MtAccessToken token = mtAccessTokenMapper.selectByShopId(payload.getShopId());
+        if (token == null || StringUtils.isBlank(token.getAccessToken())) {
+            throw new IllegalStateException("AUTH_COMMENT_BACKFILL_TOKEN_MISSING");
+        }
+        syncAndReplyShop(token, LocalDate.now(), Math.max(mtProperties.getComment().getLookbackDays(), 1), "AUTH_BACKFILL");
+    }
+
+    private void syncAndReplyShop(MtAccessToken token, LocalDate currentDate, int lookbackDays, String scene) {
         if (token == null || token.getShopId() == null || StringUtils.isBlank(token.getAccessToken())) {
             return;
         }
@@ -69,9 +86,13 @@ public class MtCommentAutoReplyService {
             return;
         }
         LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
-        LocalDate startDate = endDate.minusDays(Math.max(mtProperties.getComment().getLookbackDays(), 1));
+        LocalDate startDate = endDate.minusDays(Math.max(lookbackDays, 1));
+        log.info("评价自动回复同步开始，scene={}, shopId={}, startDate={}, endDate={}",
+                scene, token.getShopId(), startDate, endDate);
         syncUnrepliedComments(token, shop, startDate, endDate);
         enqueuePendingCommentReplyTasks(shop);
+        log.info("评价自动回复同步完成，scene={}, shopId={}, startDate={}, endDate={}",
+                scene, token.getShopId(), startDate, endDate);
     }
 
     private void syncUnrepliedComments(MtAccessToken token, MtShop shop, LocalDate startDate, LocalDate endDate) {

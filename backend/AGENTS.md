@@ -18,7 +18,7 @@
   - `MtPowerRechargeService`：算力充值、支付查询、支付通知处理。
   - `MtOrderPushControlService` / `MtAppOrderService`：订单推送开关与订阅单相关逻辑。
 - `task/`
-  - `MtCommentAutoReplyTask`：每天早中晚查询近 7 天未回复评价并自动回复。
+  - `MtCommentAutoReplyTask`：每天早中晚查询前 1 天未回复评价并入队自动回复。
   - `MtAccessTokenRefreshTask`、`MtAppOrderPullTask`：授权与订阅相关任务。
   - `MtAsyncTaskWorkerTask`：数据库异步任务 worker。
 - `mapper/` + `src/main/resources/mapper/`
@@ -30,7 +30,7 @@
 
 - 门店从美团进入 H5，小程序参数通过 `/api/mt/auth/login` 完成直登。
 - 门店授权后异步调用美团消息屏蔽接口关闭订单推送，本服务不接收和保存美团外卖订单数据。
-- 定时任务通过美团接口查询近 7 天未回复评价，按 `comment_id` 幂等保存到 `mt_comment`。
+- 授权后异步任务通过美团接口回补近 7 天未回复评价；日常定时任务查询前 1 天未回复评价；二者都按 `comment_id` 幂等保存到 `mt_comment` 并入队逐条自动回复。
 - 对本地未回复且未成功自动回复的评价，调用美团“根据评价id添加商家回复”接口，当前固定回复“很好”。
 - 商家算力充值由 H5 发起，后端落单、调支付、查单、处理微信回调，并给门店账户入账。
 - 门店权益既可能来自美团买量权益接口，也可能来自订阅订单补偿，接口鉴权依赖 `@RequiresShopRight`。

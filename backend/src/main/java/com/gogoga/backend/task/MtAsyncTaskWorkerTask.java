@@ -34,6 +34,7 @@ public class MtAsyncTaskWorkerTask {
     private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
+            MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL,
             MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY
     );
 
@@ -127,6 +128,7 @@ public class MtAsyncTaskWorkerTask {
             switch (taskType) {
                 case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
+                case AUTH_COMMENT_BACKFILL -> executeAuthCommentBackfillTask(task);
                 case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
@@ -143,6 +145,10 @@ public class MtAsyncTaskWorkerTask {
 
     private void executeAuthBlockOrderPushTask(MtAsyncTask task) {
         mtAuthAsyncTaskService.executeAuthBlockOrderPushTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthCommentBackfillTask(MtAsyncTask task) {
+        mtCommentAutoReplyService.executeAuthCommentBackfillTask(parseAuthPayload(task));
     }
 
     private void executeCommentAutoReplyTask(MtAsyncTask task) {
@@ -162,6 +168,7 @@ public class MtAsyncTaskWorkerTask {
         MtProperties.AsyncTask asyncTask = mtProperties.getAsyncTask();
         return switch (taskType) {
             case AUTH_SYNC_RIGHTS -> resolvePolicy(asyncTask.getAuthSyncRights());
+            case AUTH_COMMENT_BACKFILL -> resolvePolicy(asyncTask.getAuthCommentBackfill());
             case AUTH_BLOCK_ORDER_PUSH -> MtAsyncTaskExecutionPolicy.builder()
                     .maxRetryCount(0)
                     .timeout(Duration.ofSeconds(180))

@@ -39,6 +39,7 @@ public class MtAuthAsyncTaskService {
         payload.setShopId(shopId);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH, payload);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload);
+        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL, payload);
     }
 
     public void executeAuthSyncRightsTask(MtAuthPostProcessTaskPayload payload) {
@@ -89,6 +90,7 @@ public class MtAuthAsyncTaskService {
         return switch (taskType) {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
             case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
+            case AUTH_COMMENT_BACKFILL -> mtProperties.getAsyncTask().getAuthCommentBackfill().getMaxRetryCount();
             default -> throw new IllegalArgumentException("不支持的授权后任务类型: " + taskType);
         };
     }
