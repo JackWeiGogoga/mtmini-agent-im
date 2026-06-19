@@ -175,34 +175,9 @@ public class MtProperties {
         private int executorQueueCapacity = 200;
 
         /**
-         * 订单回调任务策略
-         */
-        private TaskPolicy orderNotify = new TaskPolicy();
-
-        /**
          * 授权后同步权益任务策略
          */
         private TaskPolicy authSyncRights = new TaskPolicy();
-
-        /**
-         * 授权后补齐 poiId 任务策略
-         */
-        private TaskPolicy authBackfillPoiId = new TaskPolicy();
-
-        /**
-         * 授权后历史订单补数任务策略
-         */
-        private TaskPolicy authHistoricalOrderBackfill = new TaskPolicy();
-
-        /**
-         * 同订单回调锁定秒数
-         */
-        private long orderNotifyLockSeconds = 60L;
-
-        /**
-         * 同订单回调锁冲突退避秒数
-         */
-        private long orderNotifyBusyBackoffSeconds = 5L;
 
         /**
          * 历史终态任务清理配置

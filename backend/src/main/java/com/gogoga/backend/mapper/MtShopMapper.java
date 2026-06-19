@@ -45,24 +45,6 @@ public interface MtShopMapper {
      */
     int insert(MtShop shop);
 
-    int markHistoricalOrderBackfillProcessing(@Param("id") Long id,
-                                              @Param("expectedStatus") String expectedStatus,
-                                              @Param("processingStatus") String processingStatus,
-                                              @Param("backfillAt") java.time.LocalDateTime backfillAt,
-                                              @Param("updateTime") java.time.LocalDateTime updateTime);
-
-    int markHistoricalOrderBackfillProcessingIfRetryable(@Param("id") Long id,
-                                                         @Param("initStatus") String initStatus,
-                                                         @Param("failedStatus") String failedStatus,
-                                                         @Param("processingStatus") String processingStatus,
-                                                         @Param("backfillAt") java.time.LocalDateTime backfillAt,
-                                                         @Param("updateTime") java.time.LocalDateTime updateTime);
-
-    int updateHistoricalOrderBackfillState(@Param("id") Long id,
-                                           @Param("status") String status,
-                                           @Param("backfillAt") java.time.LocalDateTime backfillAt,
-                                           @Param("updateTime") java.time.LocalDateTime updateTime);
-
     /**
      * 按主键更新店铺
      *

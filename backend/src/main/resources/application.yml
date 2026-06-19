@@ -163,13 +163,6 @@ mt:
     executor-core-pool-size: ${MT_ASYNC_TASK_EXECUTOR_CORE_POOL_SIZE:4}
     executor-max-pool-size: ${MT_ASYNC_TASK_EXECUTOR_MAX_POOL_SIZE:8}
     executor-queue-capacity: ${MT_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
-    order-notify-lock-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_LOCK_SECONDS:60}
-    order-notify-busy-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_BUSY_BACKOFF_SECONDS:5}
-    order-notify:
-      max-retry-count: ${MT_ASYNC_TASK_ORDER_NOTIFY_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_INITIAL_BACKOFF_SECONDS:30}
-      max-backoff-seconds: ${MT_ASYNC_TASK_ORDER_NOTIFY_MAX_BACKOFF_SECONDS:300}
     cleanup:
       enabled: ${MT_ASYNC_TASK_CLEANUP_ENABLED:false}
       delay-ms: ${MT_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
@@ -182,16 +175,6 @@ mt:
       timeout-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_TIMEOUT_SECONDS:180}
       initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_SYNC_RIGHTS_MAX_BACKOFF_SECONDS:900}
-    auth-backfill-poi-id:
-      max-retry-count: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_BACKOFF_SECONDS:900}
-    auth-historical-order-backfill:
-      max-retry-count: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_TIMEOUT_SECONDS:600}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_INITIAL_BACKOFF_SECONDS:300}
-      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_HISTORICAL_ORDER_BACKFILL_MAX_BACKOFF_SECONDS:3600}
   comment:
     pull-cron: ${MT_COMMENT_PULL_CRON:0 0 8,13,19 * * ?}
     lookback-days: ${MT_COMMENT_LOOKBACK_DAYS:7}

@@ -27,10 +27,6 @@ import java.util.UUID;
 @Service
 public class MtShopService {
 
-    public static final String HISTORICAL_ORDER_BACKFILL_STATUS_INIT = "INIT";
-    public static final String HISTORICAL_ORDER_BACKFILL_STATUS_PROCESSING = "PROCESSING";
-    public static final String HISTORICAL_ORDER_BACKFILL_STATUS_SUCCESS = "SUCCESS";
-    public static final String HISTORICAL_ORDER_BACKFILL_STATUS_FAILED = "FAILED";
     private static final String AUTHORIZED_SHOP_GRANT_STATUS_SUCCESS = "SUCCESS";
     private static final String AUTHORIZED_SHOP_GRANT_REASON = "新商户授权赠送";
     private static final String AUTHORIZED_SHOP_GRANT_OPERATOR = "system";
@@ -117,8 +113,6 @@ public class MtShopService {
 
         if (isNew) {
             shop.setCreateTime(now);
-            shop.setHistoricalOrderBackfillStatus(HISTORICAL_ORDER_BACKFILL_STATUS_INIT);
-            shop.setHistoricalOrderBackfillAt(null);
         }
 
         String shopName = firstNonBlank(shopDetail == null ? null : shopDetail.getName(), tokenData.getOpBizName(), tokenData.getOpBizCode());
@@ -246,42 +240,6 @@ public class MtShopService {
         shop.setUpdateTime(LocalDateTime.now());
         mtShopMapper.updateById(shop);
         return shop;
-    }
-
-    public boolean tryMarkHistoricalOrderBackfillProcessing(Long shopId) {
-        if (shopId == null) {
-            return false;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        return mtShopMapper.markHistoricalOrderBackfillProcessing(
-                shopId,
-                HISTORICAL_ORDER_BACKFILL_STATUS_INIT,
-                HISTORICAL_ORDER_BACKFILL_STATUS_PROCESSING,
-                now,
-                now
-        ) > 0;
-    }
-
-    public boolean tryMarkHistoricalOrderBackfillProcessingIfRetryable(Long shopId) {
-        if (shopId == null) {
-            return false;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        return mtShopMapper.markHistoricalOrderBackfillProcessingIfRetryable(
-                shopId,
-                HISTORICAL_ORDER_BACKFILL_STATUS_INIT,
-                HISTORICAL_ORDER_BACKFILL_STATUS_FAILED,
-                HISTORICAL_ORDER_BACKFILL_STATUS_PROCESSING,
-                now,
-                now
-        ) > 0;
-    }
-
-    public void updateHistoricalOrderBackfillState(Long shopId, String status, LocalDateTime backfillAt) {
-        if (shopId == null || StringUtils.isBlank(status)) {
-            return;
-        }
-        mtShopMapper.updateHistoricalOrderBackfillState(shopId, status, backfillAt, LocalDateTime.now());
     }
 
     private String formatCoordinate(Double value, String fallback) {

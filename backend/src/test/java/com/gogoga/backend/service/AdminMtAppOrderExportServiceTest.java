@@ -33,7 +33,7 @@ class AdminMtAppOrderExportServiceTest {
     private AdminDataScopeService adminDataScopeService;
 
     @Test
-    void shouldExportMtOrderRowsWithFiltersAndCoreColumns() throws Exception {
+    void shouldExportMtAppOrderRowsWithFiltersAndCoreColumns() throws Exception {
         AdminMtAppOrderService service = new AdminMtAppOrderService(mtAppOrderMapper, adminDataScopeService);
         when(adminDataScopeService.getCurrentScopeType()).thenReturn(AdminDataScopeTypeEnum.ALL);
         AdminMtAppOrderRowVO row = new AdminMtAppOrderRowVO();

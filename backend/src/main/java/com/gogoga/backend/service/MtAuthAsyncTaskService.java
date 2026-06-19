@@ -28,38 +28,22 @@ public class MtAuthAsyncTaskService {
     private final MtAccessTokenService mtAccessTokenService;
     private final MtShopService mtShopService;
     private final MtShopRightService mtShopRightService;
-    private final MtShopPoiIdBackfillService mtShopPoiIdBackfillService;
-    private final MtHistoricalOrderBackfillService mtHistoricalOrderBackfillService;
     private final MtOrderPushControlService mtOrderPushControlService;
 
-    public void enqueuePostAuthorizationTasks(Long shopId, String accessToken, boolean newlyCreatedToken) {
+    public void enqueuePostAuthorizationTasks(Long shopId, String accessToken) {
         if (shopId == null || StringUtils.isBlank(accessToken)) {
             return;
         }
         String authEventKey = buildAuthEventKey(shopId, accessToken);
         MtAuthPostProcessTaskPayload payload = new MtAuthPostProcessTaskPayload();
         payload.setShopId(shopId);
-        if (newlyCreatedToken) {
-            enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH, payload, false);
-        }
-        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID, payload, false);
-        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload, false);
-        log.info("跳过授权后历史订单补数任务入队，原因=新评论回复服务不依赖订单历史补数, shopId={}", shopId);
+        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH, payload);
+        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload);
     }
 
     public void executeAuthSyncRightsTask(MtAuthPostProcessTaskPayload payload) {
         ShopContext context = loadContext(payload);
         mtShopRightService.syncRightsFromBuyInfo(context.shop(), context.token().getAccessToken());
-    }
-
-    public void executeAuthBackfillPoiIdTask(MtAuthPostProcessTaskPayload payload) {
-        ShopContext context = loadContext(payload);
-        mtShopPoiIdBackfillService.tryBackfillAfterAuthorization(context.shop(), context.token().getAccessToken());
-    }
-
-    public void executeAuthHistoricalOrderBackfillTask(MtAuthPostProcessTaskPayload payload) {
-        ShopContext context = loadContext(payload);
-        mtHistoricalOrderBackfillService.backfillAfterAuthorization(context.shop(), context.token().getAccessToken());
     }
 
     public void executeAuthBlockOrderPushTask(MtAuthPostProcessTaskPayload payload) {
@@ -92,19 +76,11 @@ public class MtAuthAsyncTaskService {
             Long shopId,
             String authEventKey,
             MtAsyncTaskTypeEnum taskType,
-            MtAuthPostProcessTaskPayload payload,
-            boolean revertHistoricalBackfillStateOnFailure
+            MtAuthPostProcessTaskPayload payload
     ) {
         try {
             enqueue(shopId, authEventKey, taskType, payload);
         } catch (RuntimeException e) {
-            if (revertHistoricalBackfillStateOnFailure) {
-                mtShopService.updateHistoricalOrderBackfillState(
-                        shopId,
-                        MtShopService.HISTORICAL_ORDER_BACKFILL_STATUS_FAILED,
-                        LocalDateTime.now()
-                );
-            }
             log.error("授权后异步任务入队失败，taskType={}, shopId={}", taskType.name(), shopId, e);
         }
     }
@@ -113,9 +89,6 @@ public class MtAuthAsyncTaskService {
         return switch (taskType) {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
             case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
-            case AUTH_BACKFILL_POI_ID -> mtProperties.getAsyncTask().getAuthBackfillPoiId().getMaxRetryCount();
-            case AUTH_HISTORICAL_ORDER_BACKFILL -> mtProperties.getAsyncTask().getAuthHistoricalOrderBackfill().getMaxRetryCount();
-            default -> 0;
         };
     }
 

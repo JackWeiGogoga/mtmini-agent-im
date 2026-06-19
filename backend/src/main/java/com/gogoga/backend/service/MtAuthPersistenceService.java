@@ -30,17 +30,16 @@ public class MtAuthPersistenceService {
         mtPowerAccountService.ensureAccountInitialized(shop.getId());
         triggerPostAuthorizationTasksAfterCommit(
                 shop.getId(),
-                savedToken.getAccessToken(),
-                Boolean.TRUE.equals(savedToken.getNewlyCreated())
+                savedToken.getAccessToken()
         );
         return new AuthorizedShopContext(shop, savedToken);
     }
 
-    private void triggerPostAuthorizationTasksAfterCommit(Long shopId, String accessToken, boolean newlyCreatedToken) {
+    private void triggerPostAuthorizationTasksAfterCommit(Long shopId, String accessToken) {
         if (shopId == null || StringUtils.isBlank(accessToken)) {
             return;
         }
-        Runnable action = () -> mtAuthAsyncTaskService.enqueuePostAuthorizationTasks(shopId, accessToken, newlyCreatedToken);
+        Runnable action = () -> mtAuthAsyncTaskService.enqueuePostAuthorizationTasks(shopId, accessToken);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             action.run();
             return;

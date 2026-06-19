@@ -34,16 +34,13 @@
         <result column="logo" property="logo"/>
         <result column="phone" property="phone"/>
         <result column="shipping_time" property="shippingTime"/>
-        <result column="historical_order_backfill_status" property="historicalOrderBackfillStatus"/>
-        <result column="historical_order_backfill_at" property="historicalOrderBackfillAt"/>
     </resultMap>
 
     <sql id="BaseColumnList">
         id, name, contact_name, contact_phone, less_delivery_price, member_price, new_person_price, reduction,
         category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
         guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
-        door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
-        historical_order_backfill_status, historical_order_backfill_at
+        door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time
     </sql>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -72,43 +69,15 @@
             name, contact_name, contact_phone, less_delivery_price, member_price, new_person_price, reduction,
             category1, category2, category3, address, latitude, longitude, epoi_id, poi_id, poi_name, send_price,
             guaranteed_price, create_time, promotion_info, door_head_posters, promote_img, update_time,
-            door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time,
-            historical_order_backfill_status, historical_order_backfill_at
+            door_head_posters_code, promote_img_code, mini_poi_id, laber_name, logo, phone, shipping_time
         ) VALUES (
             #{name}, #{contactName}, #{contactPhone}, #{lessDeliveryPrice}, #{memberPrice}, #{newPersonPrice},
             #{reduction}, #{category1}, #{category2}, #{category3}, #{address}, #{latitude}, #{longitude},
             #{epoiId}, #{poiId}, #{poiName}, #{sendPrice}, #{guaranteedPrice}, #{createTime}, #{promotionInfo},
             #{doorHeadPosters}, #{promoteImg}, #{updateTime}, #{doorHeadPostersCode}, #{promoteImgCode},
-            #{miniPoiId}, #{laberName}, #{logo}, #{phone}, #{shippingTime},
-            #{historicalOrderBackfillStatus}, #{historicalOrderBackfillAt}
+            #{miniPoiId}, #{laberName}, #{logo}, #{phone}, #{shippingTime}
         )
     </insert>
-
-    <update id="markHistoricalOrderBackfillProcessing">
-        UPDATE mt_shop
-        SET historical_order_backfill_status = #{processingStatus},
-            historical_order_backfill_at = #{backfillAt},
-            update_time = #{updateTime}
-        WHERE id = #{id}
-          AND historical_order_backfill_status = #{expectedStatus}
-    </update>
-
-    <update id="markHistoricalOrderBackfillProcessingIfRetryable">
-        UPDATE mt_shop
-        SET historical_order_backfill_status = #{processingStatus},
-            historical_order_backfill_at = #{backfillAt},
-            update_time = #{updateTime}
-        WHERE id = #{id}
-          AND historical_order_backfill_status IN (#{initStatus}, #{failedStatus})
-    </update>
-
-    <update id="updateHistoricalOrderBackfillState">
-        UPDATE mt_shop
-        SET historical_order_backfill_status = #{status},
-            historical_order_backfill_at = #{backfillAt},
-            update_time = #{updateTime}
-        WHERE id = #{id}
-    </update>
 
     <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtShop">
         UPDATE mt_shop
@@ -140,9 +109,7 @@
             laber_name = #{laberName},
             logo = #{logo},
             phone = #{phone},
-            shipping_time = #{shippingTime},
-            historical_order_backfill_status = #{historicalOrderBackfillStatus},
-            historical_order_backfill_at = #{historicalOrderBackfillAt}
+            shipping_time = #{shippingTime}
         WHERE id = #{id}
     </update>
 

@@ -30,8 +30,6 @@ CREATE TABLE IF NOT EXISTS `mt_shop` (
   `logo` varchar(1000) DEFAULT NULL COMMENT '店铺logo',
   `phone` varchar(255) DEFAULT NULL COMMENT '通知手机号',
   `shipping_time` varchar(255) DEFAULT NULL COMMENT '营业时间',
-  `historical_order_backfill_status` varchar(32) NOT NULL DEFAULT 'INIT' COMMENT '历史订单补数状态',
-  `historical_order_backfill_at` datetime DEFAULT NULL COMMENT '历史订单补数最近一次处理时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_mt_shop_epoi_id` (`epoi_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团店铺表';
@@ -77,23 +75,6 @@ CREATE TABLE IF NOT EXISTS `mt_access_token_history` (
   KEY `idx_mt_access_token_history_op_biz_time` (`op_biz_code`, `create_time`),
   KEY `idx_mt_access_token_history_access_fp` (`access_token_fingerprint`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团token历史表';
-
-CREATE TABLE IF NOT EXISTS `mt_china_workday_calendar` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `calendar_date` date NOT NULL COMMENT '日历日期',
-  `day_type` varchar(32) NOT NULL COMMENT '日型: HOLIDAY/ADJUSTED_WORKDAY',
-  `holiday_name` varchar(64) DEFAULT NULL COMMENT '节假日名称',
-  `source_year` int NOT NULL COMMENT '来源年份',
-  `source_title` varchar(255) NOT NULL COMMENT '来源标题',
-  `source_url` varchar(1000) DEFAULT NULL COMMENT '来源链接',
-  `enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-  `create_time` datetime NOT NULL COMMENT '创建时间',
-  `update_time` datetime NOT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_china_workday_calendar_date` (`calendar_date`),
-  KEY `idx_mt_china_workday_calendar_year_enabled` (`source_year`, `enabled`),
-  KEY `idx_mt_china_workday_calendar_date_enabled` (`calendar_date`, `enabled`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='中国工作日历表';
 
 CREATE TABLE IF NOT EXISTS `mt_app_order` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -164,75 +145,6 @@ CREATE TABLE IF NOT EXISTS `mt_version_service_mapping` (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_mt_version_service_mapping` (`mt_version`, `service_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团版本权益映射表';
-
-CREATE TABLE IF NOT EXISTS `mt_order` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `order_id` varchar(255) DEFAULT NULL COMMENT '订单ID（订单展示Id。用户下单时看到的订单号）',
-  `shop_id` bigint DEFAULT NULL COMMENT '店铺id',
-  `epoi_id` varchar(255) DEFAULT NULL COMMENT 'erp门店id',
-  `poi_id` varchar(255) DEFAULT NULL COMMENT '门店ID',
-  `activity` longtext COMMENT '活动信息',
-  `caution` varchar(255) DEFAULT NULL COMMENT '备注',
-  `day_seq` varchar(255) DEFAULT NULL COMMENT '流水单号',
-  `delivery_time` bigint DEFAULT NULL COMMENT '用户预计送达时间',
-  `logistics_code` varchar(255) DEFAULT NULL COMMENT '配送方式',
-  `original_price` decimal(10,2) DEFAULT NULL COMMENT '商品原价',
-  `pay_type` int DEFAULT NULL COMMENT '支付类型，1表货到付款，2表在线支付',
-  `pick_type` int DEFAULT NULL COMMENT '取餐类型（0：普通取餐；1：到店取餐）',
-  `recipient_address` varchar(255) DEFAULT NULL COMMENT '收货地址',
-  `recipient_name` varchar(255) DEFAULT NULL COMMENT '收货人名字',
-  `recipient_phone` varchar(255) DEFAULT NULL COMMENT '收货人手机号',
-  `shipper_phone` varchar(255) DEFAULT NULL COMMENT '配送员电话',
-  `shipping_fee` decimal(10,2) DEFAULT NULL COMMENT '门店配送费',
-  `status` int DEFAULT NULL COMMENT '订单状态 2新订单，4已接单，8订单完成，9订单取消',
-  `total` decimal(10,2) DEFAULT NULL COMMENT '订单金额',
-  `poi_receive_detail` longtext COMMENT '商家对账信息，此字段为JSON字符串',
-  `latitude` varchar(255) DEFAULT NULL COMMENT '实际送餐地址纬度',
-  `longitude` varchar(255) DEFAULT NULL COMMENT '实际送餐地址经度',
-  `order_send_time` bigint DEFAULT NULL COMMENT '用户下单时间',
-  `order_receive_time` bigint DEFAULT NULL COMMENT '商户收到时间',
-  `order_confirm_time` bigint DEFAULT NULL COMMENT '商户确认时间',
-  `order_cancel_time` bigint DEFAULT NULL COMMENT '订单取消时间',
-  `order_completed_time` bigint DEFAULT NULL COMMENT '订单完成时间',
-  `logistics_send_time` bigint DEFAULT NULL COMMENT '配送单下单时间',
-  `logistics_confirm_time` bigint DEFAULT NULL COMMENT '配送单确认时间',
-  `logistics_cancel_time` bigint DEFAULT NULL COMMENT '配送单取消时间',
-  `logistics_fetch_time` bigint DEFAULT NULL COMMENT '骑手取单时间',
-  `logistics_completed_time` bigint DEFAULT NULL COMMENT '配送完成时间',
-  `userId_view` varchar(255) DEFAULT NULL COMMENT '透传给第三方的偏移后的user_id',
-  `is_black` int DEFAULT NULL COMMENT '0未加入黑名单 1黑名单订单',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  `income` decimal(10,2) DEFAULT NULL COMMENT '订单收入',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_order_order_id` (`order_id`) USING BTREE,
-  KEY `idx_mt_order_shop_id` (`shop_id`) USING BTREE,
-  KEY `idx_mt_order_shop_send_status` (`shop_id`, `order_send_time`, `status`) USING BTREE,
-  KEY `idx_mt_order_userid_view` (`userId_view`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团订单';
-
-CREATE TABLE IF NOT EXISTS `mt_order_detail` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `app_food_code` varchar(255) DEFAULT NULL COMMENT '菜品code',
-  `food_name` varchar(255) DEFAULT NULL COMMENT '菜品名称',
-  `sku_id` varchar(255) DEFAULT NULL COMMENT 'sku编码',
-  `quantity` int DEFAULT NULL COMMENT '商品数量',
-  `price` decimal(10,2) DEFAULT NULL COMMENT '商品单价',
-  `box_num` int DEFAULT NULL COMMENT '餐盒数量',
-  `box_price` decimal(10,2) DEFAULT NULL COMMENT '餐盒价格',
-  `unit` varchar(50) DEFAULT NULL COMMENT '单位',
-  `food_property` varchar(255) DEFAULT NULL COMMENT '菜品属性',
-  `spec` varchar(255) DEFAULT NULL COMMENT '菜品规格名称',
-  `mt_sku_id` varchar(255) DEFAULT NULL COMMENT '透传给第三方的偏移后的sku的id',
-  `mt_spu_id` varchar(255) DEFAULT NULL COMMENT '透传给第三方的偏移后的spu的id',
-  `mt_tag_id` varchar(255) DEFAULT NULL COMMENT '透传给第三方的偏移后的tag_id',
-  `tag_name` varchar(255) DEFAULT NULL COMMENT '透传给第三方的tag_name',
-  `mtorder_id` varchar(255) DEFAULT NULL COMMENT '美团订单id',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_mt_order_detail_mtorder_id` (`mtorder_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团订单详情';
 
 CREATE TABLE IF NOT EXISTS `mt_comment` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

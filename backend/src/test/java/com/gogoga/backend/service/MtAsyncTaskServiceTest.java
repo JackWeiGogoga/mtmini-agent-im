@@ -43,11 +43,11 @@ class MtAsyncTaskServiceTest {
         doThrow(new DuplicateKeyException("duplicate")).when(mtAsyncTaskMapper).insert(any(MtAsyncTask.class));
         MtAsyncTask existingTask = new MtAsyncTask();
         existingTask.setId(99L);
-        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(), "1#2026-04-18T12:00"))
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey(MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(), "1#2026-04-18T12:00"))
                 .thenReturn(existingTask);
 
         MtAsyncTaskEnqueueResult enqueueResult = mtAsyncTaskService.enqueueTask(
-                MtAsyncTaskTypeEnum.ORDER_NOTIFY,
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
                 "1#2026-04-18T12:00",
                 "1",
                 java.util.Map.of("shopId", 1L),
@@ -76,7 +76,7 @@ class MtAsyncTaskServiceTest {
         ArgumentCaptor<LocalDateTime> availableAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(mtAsyncTaskMapper).rescheduleFromProcessing(
                 eq(1L),
-                eq(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name()),
+                eq(MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name()),
                 retryCaptor.capture(),
                 availableAtCaptor.capture(),
                 eq("REMOTE_TIMEOUT"),
@@ -102,7 +102,7 @@ class MtAsyncTaskServiceTest {
 
         verify(mtAsyncTaskMapper).markDead(
                 1L,
-                MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(),
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),
                 4,
                 now,
                 "STALE_TASK_TIMEOUT"
@@ -120,7 +120,7 @@ class MtAsyncTaskServiceTest {
 
         verify(mtAsyncTaskMapper).rescheduleFromProcessing(
                 2L,
-                MtAsyncTaskTypeEnum.ORDER_NOTIFY.name(),
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),
                 2,
                 nextAvailableAt,
                 "SHOP_EXECUTION_BUSY",
@@ -203,7 +203,7 @@ class MtAsyncTaskServiceTest {
     private MtAsyncTask buildProcessingTask(Long id, int retryCount, int maxRetryCount) {
         MtAsyncTask task = new MtAsyncTask();
         task.setId(id);
-        task.setTaskType(MtAsyncTaskTypeEnum.ORDER_NOTIFY.name());
+        task.setTaskType(MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name());
         task.setStatus("PROCESSING");
         task.setRetryCount(retryCount);
         task.setMaxRetryCount(maxRetryCount);

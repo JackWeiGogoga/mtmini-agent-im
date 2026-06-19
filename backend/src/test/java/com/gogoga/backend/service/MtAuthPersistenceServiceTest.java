@@ -52,6 +52,6 @@ class MtAuthPersistenceServiceTest {
         inOrder.verify(mtShopService).saveAuthorizedShop(tokenData, null);
         inOrder.verify(mtAccessTokenService).saveOrUpdate(shop, tokenData);
         inOrder.verify(mtPowerAccountService).ensureAccountInitialized(1L);
-        inOrder.verify(mtAuthAsyncTaskService).enqueuePostAuthorizationTasks(1L, "access-token", true);
+        inOrder.verify(mtAuthAsyncTaskService).enqueuePostAuthorizationTasks(1L, "access-token");
     }
 }

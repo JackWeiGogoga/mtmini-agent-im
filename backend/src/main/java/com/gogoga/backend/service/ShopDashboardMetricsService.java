@@ -2,8 +2,6 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
-import com.gogoga.backend.enums.MtOrderStatusEnum;
-import com.gogoga.backend.mapper.MtOrderMapper;
 import com.gogoga.backend.mapper.MtPoiTrafficDailyMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
 import lombok.Data;
@@ -31,7 +29,6 @@ public class ShopDashboardMetricsService {
     private static final BigDecimal ZERO_RATIO = new BigDecimal("0.000000");
     private static final ZoneId DEFAULT_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
-    private final MtOrderMapper mtOrderMapper;
     private final MtPoiTrafficDailyMapper mtPoiTrafficDailyMapper;
     private final MtPowerConsumeMapper mtPowerConsumeMapper;
 
@@ -53,28 +50,23 @@ public class ShopDashboardMetricsService {
 
     public DashboardStatsSnapshot buildDashboardStats(Long shopId, DashboardStatsRangeTypeEnum statsRange) {
         TimeRange range = buildTimeRange(statsRange);
-        BigDecimal currentIncome = sumIncome(shopId, range.currentFrom(), range.currentTo());
-        BigDecimal previousIncome = sumIncome(shopId, range.previousFrom(), range.previousTo());
-        Integer currentOrderCount = countOrders(shopId, range.currentFrom(), range.currentTo());
-        Integer previousOrderCount = countOrders(shopId, range.previousFrom(), range.previousTo());
-
         MarketingStatsSnapshot marketing = new MarketingStatsSnapshot();
         marketing.setCurrentExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_ALL,
                 range.currentFrom().toLocalDate(), range.currentTo().toLocalDate().plusDays(1)));
         marketing.setPreviousExposure(sumExposure(shopId, MtPoiTrafficDailyService.FLOW_PROP_ALL,
                 range.previousFrom().toLocalDate(), range.previousTo().toLocalDate().plusDays(1)));
-        marketing.setCurrentIncome(currentIncome);
-        marketing.setPreviousIncome(previousIncome);
+        marketing.setCurrentIncome(ZERO_MONEY);
+        marketing.setPreviousIncome(ZERO_MONEY);
         marketing.setCurrentCost(ZERO_MONEY);
         marketing.setPreviousCost(ZERO_MONEY);
         marketing.setCurrentCostRatio(ZERO_RATIO);
         marketing.setPreviousCostRatio(ZERO_RATIO);
 
         OrderStatsSnapshot orderStats = new OrderStatsSnapshot();
-        orderStats.setCurrentCompletedIncome(currentIncome);
-        orderStats.setPreviousCompletedIncome(previousIncome);
-        orderStats.setCurrentCompletedOrderCount(currentOrderCount);
-        orderStats.setPreviousCompletedOrderCount(previousOrderCount);
+        orderStats.setCurrentCompletedIncome(ZERO_MONEY);
+        orderStats.setPreviousCompletedIncome(ZERO_MONEY);
+        orderStats.setCurrentCompletedOrderCount(0);
+        orderStats.setPreviousCompletedOrderCount(0);
 
         DashboardStatsSnapshot snapshot = new DashboardStatsSnapshot();
         snapshot.setMarketingStats(marketing);
@@ -135,25 +127,6 @@ public class ShopDashboardMetricsService {
         return snapshot;
     }
 
-    private BigDecimal sumIncome(Long shopId, LocalDateTime from, LocalDateTime to) {
-        BigDecimal value = mtOrderMapper.sumIncomeByShopIdAndOrderSendTimeBetweenExcludingStatus(
-                shopId,
-                MtOrderStatusEnum.CANCELED.getCode(),
-                toEpochSeconds(from),
-                toEpochSeconds(to)
-        );
-        return value == null ? ZERO_MONEY : value;
-    }
-
-    private Integer countOrders(Long shopId, LocalDateTime from, LocalDateTime to) {
-        return defaultInteger(mtOrderMapper.countOrdersByShopIdAndOrderSendTimeBetweenExcludingStatus(
-                shopId,
-                MtOrderStatusEnum.CANCELED.getCode(),
-                toEpochSeconds(from),
-                toEpochSeconds(to)
-        ));
-    }
-
     private Integer sumExposure(Long shopId, Integer flowProp, LocalDate from, LocalDate to) {
         return defaultInteger(mtPoiTrafficDailyMapper.sumExposureCountByShopIdAndBizDateBetween(shopId, flowProp, from, to));
     }
@@ -166,10 +139,6 @@ public class ShopDashboardMetricsService {
         LocalDateTime previousTo = currentFrom;
         LocalDateTime previousFrom = previousTo.minusDays(range.getDays());
         return new TimeRange(currentFrom, currentTo, previousFrom, previousTo);
-    }
-
-    private Long toEpochSeconds(LocalDateTime time) {
-        return time.atZone(DEFAULT_ZONE_ID).toEpochSecond();
     }
 
     private Integer defaultInteger(Integer value) {

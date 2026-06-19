@@ -169,13 +169,4 @@ public class MtShop {
      */
     private String shippingTime;
 
-    /**
-     * 历史订单补数状态
-     */
-    private String historicalOrderBackfillStatus;
-
-    /**
-     * 历史订单补数最近一次处理时间
-     */
-    private LocalDateTime historicalOrderBackfillAt;
 }
