@@ -45,7 +45,7 @@
 
 ## 远端执行 SQL 模板
 
-不要手写 SSH + MySQL 密码命令。统一使用 `ops.sh mysql-query`，脚本会在 edge 上通过 `/root/.my.cnf` 连接 MySQL；`/root/.my.cnf` 的 `[client]` 必须包含 `database=mtmini_ai_agent`。
+不要手写 SSH + MySQL 密码命令。统一使用 `ops.sh mysql-query`，脚本会在 `mt3` 上通过 `/root/.my.cnf` 连接 MySQL；`/root/.my.cnf` 的 `[client]` 必须包含 `database=mtmini_ai_agent`。
 
 ```bash
 .codex/skills/waimaidashi-ops/scripts/ops.sh mysql-query --sql "
@@ -79,15 +79,14 @@ LIMIT 20;
 表名通常按实体驼峰转下划线。执行前可用 `SHOW TABLES LIKE 'mt_%';` 确认。
 
 - 门店：`mt_shop`
-- 门店权益：`mt_shop_right`
 - 美团 token：`mt_access_token`、`mt_access_token_history`
-- 美团订单：`mt_order`、`mt_order_detail`、`mt_app_order`
-- 推广配置：`mt_promotion_setting`、`mt_promotion_setting_history`
-- 推广日志/出价：`mt_promotion_bid_record`
-- 推广指标：`mt_promotion_metric_snapshot`、`mt_promotion_period_metric_daily`
-- 广告实时/小时/日数据：`mt_promotion_ad_realtime_snapshot`、`mt_promotion_ad_hourly_detail`、`mt_promotion_ad_daily`
+- 门店权益：`mt_shop_right`
+- 评价：`mt_comment`
 - 异步任务：`mt_async_task`
 - 算力：`mt_power_account`、`mt_power_consume`、`mt_power_consume_detail`、`mt_power_recharge`、`mt_power_grant`
+- 美团订阅订单/权益辅助：`mt_app_order`
+- 有赞：`yz_app_auth`、`yz_app_token`、`yz_callback_event`
+- 系统账号权限：`ai_user`、`ai_role`、`ai_menu`、`ai_user_role`、`ai_role_menu`
 
 ## 查询模板
 
@@ -114,9 +113,9 @@ LIMIT 30;
 按门店查基础状态：
 
 ```sql
-SELECT id, poi_id, epoi_id, name, poi_name, promotion_ad_backfill_status, historical_order_backfill_status, update_time
+SELECT id, poi_id, epoi_id, name, poi_name, auth_status, auth_status_changed_at, update_time
 FROM mt_shop
-WHERE poi_id = '<wmPoiId>' OR epoi_id = '<wmPoiId>' OR mini_poi_id = '<wmPoiId>'
+WHERE poi_id = '<wmPoiId>' OR epoi_id = '<wmPoiId>'
 LIMIT 20;
 ```
 
@@ -130,13 +129,34 @@ ORDER BY update_time DESC
 LIMIT 20;
 ```
 
-最近推广出价记录：
+最近评价自动回复状态：
 
 ```sql
-SELECT id, shop_id, poi_id, period_start_time, period_end_time, bid_amount, status, error_msg, create_time
-FROM mt_promotion_bid_record
+SELECT shop_id, reply_status, auto_reply_status, COUNT(*) AS cnt, MAX(update_time) AS latest_update_time
+FROM mt_comment
+WHERE create_time >= NOW() - INTERVAL 7 DAY
+GROUP BY shop_id, reply_status, auto_reply_status
+ORDER BY latest_update_time DESC
+LIMIT 30;
+```
+
+最近评价自动回复失败：
+
+```sql
+SELECT id, shop_id, comment_id, reply_status, auto_reply_status, LEFT(auto_reply_error, 300) AS auto_reply_error, create_time, update_time
+FROM mt_comment
+WHERE auto_reply_status = 'FAILED'
+ORDER BY update_time DESC
+LIMIT 30;
+```
+
+按门店查评价：
+
+```sql
+SELECT id, shop_id, comment_id, result, order_comment_score, reply_status, auto_reply_status, comment_time, update_time
+FROM mt_comment
 WHERE shop_id = <shopId>
-ORDER BY create_time DESC
+ORDER BY update_time DESC
 LIMIT 30;
 ```
 
@@ -150,11 +170,11 @@ ORDER BY create_time DESC
 LIMIT 20;
 ```
 
-最近订单同步：
+最近美团订阅订单：
 
 ```sql
 SELECT shop_id, COUNT(*) AS order_count, MAX(update_time) AS latest_update_time
-FROM mt_order
+FROM mt_app_order
 WHERE create_time >= NOW() - INTERVAL 1 DAY
 GROUP BY shop_id
 ORDER BY latest_update_time DESC

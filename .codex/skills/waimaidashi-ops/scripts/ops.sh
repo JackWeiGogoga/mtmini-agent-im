@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
-EDGE_HOST="${WMD_EDGE_HOST:-mt_ai_agent}"
-WORKER_HOST="${WMD_WORKER_HOST:-root@49.233.251.114}"
+WEB_HOST="${WMD_WEB_HOST:-${WMD_EDGE_HOST:-mt4}}"
+DB_HOST="${WMD_DB_HOST:-mt3}"
+EDGE_HOST="${WEB_HOST}"
 BACKEND_SERVICE="${WMD_BACKEND_SERVICE:-waimaidashi-backend}"
 CADDY_SERVICE="${WMD_CADDY_SERVICE:-caddy}"
 REMOTE_ENV_PATH="${WMD_REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
@@ -11,21 +12,21 @@ REMOTE_ENV_PATH="${WMD_REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 HOST_SELECTOR="both"
 SINCE="30 min ago"
 LINES="200"
-PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|promotion"
+PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|comment|reply|auth"
 SLOW_THRESHOLD="0.5"
 
 usage() {
   cat <<'EOF'
 Usage:
-  ops.sh health [--host edge|worker|both]
-  ops.sh status [--host edge|worker|both]
-  ops.sh logs [--host edge|worker|both] [--since "30 min ago"] [--lines 200]
-  ops.sh errors [--host edge|worker|both] [--since "2 hours ago"] [--lines 200] [--pattern REGEX]
-  ops.sh tasks [--host edge|worker|both] [--since "6 hours ago"]
-  ops.sh ports [--host edge|worker|both]
+  ops.sh health [--host web|db|both]
+  ops.sh status [--host web|db|both]
+  ops.sh logs [--host web] [--since "30 min ago"] [--lines 200]
+  ops.sh errors [--host web] [--since "2 hours ago"] [--lines 200] [--pattern REGEX]
+  ops.sh tasks [--host web] [--since "6 hours ago"]
+  ops.sh ports [--host web|db|both]
   ops.sh caddy
   ops.sh caddy-access [--since "2026/05/17 14:15"] [--lines 20000] [--slow-threshold 0.5]
-  ops.sh env-summary [--host edge|worker]
+  ops.sh env-summary [--host web]
   ops.sh redis-locks [--lines 100]
   ops.sh redis-persistence
   ops.sh mysql-check
@@ -36,8 +37,8 @@ Usage:
   ops.sh sites
 
 Env overrides:
-  WMD_EDGE_HOST=mt_ai_agent
-  WMD_WORKER_HOST=root@49.233.251.114
+  WMD_WEB_HOST=mt4
+  WMD_DB_HOST=mt3
   WMD_BACKEND_SERVICE=waimaidashi-backend
   WMD_REMOTE_ENV_PATH=/etc/waimaidashi/backend.env
 EOF
@@ -93,19 +94,30 @@ parse_common_args() {
 
 selected_hosts() {
   case "${HOST_SELECTOR}" in
-    edge)
-      printf '%s\n' "${EDGE_HOST}"
+    web|edge)
+      printf '%s\n' "${WEB_HOST}"
       ;;
-    worker)
-      printf '%s\n' "${WORKER_HOST}"
+    db|worker)
+      printf '%s\n' "${DB_HOST}"
       ;;
     both)
-      printf '%s\n%s\n' "${EDGE_HOST}" "${WORKER_HOST}"
+      printf '%s\n%s\n' "${WEB_HOST}" "${DB_HOST}"
       ;;
     *)
       printf '%s\n' "${HOST_SELECTOR}"
       ;;
   esac
+}
+
+host_role() {
+  local host="$1"
+  if [[ "${host}" == "${WEB_HOST}" ]]; then
+    printf 'web\n'
+  elif [[ "${host}" == "${DB_HOST}" ]]; then
+    printf 'db\n'
+  else
+    printf 'custom\n'
+  fi
 }
 
 run_ssh() {
@@ -123,22 +135,36 @@ run_ssh_with_stdin() {
 cmd_status() {
   parse_common_args "$@"
   while IFS= read -r host; do
-    log "backend status on ${host}"
-    run_ssh "${host}" "hostname; date; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,45p'"
+    if [[ "$(host_role "${host}")" == "db" ]]; then
+      log "database/cache status on ${host}"
+      run_ssh "${host}" "hostname; date; (systemctl is-active mysqld || systemctl is-active mysql || true); sudo systemctl status mysqld --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status mysql --no-pager -l 2>/dev/null | sed -n '1,35p' || true; echo; (systemctl is-active redis || systemctl is-active redis-server || true); sudo systemctl status redis --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status redis-server --no-pager -l 2>/dev/null | sed -n '1,35p' || true"
+    else
+      log "backend status on ${host}"
+      run_ssh "${host}" "hostname; date; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,45p'"
+    fi
   done < <(selected_hosts)
 }
 
 cmd_health() {
   parse_common_args "$@"
   while IFS= read -r host; do
-    log "health on ${host}"
-    run_ssh "${host}" "hostname; date; uptime; echo; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,25p'; echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:8080|:31306|:6379|:80|:443)' || true"
+    if [[ "$(host_role "${host}")" == "db" ]]; then
+      log "database/cache health on ${host}"
+      run_ssh "${host}" "hostname; date; uptime; echo; (systemctl is-active mysqld || systemctl is-active mysql || true); (systemctl is-active redis || systemctl is-active redis-server || true); echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:31306|:6379)' || true"
+    else
+      log "web/backend health on ${host}"
+      run_ssh "${host}" "hostname; date; uptime; echo; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,25p'; echo; systemctl is-active '${CADDY_SERVICE}' || true; echo; curl -fsS http://127.0.0.1:8080/health/check || true; echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:8080|:80|:443)' || true"
+    fi
   done < <(selected_hosts)
 }
 
 cmd_logs() {
   parse_common_args "$@"
   while IFS= read -r host; do
+    if [[ "$(host_role "${host}")" == "db" ]]; then
+      log "skip backend logs on database host ${host}"
+      continue
+    fi
     log "backend logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager -n '${LINES}'"
   done < <(selected_hosts)
@@ -147,6 +173,10 @@ cmd_logs() {
 cmd_errors() {
   parse_common_args "$@"
   while IFS= read -r host; do
+    if [[ "$(host_role "${host}")" == "db" ]]; then
+      log "skip backend filtered logs on database host ${host}"
+      continue
+    fi
     log "backend filtered logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager | egrep -i '${PATTERN}' | tail -n '${LINES}' || true"
   done < <(selected_hosts)
@@ -154,9 +184,13 @@ cmd_errors() {
 
 cmd_tasks() {
   SINCE="6 hours ago"
-  PATTERN="MtPromotionAutoBidTask|MtPromotionAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|MtPromotionAdDataTask|MtPromotionRightExpiryShutdownTask|MtPoiTrafficDailyTask|MtShopPeakWindowProfileRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|lock"
+  PATTERN="MtCommentAutoReplyTask|MtAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|数据库异步任务|评价自动回复|授权后异步|lock"
   parse_common_args "$@"
   while IFS= read -r host; do
+    if [[ "$(host_role "${host}")" == "db" ]]; then
+      log "skip backend task logs on database host ${host}"
+      continue
+    fi
     log "task logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager | egrep -i '${PATTERN}' | tail -n '${LINES}' || true"
   done < <(selected_hosts)
@@ -196,9 +230,9 @@ since_raw = os.environ["SINCE"]
 since = since_raw[:16] if since_raw[:1].isdigit() else ""
 slow_threshold = float(os.environ["SLOW_THRESHOLD"])
 paths = [
-    "/var/log/caddy/aia-access.log",
-    "/var/log/caddy/aiadmin-access.log",
-    "/var/log/caddy/aiapi-access.log",
+    "/var/log/caddy/aib-access.log",
+    "/var/log/caddy/aibadmin-access.log",
+    "/var/log/caddy/aibapi-access.log",
 ]
 
 rows = []
@@ -274,18 +308,18 @@ cmd_env_summary() {
 }
 
 cmd_redis_locks() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   parse_common_args "$@"
-  log "redis lock-like keys on ${EDGE_HOST}"
-  run_ssh "${EDGE_HOST}" "pass=\$(sudo sed -n 's/^SPRING_DATA_REDIS_PASSWORD=//p' '${REMOTE_ENV_PATH}' | head -n1); REDISCLI_AUTH=\"\$pass\" redis-cli -h 127.0.0.1 -p 6379 ping; echo; REDISCLI_AUTH=\"\$pass\" redis-cli -h 127.0.0.1 -p 6379 --scan --pattern '*lock*' | head -n '${LINES}'"
+  log "redis lock-like keys on ${DB_HOST}"
+  run_ssh "${DB_HOST}" "pass=\$(sudo sed -n 's/^requirepass[[:space:]]\\+//p' /etc/redis/redis.conf /etc/redis.conf 2>/dev/null | tail -n1); REDISCLI_AUTH=\"\$pass\" redis-cli -h 127.0.0.1 -p 6379 ping; echo; REDISCLI_AUTH=\"\$pass\" redis-cli -h 127.0.0.1 -p 6379 --scan --pattern '*lock*' | head -n '${LINES}'"
 }
 
 cmd_redis_persistence() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   parse_common_args "$@"
-  log "redis persistence on ${EDGE_HOST}"
-  run_ssh "${EDGE_HOST}" "
-    pass=\$(sudo sed -n 's/^SPRING_DATA_REDIS_PASSWORD=//p' '${REMOTE_ENV_PATH}' | head -n1)
+  log "redis persistence on ${DB_HOST}"
+  run_ssh "${DB_HOST}" "
+    pass=\$(sudo sed -n 's/^requirepass[[:space:]]\\+//p' /etc/redis/redis.conf /etc/redis.conf 2>/dev/null | tail -n1)
     rc() { REDISCLI_AUTH=\"\$pass\" redis-cli -h 127.0.0.1 -p 6379 \"\$@\"; }
 
     hostname
@@ -322,10 +356,10 @@ cmd_redis_persistence() {
 }
 
 cmd_mysql_check() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   parse_common_args "$@"
-  log "mysql connectivity and table overview on ${EDGE_HOST}"
-  run_ssh_with_stdin "${EDGE_HOST}" "bash -s" <<'REMOTE'
+  log "mysql connectivity and table overview on ${DB_HOST}"
+  run_ssh_with_stdin "${DB_HOST}" "bash -s" <<'REMOTE'
     set -euo pipefail
     mysql_exec() {
       sudo test -r /root/.my.cnf || {
@@ -349,7 +383,7 @@ REMOTE
 }
 
 cmd_mysql_query() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   local sql=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -399,11 +433,11 @@ REMOTE
 }
 
 cmd_mysql_info() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   LINES="20"
   parse_common_args "$@"
-  log "mysql basic info and table sizes on ${EDGE_HOST}"
-  run_ssh "${EDGE_HOST}" "
+  log "mysql basic info and table sizes on ${DB_HOST}"
+  run_ssh "${DB_HOST}" "
     mysql_exec() {
       sudo test -r /root/.my.cnf || {
         echo 'ERROR: /root/.my.cnf is missing or unreadable; configure remote MySQL defaults before querying' >&2
@@ -453,10 +487,10 @@ cmd_mysql_info() {
 }
 
 cmd_mysql_slow() {
-  HOST_SELECTOR="edge"
+  HOST_SELECTOR="db"
   parse_common_args "$@"
-  log "mysql slow query diagnostics on ${EDGE_HOST}"
-  run_ssh "${EDGE_HOST}" "
+  log "mysql slow query diagnostics on ${DB_HOST}"
+  run_ssh "${DB_HOST}" "
     mysql_exec() { sudo mysql --defaults-extra-file=/root/.my.cnf --batch --raw -e \"\$1\"; }
 
     hostname
@@ -506,7 +540,7 @@ Manual MySQL backup script:
   tools/mysql-backup-download.sh
 
 Defaults:
-  remote host: mt_ai_agent
+  remote host: mt3
   database: mtmini_ai_agent
   remote dir: /data/backup/mysql
   local dir: ~/data/outsourcing/takeout-master-ai/db-backups
@@ -526,11 +560,10 @@ EOF
 cmd_sites() {
   log "public site headers"
   for url in \
-    https://aia.waimaidashi.com/ \
-    https://aiadmin.waimaidashi.com/ \
-    https://aiapi.waimaidashi.com/api/callbacks/meituan/auth \
-    https://aiapi.waimaidashi.com/api/callbacks/meituan/order \
-    https://aiapi.waimaidashi.com/api/callbacks/wechat/pay
+    https://aib.waimaidashi.com/ \
+    https://aibadmin.waimaidashi.com/ \
+    https://aibapi.waimaidashi.com/api/callbacks/meituan/auth \
+    https://aibapi.waimaidashi.com/api/callbacks/wechat/pay
   do
     printf '\n[ops] curl -I %s\n' "${url}"
     curl -I --connect-timeout 8 --max-time 15 "${url}" || true

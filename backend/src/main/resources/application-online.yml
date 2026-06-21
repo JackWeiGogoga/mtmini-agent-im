@@ -1,7 +1,7 @@
 mt:
   async-task:
-    enabled: ${MT_ASYNC_TASK_ENABLED:true}
-    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:true}
+    enabled: ${MT_ASYNC_TASK_ENABLED:false}
+    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:false}
 
 scheduled:
   enabled: ${SCHEDULED_ENABLED:false}

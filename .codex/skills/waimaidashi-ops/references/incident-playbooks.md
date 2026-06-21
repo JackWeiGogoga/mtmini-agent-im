@@ -6,23 +6,23 @@
 
 ```bash
 .codex/skills/waimaidashi-ops/scripts/ops.sh health
-.codex/skills/waimaidashi-ops/scripts/ops.sh errors --host both --since "2 hours ago"
+.codex/skills/waimaidashi-ops/scripts/ops.sh errors --host web --since "2 hours ago"
 ```
 
 判断顺序：
 
-1. 两台 backend 是否 active
-2. edge 的 Caddy 是否 active 且配置有效
-3. edge 的 MySQL/Redis 是否监听内网端口
-4. worker 是否能通过内网访问 MySQL/Redis
-5. 同一时间窗口两台日志是否出现相同任务重复执行或锁争用
-6. 是否集中出现美团、微信、Redis、MySQL、LLM、COS、短信相关错误
+1. `mt4` backend 是否 active，`/health/check` 是否正常
+2. `mt4` Caddy 是否 active 且配置有效
+3. `mt3` MySQL/Redis 是否监听内网端口
+4. `mt4` 是否能通过内网访问 `mt3` MySQL/Redis
+5. 是否集中出现美团、微信、Redis、MySQL、COS、短信相关错误
+6. 定时任务和异步 worker 是否按当前发布策略开启或关闭
 
 ## 后端不可用
 
 ```bash
-.codex/skills/waimaidashi-ops/scripts/ops.sh status --host both
-.codex/skills/waimaidashi-ops/scripts/ops.sh logs --host both --since "30 min ago" --lines 300
+.codex/skills/waimaidashi-ops/scripts/ops.sh status --host web
+.codex/skills/waimaidashi-ops/scripts/ops.sh logs --host web --since "30 min ago" --lines 300
 .codex/skills/waimaidashi-ops/scripts/ops.sh ports --host both
 ```
 
@@ -45,30 +45,26 @@
 
 ## 定时任务与异步消费
 
-两台都运行定时任务和异步任务消费，不能只看一台。
+当前新项目只有 `mt4` 运行 backend。线上默认配置下普通定时任务和数据库异步 worker 可以关闭，排查时先确认 jar 内 `application-online.yml` 和 `/etc/waimaidashi/backend.env` 的最终开关。
 
 ```bash
-.codex/skills/waimaidashi-ops/scripts/ops.sh tasks --host both --since "6 hours ago"
+.codex/skills/waimaidashi-ops/scripts/ops.sh tasks --host web --since "6 hours ago"
 .codex/skills/waimaidashi-ops/scripts/ops.sh redis-locks --lines 100
 ```
 
 重点任务名：
 
-- `MtPromotionAutoBidTask`
-- `MtPromotionAsyncTaskWorkerTask`
+- `MtCommentAutoReplyTask`
+- `MtAsyncTaskWorkerTask`
 - `MtAppOrderPullTask`
 - `MtAccessTokenRefreshTask`
-- `MtPromotionAdDataTask`
-- `MtPromotionRightExpiryShutdownTask`
-- `MtPoiTrafficDailyTask`
-- `MtShopPeakWindowProfileRefreshTask`
 - `YouzanAccessTokenRefreshTask`
 
-如果两台都出现同一任务日志，先确认是否有 Redis 分布式锁的 acquire/skip 记录，再判断是否重复执行。
+如果授权回调正常但后续没有关闭订单推送、同步权益、回补评价或自动回复，优先检查 `MT_ASYNC_TASK_ENABLED` 和 `MT_ASYNC_TASK_WORKER_ENABLED` 是否开启，再查 `mt_async_task` 的状态分布。
 
 ## Redis 排查
 
-Redis 在 edge 上，需要认证。不要直接 `redis-cli CONFIG GET ...`，也不要 `source /etc/waimaidashi/backend.env`；`backend.env` 是 systemd EnvironmentFile，JDBC URL 中的 `&` 会让 shell 解析失败。
+Redis 在 `mt3` 上，需要认证。不要直接 `source /etc/waimaidashi/backend.env`；`backend.env` 是 systemd EnvironmentFile，JDBC URL 中的 `&` 会让 shell 解析失败。
 
 持久化配置和状态统一用：
 
@@ -94,20 +90,20 @@ Redis 在 edge 上，需要认证。不要直接 `redis-cli CONFIG GET ...`，�
 重启前必须先采集：
 
 ```bash
-.codex/skills/waimaidashi-ops/scripts/ops.sh status --host <edge|worker>
-.codex/skills/waimaidashi-ops/scripts/ops.sh logs --host <edge|worker> --since "20 min ago" --lines 200
+.codex/skills/waimaidashi-ops/scripts/ops.sh status --host web
+.codex/skills/waimaidashi-ops/scripts/ops.sh logs --host web --since "20 min ago" --lines 200
 ```
 
 用户明确授权后才可重启：
 
 ```bash
-ssh <host> 'sudo systemctl restart waimaidashi-backend && sudo systemctl status waimaidashi-backend --no-pager -l'
+ssh mt4 'sudo systemctl restart waimaidashi-backend && sudo systemctl status waimaidashi-backend --no-pager -l'
 ```
 
 重启后验证：
 
 ```bash
-.codex/skills/waimaidashi-ops/scripts/ops.sh status --host <edge|worker>
-.codex/skills/waimaidashi-ops/scripts/ops.sh errors --host <edge|worker> --since "10 min ago"
+.codex/skills/waimaidashi-ops/scripts/ops.sh status --host web
+.codex/skills/waimaidashi-ops/scripts/ops.sh errors --host web --since "10 min ago"
 .codex/skills/waimaidashi-ops/scripts/ops.sh sites
 ```

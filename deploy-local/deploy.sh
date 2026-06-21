@@ -5,14 +5,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-REMOTE_HOST="${REMOTE_HOST:-mt_ai_agent}"
+REMOTE_HOST="${REMOTE_HOST:-mt4}"
 REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-/opt/waimaidashi/backend}"
 REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-h5}"
 REMOTE_FRONTEND_DIR="${REMOTE_FRONTEND_DIR:-/var/www/mt-admin}"
 REMOTE_ENV_PATH="${REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 REMOTE_CERT_DIR="${REMOTE_CERT_DIR:-/opt/waimaidashi/certs/wechat}"
+APP_USER="${APP_USER:-waimaidashi}"
+APP_GROUP="${APP_GROUP:-waimaidashi}"
 BACKEND_SERVICE_NAME="${BACKEND_SERVICE_NAME:-waimaidashi-backend}"
+BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-http://127.0.0.1:8080/health/check}"
 MVN_BIN="${MVN_BIN:-/Users/jackwei/data/apache-maven-3.9.14/bin/mvn}"
+H5_PACKAGE_MANAGER="${H5_PACKAGE_MANAGER:-npm}"
+FRONTEND_PACKAGE_MANAGER="${FRONTEND_PACKAGE_MANAGER:-auto}"
 H5_BUILD_DIR="${H5_BUILD_DIR:-${REPO_ROOT}/h5/dist/build/h5}"
 FRONTEND_BUILD_DIR="${FRONTEND_BUILD_DIR:-${REPO_ROOT}/frontend/dist}"
 LOCAL_ENV_FILE="${LOCAL_ENV_FILE:-${REPO_ROOT}/deploy-local/backend.env}"
@@ -58,8 +63,13 @@ Environment variables:
   REMOTE_FRONTEND_DIR         Remote frontend static directory
   REMOTE_ENV_PATH             Remote backend env file path
   REMOTE_CERT_DIR             Remote WeChat cert directory
+  APP_USER                    App runtime user, default: ${APP_USER}
+  APP_GROUP                   App runtime group, default: ${APP_GROUP}
   BACKEND_SERVICE_NAME        systemd backend service name
+  BACKEND_HEALTH_URL          Local backend health URL checked after restart; empty to disable
   MVN_BIN                     Maven binary path
+  H5_PACKAGE_MANAGER          H5 package manager command, default: npm
+  FRONTEND_PACKAGE_MANAGER    Frontend package manager command, default: auto
   FRONTEND_BUILD_DIR          Local frontend build directory
   LOCAL_ENV_FILE              Local backend env file path
   LOCAL_WECHAT_KEY_FILE       Local apiclient_key.pem path
@@ -162,7 +172,6 @@ done
 
 require_cmd ssh
 require_cmd scp
-require_cmd npm
 
 if [[ ! -x "${MVN_BIN}" ]]; then
   if command -v mvn >/dev/null 2>&1; then
@@ -172,11 +181,50 @@ if [[ ! -x "${MVN_BIN}" ]]; then
   fi
 fi
 
+resolve_package_manager() {
+  local configured="$1"
+  local dir="$2"
+  if [[ "${configured}" != "auto" ]]; then
+    command -v "${configured}" >/dev/null 2>&1 || fail "Missing package manager: ${configured}"
+    printf '%s\n' "${configured}"
+    return 0
+  fi
+  if [[ -f "${dir}/pnpm-lock.yaml" ]] && command -v pnpm >/dev/null 2>&1; then
+    printf '%s\n' pnpm
+    return 0
+  fi
+  if command -v npm >/dev/null 2>&1; then
+    printf '%s\n' npm
+    return 0
+  fi
+  fail "No package manager found for ${dir}; install pnpm/npm or set package manager env"
+}
+
+run_package_script() {
+  local package_manager="$1"
+  local script_name="$2"
+  if [[ "${package_manager}" == "npm" ]]; then
+    npm run "${script_name}"
+  else
+    "${package_manager}" run "${script_name}"
+  fi
+}
+
+H5_PACKAGE_MANAGER="$(resolve_package_manager "${H5_PACKAGE_MANAGER}" "${REPO_ROOT}/h5")"
+FRONTEND_PACKAGE_MANAGER="$(resolve_package_manager "${FRONTEND_PACKAGE_MANAGER}" "${REPO_ROOT}/frontend")"
+
 upload_env_file() {
   [[ -f "${LOCAL_ENV_FILE}" ]] || fail "Env file not found: ${LOCAL_ENV_FILE}"
-  ssh "${REMOTE_HOST}" "mkdir -p \"$(dirname "${REMOTE_ENV_PATH}")\""
+  assert_safe_remote_path "${REMOTE_ENV_PATH}" "Remote env path"
   log "Uploading backend env to ${REMOTE_HOST}:${REMOTE_ENV_PATH}"
-  scp "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:${REMOTE_ENV_PATH}"
+  scp "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
+  ssh "${REMOTE_HOST}" "
+    set -eu
+    mkdir -p \"$(dirname "${REMOTE_ENV_PATH}")\"
+    mv -f /tmp/waimaidashi-backend.env '${REMOTE_ENV_PATH}'
+    chown root:root '${REMOTE_ENV_PATH}'
+    chmod 600 '${REMOTE_ENV_PATH}'
+  "
 }
 
 upload_cert_files() {
@@ -184,10 +232,21 @@ upload_cert_files() {
   [[ -n "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "LOCAL_WECHAT_PUB_KEY_FILE is required for --upload-certs"
   [[ -f "${LOCAL_WECHAT_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_KEY_FILE}"
   [[ -f "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_PUB_KEY_FILE}"
+  assert_safe_remote_path "${REMOTE_CERT_DIR}" "Remote cert directory"
   ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_CERT_DIR}'"
   log "Uploading WeChat cert files to ${REMOTE_HOST}:${REMOTE_CERT_DIR}"
-  scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:${REMOTE_CERT_DIR}/apiclient_key.pem"
-  scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:${REMOTE_CERT_DIR}/pub_key.pem"
+  scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
+  scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
+  ssh "${REMOTE_HOST}" "
+    set -eu
+    mkdir -p '${REMOTE_CERT_DIR}'
+    mv -f /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
+    mv -f /tmp/pub_key.pem '${REMOTE_CERT_DIR}/pub_key.pem'
+    chown -R '${APP_USER}:${APP_GROUP}' '${REMOTE_CERT_DIR}'
+    chmod 700 '${REMOTE_CERT_DIR}'
+    chmod 600 '${REMOTE_CERT_DIR}/apiclient_key.pem'
+    chmod 644 '${REMOTE_CERT_DIR}/pub_key.pem'
+  "
 }
 
 assert_safe_remote_path() {
@@ -233,6 +292,7 @@ cleanup_remote_dir_backups() {
 }
 
 deploy_backend() {
+  assert_safe_remote_path "${REMOTE_BACKEND_DIR}" "Remote backend directory"
   log "Building backend jar"
   "${MVN_BIN}" -f "${REPO_ROOT}/backend/pom.xml" clean package -DskipTests
 
@@ -259,17 +319,33 @@ deploy_backend() {
         cp -a '${remote_jar}' '${remote_backup_jar}'
       fi
       mv -f '${remote_new_jar}' '${remote_jar}'
+      chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
+      chmod 644 '${remote_jar}'
     "
   else
     ssh "${REMOTE_HOST}" "
       set -eu
       mv -f '${remote_new_jar}' '${remote_jar}'
+      chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
+      chmod 644 '${remote_jar}'
     "
   fi
 
   if (( RESTART_BACKEND == 1 )); then
     log "Restarting backend service ${BACKEND_SERVICE_NAME}"
-    if ! ssh "${REMOTE_HOST}" "sudo systemctl restart '${BACKEND_SERVICE_NAME}' && sudo systemctl is-active --quiet '${BACKEND_SERVICE_NAME}'"; then
+    if ! ssh "${REMOTE_HOST}" "
+      sudo systemctl restart '${BACKEND_SERVICE_NAME}'
+      sudo systemctl is-active --quiet '${BACKEND_SERVICE_NAME}'
+      if [ -n '${BACKEND_HEALTH_URL}' ]; then
+        for i in \$(seq 1 20); do
+          if curl -fsS --max-time 2 '${BACKEND_HEALTH_URL}' >/dev/null; then
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 1
+      fi
+    "; then
       if (( BACKUP_BACKEND == 1 )); then
         log "Backend restart failed; restoring backup ${remote_backup_jar}"
         ssh "${REMOTE_HOST}" "
@@ -296,25 +372,50 @@ deploy_backend() {
 }
 
 deploy_h5() {
+  assert_safe_remote_path "${REMOTE_H5_DIR}" "Remote H5 directory"
   log "Building H5"
   (
     cd "${REPO_ROOT}/h5"
-    npm run build:h5
+    run_package_script "${H5_PACKAGE_MANAGER}" build:h5
   )
 
   [[ -d "${H5_BUILD_DIR}" ]] || fail "H5 build directory not found: ${H5_BUILD_DIR}"
-  ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_H5_DIR}'"
+  local remote_parent
+  local remote_base
+  local remote_tmp
+  remote_parent="$(dirname "${REMOTE_H5_DIR}")"
+  remote_base="$(basename "${REMOTE_H5_DIR}")"
+  remote_tmp="${remote_parent}/.${remote_base}.new-$(date +%Y%m%d-%H%M%S)"
+  assert_safe_remote_path "${remote_parent}" "Remote H5 parent directory"
+  ssh "${REMOTE_HOST}" "mkdir -p '${remote_tmp}'"
+
+  log "Uploading H5 dist to ${REMOTE_HOST}:${remote_tmp}"
+  scp -r "${H5_BUILD_DIR}/." "${REMOTE_HOST}:${remote_tmp}/"
 
   if (( BACKUP_H5 == 1 )); then
     log "Backing up remote H5 files at ${REMOTE_H5_DIR}"
-    ssh "${REMOTE_HOST}" "backup_dir=${REMOTE_H5_DIR}-backup-\$(date +%Y%m%d-%H%M%S) && mkdir -p \"\$backup_dir\" && if [ -d '${REMOTE_H5_DIR}' ]; then cp -a '${REMOTE_H5_DIR}/.' \"\$backup_dir\"/ 2>/dev/null || true; fi && find '${REMOTE_H5_DIR}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +"
+    ssh "${REMOTE_HOST}" "
+      set -eu
+      backup_dir=${REMOTE_H5_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
+      if [ -d '${REMOTE_H5_DIR}' ]; then
+        mv '${REMOTE_H5_DIR}' \"\$backup_dir\"
+      fi
+      mv '${remote_tmp}' '${REMOTE_H5_DIR}'
+      chown -R root:root '${REMOTE_H5_DIR}'
+      find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
+      find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
+    "
   else
-    log "Clearing remote H5 files without backup"
-    ssh "${REMOTE_HOST}" "find '${REMOTE_H5_DIR}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +"
+    log "Replacing remote H5 files without backup"
+    ssh "${REMOTE_HOST}" "
+      set -eu
+      rm -rf '${REMOTE_H5_DIR}'
+      mv '${remote_tmp}' '${REMOTE_H5_DIR}'
+      chown -R root:root '${REMOTE_H5_DIR}'
+      find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
+      find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
+    "
   fi
-
-  log "Uploading H5 dist to ${REMOTE_HOST}:${REMOTE_H5_DIR}"
-  scp -r "${H5_BUILD_DIR}/." "${REMOTE_HOST}:${REMOTE_H5_DIR}/"
 
   if (( BACKUP_H5 == 1 )); then
     cleanup_remote_dir_backups "${REMOTE_H5_DIR}"
@@ -322,25 +423,50 @@ deploy_h5() {
 }
 
 deploy_frontend() {
+  assert_safe_remote_path "${REMOTE_FRONTEND_DIR}" "Remote frontend directory"
   log "Building frontend"
   (
     cd "${REPO_ROOT}/frontend"
-    npm run build
+    run_package_script "${FRONTEND_PACKAGE_MANAGER}" build
   )
 
   [[ -d "${FRONTEND_BUILD_DIR}" ]] || fail "Frontend build directory not found: ${FRONTEND_BUILD_DIR}"
-  ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_FRONTEND_DIR}'"
+  local remote_parent
+  local remote_base
+  local remote_tmp
+  remote_parent="$(dirname "${REMOTE_FRONTEND_DIR}")"
+  remote_base="$(basename "${REMOTE_FRONTEND_DIR}")"
+  remote_tmp="${remote_parent}/.${remote_base}.new-$(date +%Y%m%d-%H%M%S)"
+  assert_safe_remote_path "${remote_parent}" "Remote frontend parent directory"
+  ssh "${REMOTE_HOST}" "mkdir -p '${remote_tmp}'"
+
+  log "Uploading frontend dist to ${REMOTE_HOST}:${remote_tmp}"
+  scp -r "${FRONTEND_BUILD_DIR}/." "${REMOTE_HOST}:${remote_tmp}/"
 
   if (( BACKUP_FRONTEND == 1 )); then
     log "Backing up remote frontend files at ${REMOTE_FRONTEND_DIR}"
-    ssh "${REMOTE_HOST}" "backup_dir=${REMOTE_FRONTEND_DIR}-backup-\$(date +%Y%m%d-%H%M%S) && mkdir -p \"\$backup_dir\" && if [ -d '${REMOTE_FRONTEND_DIR}' ]; then cp -a '${REMOTE_FRONTEND_DIR}/.' \"\$backup_dir\"/ 2>/dev/null || true; fi && find '${REMOTE_FRONTEND_DIR}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +"
+    ssh "${REMOTE_HOST}" "
+      set -eu
+      backup_dir=${REMOTE_FRONTEND_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
+      if [ -d '${REMOTE_FRONTEND_DIR}' ]; then
+        mv '${REMOTE_FRONTEND_DIR}' \"\$backup_dir\"
+      fi
+      mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
+      chown -R root:root '${REMOTE_FRONTEND_DIR}'
+      find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
+      find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
+    "
   else
-    log "Clearing remote frontend files without backup"
-    ssh "${REMOTE_HOST}" "find '${REMOTE_FRONTEND_DIR}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +"
+    log "Replacing remote frontend files without backup"
+    ssh "${REMOTE_HOST}" "
+      set -eu
+      rm -rf '${REMOTE_FRONTEND_DIR}'
+      mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
+      chown -R root:root '${REMOTE_FRONTEND_DIR}'
+      find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
+      find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
+    "
   fi
-
-  log "Uploading frontend dist to ${REMOTE_HOST}:${REMOTE_FRONTEND_DIR}"
-  scp -r "${FRONTEND_BUILD_DIR}/." "${REMOTE_HOST}:${REMOTE_FRONTEND_DIR}/"
 
   if (( BACKUP_FRONTEND == 1 )); then
     cleanup_remote_dir_backups "${REMOTE_FRONTEND_DIR}"
