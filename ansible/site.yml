@@ -1,0 +1,429 @@
+---
+- name: Bootstrap Python for modern Ansible
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Install Python 3.11 when absent
+      ansible.builtin.raw: |
+        if ! command -v python3.11 >/dev/null 2>&1; then
+          dnf install -y python3.11
+          echo changed
+        fi
+      register: bootstrap_python
+      changed_when: "'changed' in bootstrap_python.stdout"
+      when: not ansible_check_mode
+
+- name: Initialize Waimaidashi servers
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Ensure target is RedHat-compatible Linux
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == "OpenCloudOS" or ansible_facts.distribution_file_variety == "RedHat"
+        fail_msg: "This playbook targets OpenCloudOS/RHEL-compatible servers."
+
+  tasks:
+    - name: Set timezone
+      ansible.builtin.shell: |
+        set -euo pipefail
+        current="$(timedatectl show -p Timezone --value)"
+        if [ "$current" != "{{ timezone }}" ]; then
+          timedatectl set-timezone "{{ timezone }}"
+          echo changed
+        fi
+      args:
+        executable: /bin/bash
+      register: timezone_set
+      changed_when: "'changed' in timezone_set.stdout"
+
+    - name: Install common packages
+      ansible.builtin.dnf:
+        name: "{{ common_packages }}"
+        state: present
+
+    - name: Enable chrony
+      ansible.builtin.systemd:
+        name: chronyd
+        enabled: true
+        state: started
+
+    - name: Create application group
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        system: true
+
+    - name: Create application user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        system: true
+        create_home: false
+        shell: /sbin/nologin
+
+    - name: Create standard application directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop: "{{ app_directories }}"
+
+    - name: Install Java 17
+      ansible.builtin.dnf:
+        name: "{{ java_package }}"
+        state: present
+
+    - name: Ensure remote offline package directory exists
+      ansible.builtin.file:
+        path: "{{ offline_remote_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Upload offline packages
+      ansible.builtin.copy:
+        src: "{{ offline_local_dir }}/{{ item }}"
+        dest: "{{ offline_remote_dir }}/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - "{{ node_offline_archive }}"
+        - "{{ nvm_offline_archive }}"
+        - "{{ oh_my_zsh_offline_archive }}"
+        - "{{ zsh_autosuggestions_offline_archive }}"
+        - "{{ zsh_syntax_highlighting_offline_archive }}"
+      when: offline_packages_enabled | bool
+
+    - name: Install Oh My Zsh for root
+      ansible.builtin.git:
+        repo: "{{ oh_my_zsh_repo }}"
+        dest: /root/.oh-my-zsh
+        depth: 1
+        update: false
+      when: not (offline_packages_enabled | bool)
+
+    - name: Ensure Oh My Zsh directory exists
+      ansible.builtin.file:
+        path: /root/.oh-my-zsh
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Install Oh My Zsh for root from offline package
+      ansible.builtin.unarchive:
+        src: "{{ offline_remote_dir }}/{{ oh_my_zsh_offline_archive }}"
+        dest: /root/.oh-my-zsh
+        remote_src: true
+        owner: root
+        group: root
+        extra_opts:
+          - --strip-components=1
+        creates: /root/.oh-my-zsh/oh-my-zsh.sh
+      when:
+        - offline_packages_enabled | bool
+        - not ansible_check_mode
+
+    - name: Install zsh-autosuggestions plugin
+      ansible.builtin.git:
+        repo: "{{ zsh_autosuggestions_repo }}"
+        dest: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-autosuggestions"
+        depth: 1
+        update: false
+      when: not (offline_packages_enabled | bool)
+
+    - name: Ensure zsh-autosuggestions plugin directory exists
+      ansible.builtin.file:
+        path: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-autosuggestions"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Install zsh-autosuggestions plugin from offline package
+      ansible.builtin.unarchive:
+        src: "{{ offline_remote_dir }}/{{ zsh_autosuggestions_offline_archive }}"
+        dest: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-autosuggestions"
+        remote_src: true
+        owner: root
+        group: root
+        extra_opts:
+          - --strip-components=1
+        creates: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+      when:
+        - offline_packages_enabled | bool
+        - not ansible_check_mode
+
+    - name: Install zsh-syntax-highlighting plugin
+      ansible.builtin.git:
+        repo: "{{ zsh_syntax_highlighting_repo }}"
+        dest: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-syntax-highlighting"
+        depth: 1
+        update: false
+      when: not (offline_packages_enabled | bool)
+
+    - name: Ensure zsh-syntax-highlighting plugin directory exists
+      ansible.builtin.file:
+        path: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-syntax-highlighting"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Install zsh-syntax-highlighting plugin from offline package
+      ansible.builtin.unarchive:
+        src: "{{ offline_remote_dir }}/{{ zsh_syntax_highlighting_offline_archive }}"
+        dest: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-syntax-highlighting"
+        remote_src: true
+        owner: root
+        group: root
+        extra_opts:
+          - --strip-components=1
+        creates: "{{ oh_my_zsh_custom_dir }}/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+      when:
+        - offline_packages_enabled | bool
+        - not ansible_check_mode
+
+    - name: Create root zsh config when absent
+      ansible.builtin.copy:
+        dest: /root/.zshrc
+        owner: root
+        group: root
+        mode: "0644"
+        force: false
+        content: |
+          export ZSH="$HOME/.oh-my-zsh"
+          ZSH_THEME="robbyrussell"
+          plugins=({{ zsh_plugins | join(' ') }})
+          source $ZSH/oh-my-zsh.sh
+
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+    - name: Set root default shell to zsh
+      ansible.builtin.user:
+        name: root
+        shell: /usr/bin/zsh
+
+    - name: Install nvm for root
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if [ ! -s "{{ nvm_dir }}/nvm.sh" ]; then
+          export NVM_DIR="{{ nvm_dir }}"
+          curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh" | bash
+          echo changed
+        fi
+      args:
+        executable: /bin/bash
+      register: nvm_install
+      changed_when: "'changed' in nvm_install.stdout"
+      when: not (offline_packages_enabled | bool)
+
+    - name: Ensure nvm directory exists
+      ansible.builtin.file:
+        path: "{{ nvm_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Install nvm for root from offline package
+      ansible.builtin.unarchive:
+        src: "{{ offline_remote_dir }}/{{ nvm_offline_archive }}"
+        dest: "{{ nvm_dir }}"
+        remote_src: true
+        owner: root
+        group: root
+        extra_opts:
+          - --strip-components=1
+        creates: "{{ nvm_dir }}/nvm.sh"
+      when:
+        - offline_packages_enabled | bool
+        - not ansible_check_mode
+
+    - name: Install Node.js with nvm
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export NVM_DIR="{{ nvm_dir }}"
+        . "{{ nvm_dir }}/nvm.sh"
+        if ! nvm ls "{{ node_version }}" >/dev/null 2>&1; then
+          nvm install "{{ node_version }}"
+          echo changed
+        fi
+        nvm alias default "{{ node_version }}" >/dev/null
+      args:
+        executable: /bin/bash
+      register: node_install
+      changed_when: "'changed' in node_install.stdout"
+      when: not (offline_packages_enabled | bool)
+
+    - name: Ensure nvm Node.js version directory exists
+      ansible.builtin.file:
+        path: "{{ nvm_dir }}/versions/node/v{{ node_version }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: offline_packages_enabled | bool
+
+    - name: Install Node.js from offline package
+      ansible.builtin.unarchive:
+        src: "{{ offline_remote_dir }}/{{ node_offline_archive }}"
+        dest: "{{ nvm_dir }}/versions/node/v{{ node_version }}"
+        remote_src: true
+        owner: root
+        group: root
+        extra_opts:
+          - --strip-components=1
+        creates: "{{ nvm_dir }}/versions/node/v{{ node_version }}/bin/node"
+      when:
+        - offline_packages_enabled | bool
+        - not ansible_check_mode
+
+    - name: Set nvm default Node.js version
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export NVM_DIR="{{ nvm_dir }}"
+        . "{{ nvm_dir }}/nvm.sh"
+        nvm alias default "{{ node_version }}" >/dev/null
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Expose Node.js binaries for non-login shells
+      ansible.builtin.file:
+        src: "{{ nvm_dir }}/versions/node/v{{ node_version }}/bin/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - node
+        - npm
+        - npx
+        - corepack
+      when: not ansible_check_mode
+
+    - name: Read npm registry
+      ansible.builtin.command: npm config get registry
+      register: npm_registry_current
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Configure npm registry
+      ansible.builtin.command: npm config set registry "{{ npm_registry }}"
+      when:
+        - not ansible_check_mode
+        - npm_registry_current.stdout | trim != npm_registry
+
+    - name: Install Caddy repository on app servers
+      ansible.builtin.command: dnf copr enable -y @caddy/caddy
+      args:
+        creates: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:group_caddy:caddy.repo
+      when: "'app' in group_names"
+
+    - name: Install Caddy on app servers
+      ansible.builtin.dnf:
+        name: caddy
+        state: present
+      when: "'app' in group_names"
+
+    - name: Enable Caddy on app servers
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+      when:
+        - "'app' in group_names"
+        - not ansible_check_mode
+
+    - name: Install MySQL 8.4 community repository on data servers
+      ansible.builtin.dnf:
+        name: "{{ mysql_community_release_rpm }}"
+        state: present
+        disable_gpg_check: true
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+
+    - name: Check OpenCloudOS MySQL module state on data servers
+      ansible.builtin.shell: |
+        set -euo pipefail
+        dnf -q module list mysql --disabled 2>/dev/null | awk '$1 == "mysql" && $0 ~ /\[d\]/ { found=1 } END { exit found ? 0 : 1 }'
+      args:
+        executable: /bin/bash
+      register: mysql_module_disabled
+      changed_when: false
+      failed_when: false
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+
+    - name: Disable OpenCloudOS MySQL module on data servers
+      ansible.builtin.command: dnf -y module disable mysql
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+        - mysql_module_disabled.rc != 0
+
+    - name: Install MySQL on data servers
+      ansible.builtin.dnf:
+        name: "{{ mysql_packages }}"
+        state: present
+        disable_excludes: all
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+
+    - name: Enable MySQL on data servers
+      ansible.builtin.systemd:
+        name: mysqld
+        enabled: true
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+
+    - name: Install Redis on data servers
+      ansible.builtin.dnf:
+        name: "{{ redis_packages }}"
+        state: present
+      when: "'data' in group_names"
+
+    - name: Enable Redis on data servers
+      ansible.builtin.systemd:
+        name: redis
+        enabled: true
+      when:
+        - "'data' in group_names"
+        - not ansible_check_mode
+
+    - name: Print installed runtime versions
+      ansible.builtin.shell: |
+        set -e
+        echo "java=$({ java -version 2>&1 | head -n 1; } || true)"
+        echo "node=$(node -v 2>/dev/null || true)"
+        echo "npm=$(npm -v 2>/dev/null || true)"
+        echo "node_login=$(bash -lc 'node -v' 2>/dev/null || true)"
+        echo "caddy=$(caddy version 2>/dev/null || true)"
+        echo "mysql=$(mysql --version 2>/dev/null || true)"
+        echo "redis=$(redis-server --version 2>/dev/null || true)"
+      args:
+        executable: /bin/bash
+      register: runtime_versions
+      changed_when: false
+
+    - name: Show installed runtime versions
+      ansible.builtin.debug:
+        var: runtime_versions.stdout_lines

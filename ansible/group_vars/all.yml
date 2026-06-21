@@ -1,0 +1,82 @@
+---
+timezone: Asia/Shanghai
+
+app_user: waimaidashi
+app_group: waimaidashi
+
+java_package: java-17-openjdk
+node_version: "24.14.0"
+nvm_version: "v0.40.3"
+nvm_dir: /root/.nvm
+offline_packages_enabled: true
+offline_local_dir: "{{ playbook_dir }}/files/offline"
+offline_remote_dir: /opt/packages/waimaidashi-offline
+node_offline_archive: "node-v{{ node_version }}-linux-x64.tar.xz"
+nvm_offline_archive: "nvm-{{ nvm_version }}.tar.gz"
+oh_my_zsh_offline_archive: oh-my-zsh.tar.gz
+zsh_autosuggestions_offline_archive: zsh-autosuggestions.tar.gz
+zsh_syntax_highlighting_offline_archive: zsh-syntax-highlighting.tar.gz
+oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
+oh_my_zsh_custom_dir: /root/.oh-my-zsh/custom
+zsh_autosuggestions_repo: https://github.com/zsh-users/zsh-autosuggestions.git
+zsh_syntax_highlighting_repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+npm_registry: https://registry.npmmirror.com
+
+common_packages:
+  - ca-certificates
+  - chrony
+  - curl
+  - dnf-plugins-core
+  - git
+  - jq
+  - lsof
+  - net-tools
+  - policycoreutils-python-utils
+  - rsync
+  - tar
+  - tcpdump
+  - unzip
+  - vim-enhanced
+  - wget
+  - xz
+  - zsh
+
+zsh_plugins:
+  - git
+  - zsh-autosuggestions
+  - zsh-syntax-highlighting
+
+app_directories:
+  - path: /opt/waimaidashi
+    owner: root
+    group: root
+    mode: "0755"
+  - path: /opt/waimaidashi/backend
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  - path: /etc/waimaidashi
+    owner: root
+    group: root
+    mode: "0755"
+  - path: /var/log/waimaidashi
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  - path: /var/www/mt-admin
+    owner: root
+    group: root
+    mode: "0755"
+  - path: /var/www/mt-ai-promotion
+    owner: root
+    group: root
+    mode: "0755"
+
+mysql_packages:
+  - mysql-community-client
+  - mysql-community-libs-compat
+  - mysql-community-server
+mysql_community_release_rpm: https://repo.mysql.com/mysql84-community-release-el8-2.noarch.rpm
+
+redis_packages:
+  - redis

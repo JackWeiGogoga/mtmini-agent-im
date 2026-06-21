@@ -88,3 +88,11 @@ deploy-local/*
 !deploy-local/bootstrap-server.sh
 !deploy-local/Caddyfile
 !deploy-local/waimaidashi-backend.service
+
+# =========================
+# Ansible 离线包
+# =========================
+ansible/inventory.ini
+ansible/files/offline/*
+!ansible/files/offline/.gitkeep
+!ansible/files/offline/README.md
