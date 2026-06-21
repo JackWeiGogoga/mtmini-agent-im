@@ -5,13 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-REMOTE_HOST="${REMOTE_HOST:-mt_ai_agent}"
+REMOTE_HOST="${REMOTE_HOST:-mt4}"
 APP_USER="${APP_USER:-waimaidashi}"
 APP_GROUP="${APP_GROUP:-waimaidashi}"
 APP_HOME="${APP_HOME:-/opt/waimaidashi}"
 REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-${APP_HOME}/backend}"
-REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-ai-promotion}"
-REMOTE_FRONTEND_DIR="${REMOTE_FRONTEND_DIR:-/var/www/mt-admin}"
 REMOTE_CERT_DIR="${REMOTE_CERT_DIR:-${APP_HOME}/certs/wechat}"
 REMOTE_ENV_PATH="${REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 REMOTE_SERVICE_PATH="${REMOTE_SERVICE_PATH:-/etc/systemd/system/waimaidashi-backend.service}"
@@ -28,6 +26,7 @@ UPLOAD_CADDY=1
 UPLOAD_SERVICE=1
 UPLOAD_CERTS=0
 ENABLE_BACKEND=1
+START_BACKEND=0
 RELOAD_CADDY=1
 
 usage() {
@@ -41,6 +40,7 @@ Options:
   --skip-service              Do not upload systemd service file
   --upload-certs              Upload WeChat cert files defined by env vars
   --skip-enable-backend       Do not daemon-reload/enable backend service
+  --start-backend             Start backend service after enabling it
   --skip-reload-caddy         Do not validate/reload caddy
   -h, --help                  Show help
 
@@ -50,8 +50,6 @@ Environment variables:
   APP_GROUP                   App group name
   APP_HOME                    App home directory
   REMOTE_BACKEND_DIR          Remote backend directory
-  REMOTE_H5_DIR               Remote H5 static directory
-  REMOTE_FRONTEND_DIR         Remote frontend static directory
   REMOTE_CERT_DIR             Remote WeChat cert directory
   REMOTE_ENV_PATH             Remote backend env file path
   REMOTE_SERVICE_PATH         Remote systemd service file path
@@ -105,6 +103,10 @@ while [[ $# -gt 0 ]]; do
       ENABLE_BACKEND=0
       shift
       ;;
+    --start-backend)
+      START_BACKEND=1
+      shift
+      ;;
     --skip-reload-caddy)
       RELOAD_CADDY=0
       shift
@@ -121,24 +123,6 @@ done
 
 require_cmd ssh
 require_cmd scp
-
-prepare_remote() {
-  log "Preparing remote directories and user on ${REMOTE_HOST}"
-  ssh "${REMOTE_HOST}" "
-    set -e
-    if ! id -u '${APP_USER}' >/dev/null 2>&1; then
-      sudo useradd -r -m -d '${APP_HOME}' -s /sbin/nologin '${APP_USER}'
-    fi
-    sudo mkdir -p '${REMOTE_BACKEND_DIR}' '${REMOTE_CERT_DIR}' '${REMOTE_H5_DIR}' '${REMOTE_FRONTEND_DIR}' '/etc/waimaidashi' '/var/log/caddy'
-    sudo chown -R '${APP_USER}:${APP_GROUP}' '${APP_HOME}'
-    sudo chown -R root:root '${REMOTE_H5_DIR}'
-    sudo chown -R root:root '${REMOTE_FRONTEND_DIR}'
-    sudo chown -R caddy:caddy /var/log/caddy || true
-    sudo chmod 755 '${REMOTE_BACKEND_DIR}'
-    sudo chmod 700 '${APP_HOME}/certs' '${REMOTE_CERT_DIR}' || true
-    sudo chmod 750 /var/log/caddy || true
-  "
-}
 
 upload_env() {
   [[ -f "${LOCAL_ENV_FILE}" ]] || fail "Env file not found: ${LOCAL_ENV_FILE}"
@@ -165,9 +149,18 @@ upload_service() {
 
 upload_caddy() {
   [[ -f "${LOCAL_CADDYFILE}" ]] || fail "Caddyfile not found: ${LOCAL_CADDYFILE}"
-  log "Uploading Caddyfile"
+  log "Uploading and validating Caddyfile"
   scp "${LOCAL_CADDYFILE}" "${REMOTE_HOST}:/tmp/Caddyfile"
   ssh "${REMOTE_HOST}" "
+    set -e
+    sudo caddy validate --config /tmp/Caddyfile
+    if [ -f '${REMOTE_CADDYFILE_PATH}' ]; then
+      sudo cp -a '${REMOTE_CADDYFILE_PATH}' '${REMOTE_CADDYFILE_PATH}.backup-\$(date +%Y%m%d-%H%M%S)'
+    fi
+    sudo mkdir -p \"\$(dirname '${REMOTE_CADDYFILE_PATH}')\"
+    sudo mkdir -p /var/log/caddy
+    sudo chown -R caddy:caddy /var/log/caddy || true
+    sudo chmod 750 /var/log/caddy || true
     sudo mv /tmp/Caddyfile '${REMOTE_CADDYFILE_PATH}'
     sudo chown root:root '${REMOTE_CADDYFILE_PATH}'
     sudo chmod 644 '${REMOTE_CADDYFILE_PATH}'
@@ -183,6 +176,8 @@ upload_certs() {
   scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
   scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
   ssh "${REMOTE_HOST}" "
+    set -e
+    sudo mkdir -p '${REMOTE_CERT_DIR}'
     sudo mv /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
     sudo mv /tmp/pub_key.pem '${REMOTE_CERT_DIR}/pub_key.pem'
     sudo chown '${APP_USER}:${APP_GROUP}' '${REMOTE_CERT_DIR}/apiclient_key.pem' '${REMOTE_CERT_DIR}/pub_key.pem'
@@ -196,30 +191,29 @@ enable_backend() {
   ssh "${REMOTE_HOST}" "
     sudo systemctl daemon-reload
     sudo systemctl enable '${BACKEND_SERVICE_NAME}'
+    if [ '${START_BACKEND}' = '1' ]; then
+      sudo systemctl start '${BACKEND_SERVICE_NAME}'
+    fi
     sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager || true
   "
 }
 
 reload_caddy() {
-  log "Validating and reloading caddy"
+  log "Validating and reloading or starting caddy"
   ssh "${REMOTE_HOST}" "
+    set -e
+    sudo mkdir -p /var/log/caddy
+    sudo chown -R caddy:caddy /var/log/caddy || true
+    sudo chmod 750 /var/log/caddy || true
     sudo caddy validate --config '${REMOTE_CADDYFILE_PATH}'
-    sudo systemctl reload caddy
+    if sudo systemctl is-active --quiet caddy; then
+      sudo systemctl reload caddy
+    else
+      sudo systemctl start caddy
+    fi
     sudo systemctl status caddy --no-pager || true
   "
 }
-
-normalize_permissions() {
-  log "Normalizing remote permissions"
-  ssh "${REMOTE_HOST}" "
-    sudo find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
-    sudo find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
-    sudo find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
-    sudo find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
-  "
-}
-
-prepare_remote
 
 if (( UPLOAD_ENV == 1 )); then
   upload_env
@@ -236,8 +230,6 @@ fi
 if (( UPLOAD_CERTS == 1 )); then
   upload_certs
 fi
-
-normalize_permissions
 
 if (( ENABLE_BACKEND == 1 )); then
   enable_backend

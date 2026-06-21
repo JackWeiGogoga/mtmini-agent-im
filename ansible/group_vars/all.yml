@@ -55,6 +55,14 @@ app_directories:
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0755"
+  - path: /opt/waimaidashi/certs
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0700"
+  - path: /opt/waimaidashi/certs/wechat
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0700"
   - path: /etc/waimaidashi
     owner: root
     group: root
@@ -67,7 +75,7 @@ app_directories:
     owner: root
     group: root
     mode: "0755"
-  - path: /var/www/mt-ai-promotion
+  - path: /var/www/mt-h5
     owner: root
     group: root
     mode: "0755"

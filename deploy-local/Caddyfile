@@ -19,9 +19,9 @@
 	respond @swagger 404
 }
 
-aia.waimaidashi.com {
+aib.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aia-access.log
+		output file /var/log/caddy/aib-access.log
 		format console
 	}
 
@@ -36,39 +36,15 @@ aia.waimaidashi.com {
 	}
 
 	handle {
-		root * /var/www/mt-ai-promotion
+		root * /var/www/mt-h5
 		try_files {path} /index.html
 		file_server
 	}
 }
 
-# 如需第二个 H5 域名，可复制这一段并调整 root。
-# aib.waimaidashi.com {
-# 	log {
-# 		output file /var/log/caddy/aib-access.log
-# 		format console
-# 	}
-#
-# 	import common_security
-#
-# 	handle /api/* {
-# 		request_body {
-# 			max_size 10MB
-# 		}
-#
-# 		reverse_proxy 127.0.0.1:8080
-# 	}
-#
-# 	handle {
-# 		root * /var/www/mt-ai-promotion-b
-# 		try_files {path} /index.html
-# 		file_server
-# 	}
-# }
-
-aiadmin.waimaidashi.com {
+aibadmin.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aiadmin-access.log
+		output file /var/log/caddy/aibadmin-access.log
 		format console
 	}
 
@@ -89,9 +65,9 @@ aiadmin.waimaidashi.com {
 	}
 }
 
-aiapi.waimaidashi.com {
+aibapi.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aiapi-access.log
+		output file /var/log/caddy/aibapi-access.log
 		format console
 	}
 

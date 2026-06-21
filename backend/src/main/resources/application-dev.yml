@@ -1,11 +1,14 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/mtmini_ai_agent?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/mtmini_ai_agent_reply?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:root123456}
   data:
     redis:
       password: ${SPRING_DATA_REDIS_PASSWORD:root123456}
+
+cos:
+  enabled: ${COS_ENABLED:false}
 
 sms:
   mock-enabled: ${SMS_MOCK_ENABLED:true}

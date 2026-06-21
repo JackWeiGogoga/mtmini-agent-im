@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 REMOTE_HOST="${REMOTE_HOST:-mt_ai_agent}"
 REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-/opt/waimaidashi/backend}"
-REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-ai-promotion}"
+REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-h5}"
 REMOTE_FRONTEND_DIR="${REMOTE_FRONTEND_DIR:-/var/www/mt-admin}"
 REMOTE_ENV_PATH="${REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 REMOTE_CERT_DIR="${REMOTE_CERT_DIR:-/opt/waimaidashi/certs/wechat}"

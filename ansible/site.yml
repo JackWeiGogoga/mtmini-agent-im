@@ -341,6 +341,15 @@
         state: present
       when: "'app' in group_names"
 
+    - name: Create Caddy log directory on app servers
+      ansible.builtin.file:
+        path: /var/log/caddy
+        state: directory
+        owner: caddy
+        group: caddy
+        mode: "0750"
+      when: "'app' in group_names"
+
     - name: Enable Caddy on app servers
       ansible.builtin.systemd:
         name: caddy

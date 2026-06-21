@@ -139,7 +139,7 @@ mt:
   developer-id: ${MT_DEVELOPER_ID:}
   sign-key: ${MT_SIGN_KEY:}
   business-id: ${MT_BUSINESS_ID:16}
-  callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aia.waimaidashi.com/#/}
+  callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aib.waimaidashi.com/#/}
   h5:
     app-key: ${MT_H5_APP_KEY:}
   token:

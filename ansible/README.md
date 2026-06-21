@@ -15,7 +15,7 @@ It is based on the current production environment observed on 2026-06-21:
   - `/opt/waimaidashi/backend`
   - `/etc/waimaidashi`
   - `/var/www/mt-admin`
-  - `/var/www/mt-ai-promotion`
+  - `/var/www/mt-h5`
 
 ## Files
 

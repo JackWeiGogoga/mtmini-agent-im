@@ -410,3 +410,18 @@ CREATE TABLE IF NOT EXISTS `ai_user_shop_binding` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_shop_id` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='后台用户门店绑定表';
+
+-- 网销用户门店绑定表
+CREATE TABLE IF NOT EXISTS `ai_sales_user_shop_binding` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` VARCHAR(64) NOT NULL,
+  `shop_id` BIGINT NOT NULL,
+  `poi_id` VARCHAR(64) NOT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_sales_user_shop_binding_poi_id` (`poi_id`),
+  UNIQUE KEY `uk_sales_user_shop_binding_user_shop` (`user_id`, `shop_id`),
+  KEY `idx_sales_user_shop_binding_user_id` (`user_id`),
+  KEY `idx_sales_user_shop_binding_shop_id` (`shop_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='网销用户门店绑定表';

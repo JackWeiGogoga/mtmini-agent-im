@@ -41,7 +41,23 @@ VALUES
     ('MENU_MENU_LIST', 'MENU_SYSTEM', '菜单管理', '/system/menu', 'pages/menu-manage/MenuManage', 'system:menu:list', 'MenuOutlined', 'C', 2, 1, 1, NOW(), NOW()),
     ('MENU_MENU_ADD', 'MENU_MENU_LIST', '新增菜单', NULL, NULL, 'system:menu:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
     ('MENU_MENU_EDIT', 'MENU_MENU_LIST', '编辑菜单', NULL, NULL, 'system:menu:edit', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_MENU_DELETE', 'MENU_MENU_LIST', '删除菜单', NULL, NULL, 'system:menu:delete', NULL, 'F', 2, 1, 1, NOW(), NOW());
+    ('MENU_MENU_DELETE', 'MENU_MENU_LIST', '删除菜单', NULL, NULL, 'system:menu:delete', NULL, 'F', 2, 1, 1, NOW(), NOW()),
+
+    -- 网销门户
+    ('MENU_SALES_MASTER_CONSOLE', '0', '总控台', '/master-console', 'pages/master-console/MasterConsole', 'sales:master-console:list', 'DashboardOutlined', 'C', 4, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_MASTER_CONSOLE_VIEW', 'MENU_SALES_MASTER_CONSOLE', '查看推广配置', NULL, NULL, 'sales:master-console:view', NULL, 'F', 0, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_MASTER_CONSOLE_LOG', 'MENU_SALES_MASTER_CONSOLE', '查看推广日志', NULL, NULL, 'sales:master-console:log', NULL, 'F', 1, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_SHOP_MANAGE', '0', '门店管理', '/shops', 'pages/shop-manage/ShopManage', 'sales:binding:list', 'ShopOutlined', 'C', 5, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_SHOP_BIND', 'MENU_SALES_SHOP_MANAGE', '绑定门店', NULL, NULL, 'sales:binding:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_SHOP_UNBIND', 'MENU_SALES_SHOP_MANAGE', '解绑门店', NULL, NULL, 'sales:binding:delete', NULL, 'F', 1, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_CONFIG', '0', '网销配置', '/sales/config', 'pages/sales-config/SalesConfig', 'sales:self-config:view', 'SettingOutlined', 'C', 6, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_CONFIG_UPLOAD', 'MENU_SALES_CONFIG', '上传收款码', NULL, NULL, 'sales:self-config:upload-receipt', NULL, 'F', 0, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_COMMISSION', '0', '提成明细', '/sales/commissions', 'pages/sales-commission-manage/SalesCommissionManage', 'sales:commission:list', 'ProfileOutlined', 'C', 7, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_COMMISSION_RATIO_EDIT', 'MENU_SALES_COMMISSION', '修改佣金比例', NULL, NULL, 'sales:commission:ratio-edit', NULL, 'F', 0, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_COMMISSION_SETTLE', 'MENU_SALES_COMMISSION', '修改结算状态', NULL, NULL, 'sales:commission:settle', NULL, 'F', 1, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_REDEMPTION_CODES', '0', '兑换码', '/sales/redemption-codes', 'pages/sales-redemption-code-manage/SalesRedemptionCodeManage', 'sales:redemption-code:list', 'AppstoreOutlined', 'C', 8, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_REDEMPTION_CODES_CREATE', 'MENU_SALES_REDEMPTION_CODES', '生成兑换码', NULL, NULL, 'sales:redemption-code:create', NULL, 'F', 0, 1, 1, NOW(), NOW()),
+    ('MENU_SALES_REDEMPTION_CODES_RECEIPT_CLEAR', 'MENU_SALES_REDEMPTION_CODES', '删除收款码', NULL, NULL, 'sales:redemption-code:receipt-clear', NULL, 'F', 1, 1, 1, NOW(), NOW());
 
 -- 初始化角色数据
 INSERT INTO `ai_role` (`role_id`, `role_code`, `role_name`, `description`, `order_num`, `status`, `create_time`, `update_time`)
@@ -49,7 +65,8 @@ VALUES
     ('ROLE_SUPER', 'super_admin', '超级管理员', '最高权限，可访问所有功能', 0, 1, NOW(), NOW()),
     ('ROLE_ADMIN', 'admin', '系统管理员', '系统管理权限', 1, 1, NOW(), NOW()),
     ('ROLE_USER', 'user', '普通用户', '基本操作权限', 2, 1, NOW(), NOW()),
-    ('ROLE_YOUZAN_OPERATOR', 'youzan_operator', '有赞运营', '查看并核销有赞订购订单', 3, 1, NOW(), NOW());
+    ('ROLE_YOUZAN_OPERATOR', 'youzan_operator', '有赞运营', '查看并核销有赞订购订单', 3, 1, NOW(), NOW()),
+    ('ROLE_SALES', 'sales_user', '网销用户', '网销推广与提成查看权限', 4, 1, NOW(), NOW());
 
 -- 超级管理员分配所有菜单权限（实际上超级管理员会跳过权限检查，这里只是为了数据完整性）
 INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
@@ -97,6 +114,18 @@ INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
 VALUES
     ('ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER', NOW()),
     ('ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER_REDEEM', NOW());
+
+INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
+VALUES
+    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE_VIEW', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE_LOG', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_SHOP_MANAGE', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_SHOP_BIND', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_SHOP_UNBIND', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_CONFIG', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_CONFIG_UPLOAD', NOW()),
+    ('ROLE_SALES', 'MENU_SALES_COMMISSION', NOW());
 
 -- =============================================
 -- 初始化超级管理员用户

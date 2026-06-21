@@ -16,7 +16,7 @@
 H5：
 
 ```bash
-curl -I https://aia.waimaidashi.com/
+curl -I https://aib.waimaidashi.com/
 ```
 
 管理后台：
@@ -58,4 +58,3 @@ ssh <host> 'sudo systemctl restart waimaidashi-backend && sudo systemctl status 
 ```bash
 .codex/skills/waimaidashi-ops/scripts/ops.sh errors --host <edge|worker> --since "10 min ago"
 ```
-
