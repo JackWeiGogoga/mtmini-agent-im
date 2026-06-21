@@ -9,6 +9,7 @@ import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
+import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
@@ -98,6 +99,11 @@ public class MtCommentAutoReplyService {
     private void syncUnrepliedComments(MtAccessToken token, MtShop shop, LocalDate startDate, LocalDate endDate) {
         String startTime = COMMENT_QUERY_DATE_FORMATTER.format(startDate);
         String endTime = COMMENT_QUERY_DATE_FORMATTER.format(endDate);
+        if (mtProperties.getComment().isQueryDryRun()) {
+            log.warn("评价查询 dry run 已开启，跳过美团查询评价接口，shopId={}, startTime={}, endTime={}",
+                    shop.getId(), startTime, endTime);
+            return;
+        }
         int pageSize = Math.min(Math.max(mtProperties.getComment().getPageSize(), 1), MAX_PAGE_SIZE);
         int offset = 0;
         while (true) {
@@ -146,6 +152,10 @@ public class MtCommentAutoReplyService {
     }
 
     private void enqueuePendingCommentReplyTasks(MtShop shop) {
+        if (mtProperties.getComment().isReplyDryRun()) {
+            log.warn("评价回复 dry run 已开启，跳过自动回复任务入队，shopId={}", shop.getId());
+            return;
+        }
         List<MtComment> comments = mtCommentMapper.selectPendingAutoReplyByShopId(shop.getId());
         for (MtComment comment : comments) {
             if (comment == null || comment.getCommentId() == null) {
@@ -189,6 +199,14 @@ public class MtCommentAutoReplyService {
             throw new IllegalStateException("COMMENT_AUTO_REPLY_TOKEN_MISSING");
         }
         String reply = StringUtils.defaultIfBlank(mtProperties.getComment().getDefaultReply(), "很好");
+        if (mtProperties.getComment().isReplyDryRun()) {
+            log.warn("评价回复 dry run 已开启，跳过美团添加商家回复接口，shopId={}, commentId={}",
+                    shop.getId(), comment.getCommentId());
+            throw new MtAsyncTaskDryRunException(
+                    "MT_COMMENT_REPLY_DRY_RUN",
+                    mtProperties.getComment().getDryRunRescheduleSeconds()
+            );
+        }
         try {
             WmoperCommentAddReplyRequest request = new WmoperCommentAddReplyRequest();
             request.setCommentId(comment.getCommentId());

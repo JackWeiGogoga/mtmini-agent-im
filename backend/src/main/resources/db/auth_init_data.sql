@@ -1,139 +1,180 @@
--- =============================================
--- 初始化数据
--- =============================================
+-- =====================================================
+-- Initialization data for mtmini-agent-reply
+-- Generated from old online export auth_init_data.sql and filtered for reply-project menus.
+-- Excludes business/runtime data: shops, tokens, orders, payments, logs, analytics events.
+-- =====================================================
 
--- 初始化菜单数据
-INSERT INTO `ai_menu` (`menu_id`, `parent_id`, `menu_name`, `path`, `component`, `permission`, `icon`, `menu_type`, `order_num`, `visible`, `status`, `create_time`, `update_time`)
-VALUES
-    -- 门店管理
-    ('MENU_MASTER_CONSOLE', '0', '总控台', '/master-console', 'pages/master-console/MasterConsole', 'shop:master-console:list', 'DashboardOutlined', 'C', 4, 1, 1, NOW(), NOW()),
-    ('MENU_MASTER_CONSOLE_CONFIG', 'MENU_MASTER_CONSOLE', '配置推广', NULL, NULL, 'shop:master-console:config', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_MASTER_CONSOLE_LOG', 'MENU_MASTER_CONSOLE', '查看推广日志', NULL, NULL, 'shop:master-console:log', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_SHOP_MANAGE', '0', '门店管理', '/shops', 'pages/shop-manage/ShopManage', 'shop:binding:list', 'ShopOutlined', 'C', 5, 1, 1, NOW(), NOW()),
-    ('MENU_POWER_MANAGE', '0', '算力管理', '/power-management', 'pages/power-manage/PowerManage', 'shop:power-management:list', 'DatabaseOutlined', 'C', 6, 1, 1, NOW(), NOW()),
-    ('MENU_POWER_RECHARGE_ORDER', '0', '充值订单', '/power-recharge-orders', 'pages/power-recharge-order-manage/PowerRechargeOrderManage', 'system:power-recharge-order:list', 'CreditCardOutlined', 'C', 7, 1, 1, NOW(), NOW()),
-    ('MENU_MT_APP_ORDER', '0', '美团订单', '/mt-app-orders', 'pages/mt-app-order-manage/MtAppOrderManage', 'shop:mt-app-order:list', 'ProfileOutlined', 'C', 8, 1, 1, NOW(), NOW()),
-    ('MENU_YOUZAN_APP_ORDER', '0', '有赞订单', '/youzan-app-orders', 'pages/youzan-app-order-manage/YouzanAppOrderManage', 'youzan:app-order:list', 'ProfileOutlined', 'C', 9, 1, 1, NOW(), NOW()),
-    ('MENU_YOUZAN_APP_ORDER_REDEEM', 'MENU_YOUZAN_APP_ORDER', '核销有赞订单', NULL, NULL, 'youzan:app-order:redeem', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SHOP_BIND', 'MENU_SHOP_MANAGE', '绑定门店', NULL, NULL, 'shop:binding:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SHOP_UNBIND', 'MENU_SHOP_MANAGE', '解绑门店', NULL, NULL, 'shop:binding:delete', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_SHOP_POWER_GRANT_LIST', 'MENU_SHOP_MANAGE', '查看算力发放', NULL, NULL, 'shop:power-grant:list', NULL, 'F', 2, 1, 1, NOW(), NOW()),
-    ('MENU_SHOP_POWER_GRANT_ADD', 'MENU_SHOP_MANAGE', '发放算力', NULL, NULL, 'shop:power-grant:add', NULL, 'F', 3, 1, 1, NOW(), NOW()),
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+/*!40000 ALTER TABLE `ai_menu` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_menu` (`id`, `menu_id`, `parent_id`, `menu_name`, `path`, `component`, `permission`, `icon`, `menu_type`, `order_num`, `visible`, `status`, `create_time`, `update_time`) VALUES
+  (2,'MENU_SYSTEM','0','系统管理','/system',NULL,'','SettingOutlined','M',100,1,1,'2026-03-24 12:30:38','2026-04-26 22:28:27'),
+  (3,'MENU_USER_LIST','MENU_SYSTEM','用户管理','/system/user','pages/user-manage/UserManage','system:user:list','UserOutlined','C',0,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (4,'MENU_USER_ADD','MENU_USER_LIST','新增用户',NULL,NULL,'system:user:add',NULL,'F',0,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (5,'MENU_USER_EDIT','MENU_USER_LIST','编辑用户',NULL,NULL,'system:user:edit',NULL,'F',1,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (6,'MENU_USER_DELETE','MENU_USER_LIST','删除用户',NULL,NULL,'system:user:delete',NULL,'F',2,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (7,'MENU_USER_ASSIGN','MENU_USER_LIST','分配角色',NULL,NULL,'system:user:assign',NULL,'F',3,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (8,'MENU_ROLE_LIST','MENU_SYSTEM','角色管理','/system/role','pages/role-manage/RoleManage','system:role:list','SafetyCertificateOutlined','C',1,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (9,'MENU_ROLE_ADD','MENU_ROLE_LIST','新增角色',NULL,NULL,'system:role:add',NULL,'F',0,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (10,'MENU_ROLE_EDIT','MENU_ROLE_LIST','编辑角色',NULL,NULL,'system:role:edit',NULL,'F',1,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (11,'MENU_ROLE_DELETE','MENU_ROLE_LIST','删除角色',NULL,NULL,'system:role:delete',NULL,'F',2,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (12,'MENU_ROLE_ASSIGN','MENU_ROLE_LIST','分配权限',NULL,NULL,'system:role:assign',NULL,'F',3,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (13,'MENU_MENU_LIST','MENU_SYSTEM','菜单管理','/system/menu','pages/menu-manage/MenuManage','system:menu:list','MenuOutlined','C',2,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (14,'MENU_MENU_ADD','MENU_MENU_LIST','新增菜单',NULL,NULL,'system:menu:add',NULL,'F',0,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (15,'MENU_MENU_EDIT','MENU_MENU_LIST','编辑菜单',NULL,NULL,'system:menu:edit',NULL,'F',1,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (16,'MENU_MENU_DELETE','MENU_MENU_LIST','删除菜单',NULL,NULL,'system:menu:delete',NULL,'F',2,1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (17,'MENU_SHOP_POWER_GRANT_LIST','MENU_SHOP_MANAGE','查看算力发放',NULL,NULL,'shop:power-grant:list',NULL,'F',2,1,1,'2026-04-09 21:53:35','2026-04-11 22:11:28'),
+  (18,'MENU_SHOP_POWER_GRANT_ADD','MENU_SHOP_MANAGE','发放算力',NULL,NULL,'shop:power-grant:add',NULL,'F',3,1,1,'2026-04-09 21:53:35','2026-04-11 22:11:28'),
+  (19,'MENU_MASTER_CONSOLE','0','总控台','/master-console','pages/master-console/MasterConsole','shop:master-console:list','DashboardOutlined','C',4,1,1,'2026-04-11 10:47:31','2026-04-11 10:47:31'),
+  (22,'MENU_SHOP_MANAGE','0','门店管理','/shops','pages/shop-manage/ShopManage','shop:binding:list','ShopOutlined','C',5,1,1,'2026-04-11 22:11:28','2026-04-11 22:11:28'),
+  (23,'MENU_SHOP_BIND','MENU_SHOP_MANAGE','绑定门店',NULL,NULL,'shop:binding:add',NULL,'F',0,1,1,'2026-04-11 22:11:28','2026-04-11 22:11:28'),
+  (24,'MENU_SHOP_UNBIND','MENU_SHOP_MANAGE','解绑门店',NULL,NULL,'shop:binding:delete',NULL,'F',1,1,1,'2026-04-11 22:11:28','2026-04-11 22:11:28'),
+  (25,'MENU_POWER_MANAGE','0','算力管理','/power-management','pages/power-manage/PowerManage','shop:power-management:list','DatabaseOutlined','C',6,1,1,'2026-04-12 00:36:59','2026-04-12 00:36:59'),
+  (26,'MENU_MT_APP_ORDER','0','美团订单','/mt-app-orders','pages/mt-app-order-manage/MtAppOrderManage','shop:mt-app-order:list','CreditCardOutlined','C',10,1,1,'2026-04-12 13:58:23','2026-04-26 22:28:34'),
+  (27,'MENU_SALES_MASTER_CONSOLE','0','总控台','/master-console','pages/master-console/MasterConsole','sales:master-console:list','DashboardOutlined','C',4,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (30,'MENU_SALES_SHOP_MANAGE','0','门店管理','/shops','pages/shop-manage/ShopManage','sales:binding:list','ShopOutlined','C',5,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (31,'MENU_SALES_SHOP_BIND','MENU_SALES_SHOP_MANAGE','绑定门店',NULL,NULL,'sales:binding:add',NULL,'F',0,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (32,'MENU_SALES_SHOP_UNBIND','MENU_SALES_SHOP_MANAGE','解绑门店',NULL,NULL,'sales:binding:delete',NULL,'F',1,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (33,'MENU_SALES_CONFIG','0','网销配置','/sales/config','pages/sales-config/SalesConfig','sales:self-config:view','SettingOutlined','C',6,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (34,'MENU_SALES_CONFIG_UPLOAD','MENU_SALES_CONFIG','上传收款码',NULL,NULL,'sales:self-config:upload-receipt',NULL,'F',0,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (35,'MENU_SALES_COMMISSION','0','提成明细','/sales/commissions','pages/sales-commission-manage/SalesCommissionManage','sales:commission:list','ProfileOutlined','C',7,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (36,'MENU_SALES_COMMISSION_RATIO_EDIT','MENU_SALES_COMMISSION','修改佣金比例',NULL,NULL,'sales:commission:ratio-edit',NULL,'F',0,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (37,'MENU_SALES_COMMISSION_SETTLE','MENU_SALES_COMMISSION','修改结算状态',NULL,NULL,'sales:commission:settle',NULL,'F',1,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (38,'MENU_SALES_REDEMPTION_CODES','0','兑换码','/sales/redemption-codes','pages/sales-redemption-code-manage/SalesRedemptionCodeManage','sales:redemption-code:list','AppstoreOutlined','C',8,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (39,'MENU_SALES_REDEMPTION_CODES_CREATE','MENU_SALES_REDEMPTION_CODES','生成兑换码',NULL,NULL,'sales:redemption-code:create',NULL,'F',0,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (40,'MENU_SALES_REDEMPTION_CODES_RECEIPT_CLEAR','MENU_SALES_REDEMPTION_CODES','删除收款码',NULL,NULL,'sales:redemption-code:receipt-clear',NULL,'F',1,1,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (41,'MENU_POWER_RECHARGE_ORDER','0','充值订单','/power-recharge-orders','pages/power-recharge-order-manage/PowerRechargeOrderManage','system:power-recharge-order:list','CreditCardOutlined','C',9,1,1,'2026-04-26 22:25:43','2026-04-26 22:25:43'),
+  (42,'MENU_YOUZAN_APP_ORDER','0','有赞订单','/youzan-app-orders','pages/youzan-app-order-manage/YouzanAppOrderManage','youzan:app-order:list','ProfileOutlined','C',9,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
+  (43,'MENU_YOUZAN_APP_ORDER_REDEEM','MENU_YOUZAN_APP_ORDER','核销有赞订单',NULL,NULL,'youzan:app-order:redeem',NULL,'F',0,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
+  (45,'MENU_USER_BEHAVIOR_ANALYTICS','0','行为统计','/analytics/user-behavior','pages/user-behavior-analytics/UserBehaviorAnalytics','analytics:user-behavior:list','LineChartOutlined','C',11,1,1,'2026-05-24 12:32:34','2026-05-24 12:32:34');
+/*!40000 ALTER TABLE `ai_menu` ENABLE KEYS */;
 
-    -- 系统管理目录
-    ('MENU_SYSTEM', '0', '系统管理', '/system', NULL, '', 'SettingOutlined', 'M', 10, 1, 1, NOW(), NOW()),
-    
-    -- 用户管理
-    ('MENU_USER_LIST', 'MENU_SYSTEM', '用户管理', '/system/user', 'pages/user-manage/UserManage', 'system:user:list', 'UserOutlined', 'C', 0, 1, 1, NOW(), NOW()),
-    ('MENU_USER_ADD', 'MENU_USER_LIST', '新增用户', NULL, NULL, 'system:user:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_USER_EDIT', 'MENU_USER_LIST', '编辑用户', NULL, NULL, 'system:user:edit', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_USER_DELETE', 'MENU_USER_LIST', '删除用户', NULL, NULL, 'system:user:delete', NULL, 'F', 2, 1, 1, NOW(), NOW()),
-    ('MENU_USER_ASSIGN', 'MENU_USER_LIST', '分配角色', NULL, NULL, 'system:user:assign', NULL, 'F', 3, 1, 1, NOW(), NOW()),
-    
-    -- 角色管理
-    ('MENU_ROLE_LIST', 'MENU_SYSTEM', '角色管理', '/system/role', 'pages/role-manage/RoleManage', 'system:role:list', 'SafetyCertificateOutlined', 'C', 1, 1, 1, NOW(), NOW()),
-    ('MENU_ROLE_ADD', 'MENU_ROLE_LIST', '新增角色', NULL, NULL, 'system:role:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_ROLE_EDIT', 'MENU_ROLE_LIST', '编辑角色', NULL, NULL, 'system:role:edit', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_ROLE_DELETE', 'MENU_ROLE_LIST', '删除角色', NULL, NULL, 'system:role:delete', NULL, 'F', 2, 1, 1, NOW(), NOW()),
-    ('MENU_ROLE_ASSIGN', 'MENU_ROLE_LIST', '分配权限', NULL, NULL, 'system:role:assign', NULL, 'F', 3, 1, 1, NOW(), NOW()),
-    
-    -- 菜单管理
-    ('MENU_MENU_LIST', 'MENU_SYSTEM', '菜单管理', '/system/menu', 'pages/menu-manage/MenuManage', 'system:menu:list', 'MenuOutlined', 'C', 2, 1, 1, NOW(), NOW()),
-    ('MENU_MENU_ADD', 'MENU_MENU_LIST', '新增菜单', NULL, NULL, 'system:menu:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_MENU_EDIT', 'MENU_MENU_LIST', '编辑菜单', NULL, NULL, 'system:menu:edit', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_MENU_DELETE', 'MENU_MENU_LIST', '删除菜单', NULL, NULL, 'system:menu:delete', NULL, 'F', 2, 1, 1, NOW(), NOW()),
+/*!40000 ALTER TABLE `ai_role` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_role` (`id`, `role_id`, `role_code`, `role_name`, `description`, `order_num`, `status`, `create_time`, `update_time`) VALUES
+  (1,'ROLE_SUPER','super_admin','超级管理员','最高权限，可访问所有功能',0,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (2,'ROLE_ADMIN','admin','系统管理员','系统管理权限',1,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (3,'ROLE_USER','user','普通用户','基本操作权限',2,1,'2026-03-24 12:30:38','2026-03-24 12:30:38'),
+  (4,'ROLE_SALES','sales_user','网销用户','网销与提成查看权限',3,1,'2026-04-26 22:25:22','2026-04-26 22:25:22'),
+  (5,'ROLE_YOUZAN_OPERATOR','youzan_operator','有赞运营','查看并核销有赞订购订单',3,1,'2026-04-29 22:58:57','2026-04-29 22:58:57');
+/*!40000 ALTER TABLE `ai_role` ENABLE KEYS */;
 
-    -- 网销门户
-    ('MENU_SALES_MASTER_CONSOLE', '0', '总控台', '/master-console', 'pages/master-console/MasterConsole', 'sales:master-console:list', 'DashboardOutlined', 'C', 4, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_MASTER_CONSOLE_VIEW', 'MENU_SALES_MASTER_CONSOLE', '查看推广配置', NULL, NULL, 'sales:master-console:view', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_MASTER_CONSOLE_LOG', 'MENU_SALES_MASTER_CONSOLE', '查看推广日志', NULL, NULL, 'sales:master-console:log', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_SHOP_MANAGE', '0', '门店管理', '/shops', 'pages/shop-manage/ShopManage', 'sales:binding:list', 'ShopOutlined', 'C', 5, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_SHOP_BIND', 'MENU_SALES_SHOP_MANAGE', '绑定门店', NULL, NULL, 'sales:binding:add', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_SHOP_UNBIND', 'MENU_SALES_SHOP_MANAGE', '解绑门店', NULL, NULL, 'sales:binding:delete', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_CONFIG', '0', '网销配置', '/sales/config', 'pages/sales-config/SalesConfig', 'sales:self-config:view', 'SettingOutlined', 'C', 6, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_CONFIG_UPLOAD', 'MENU_SALES_CONFIG', '上传收款码', NULL, NULL, 'sales:self-config:upload-receipt', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_COMMISSION', '0', '提成明细', '/sales/commissions', 'pages/sales-commission-manage/SalesCommissionManage', 'sales:commission:list', 'ProfileOutlined', 'C', 7, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_COMMISSION_RATIO_EDIT', 'MENU_SALES_COMMISSION', '修改佣金比例', NULL, NULL, 'sales:commission:ratio-edit', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_COMMISSION_SETTLE', 'MENU_SALES_COMMISSION', '修改结算状态', NULL, NULL, 'sales:commission:settle', NULL, 'F', 1, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_REDEMPTION_CODES', '0', '兑换码', '/sales/redemption-codes', 'pages/sales-redemption-code-manage/SalesRedemptionCodeManage', 'sales:redemption-code:list', 'AppstoreOutlined', 'C', 8, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_REDEMPTION_CODES_CREATE', 'MENU_SALES_REDEMPTION_CODES', '生成兑换码', NULL, NULL, 'sales:redemption-code:create', NULL, 'F', 0, 1, 1, NOW(), NOW()),
-    ('MENU_SALES_REDEMPTION_CODES_RECEIPT_CLEAR', 'MENU_SALES_REDEMPTION_CODES', '删除收款码', NULL, NULL, 'sales:redemption-code:receipt-clear', NULL, 'F', 1, 1, 1, NOW(), NOW());
+/*!40000 ALTER TABLE `ai_role_menu` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VALUES
+  (1,'ROLE_SUPER','MENU_MENU_ADD','2026-03-24 12:30:38'),
+  (2,'ROLE_SUPER','MENU_MENU_DELETE','2026-03-24 12:30:38'),
+  (3,'ROLE_SUPER','MENU_MENU_EDIT','2026-03-24 12:30:38'),
+  (4,'ROLE_SUPER','MENU_MENU_LIST','2026-03-24 12:30:38'),
+  (5,'ROLE_SUPER','MENU_ROLE_ADD','2026-03-24 12:30:38'),
+  (6,'ROLE_SUPER','MENU_ROLE_ASSIGN','2026-03-24 12:30:38'),
+  (7,'ROLE_SUPER','MENU_ROLE_DELETE','2026-03-24 12:30:38'),
+  (8,'ROLE_SUPER','MENU_ROLE_EDIT','2026-03-24 12:30:38'),
+  (9,'ROLE_SUPER','MENU_ROLE_LIST','2026-03-24 12:30:38'),
+  (10,'ROLE_SUPER','MENU_SYSTEM','2026-03-24 12:30:38'),
+  (11,'ROLE_SUPER','MENU_USER_ADD','2026-03-24 12:30:38'),
+  (12,'ROLE_SUPER','MENU_USER_ASSIGN','2026-03-24 12:30:38'),
+  (13,'ROLE_SUPER','MENU_USER_DELETE','2026-03-24 12:30:38'),
+  (14,'ROLE_SUPER','MENU_USER_EDIT','2026-03-24 12:30:38'),
+  (15,'ROLE_SUPER','MENU_USER_LIST','2026-03-24 12:30:38'),
+  (33,'ROLE_ADMIN','MENU_SYSTEM','2026-03-24 12:30:38'),
+  (34,'ROLE_ADMIN','MENU_USER_LIST','2026-03-24 12:30:38'),
+  (35,'ROLE_ADMIN','MENU_USER_ADD','2026-03-24 12:30:38'),
+  (36,'ROLE_ADMIN','MENU_USER_EDIT','2026-03-24 12:30:38'),
+  (37,'ROLE_ADMIN','MENU_USER_DELETE','2026-03-24 12:30:38'),
+  (38,'ROLE_ADMIN','MENU_USER_ASSIGN','2026-03-24 12:30:38'),
+  (39,'ROLE_ADMIN','MENU_ROLE_LIST','2026-03-24 12:30:38'),
+  (40,'ROLE_ADMIN','MENU_ROLE_ADD','2026-03-24 12:30:38'),
+  (41,'ROLE_ADMIN','MENU_ROLE_EDIT','2026-03-24 12:30:38'),
+  (42,'ROLE_ADMIN','MENU_ROLE_DELETE','2026-03-24 12:30:38'),
+  (43,'ROLE_ADMIN','MENU_ROLE_ASSIGN','2026-03-24 12:30:38'),
+  (44,'ROLE_ADMIN','MENU_MENU_LIST','2026-03-24 12:30:38'),
+  (45,'ROLE_ADMIN','MENU_MENU_ADD','2026-03-24 12:30:38'),
+  (46,'ROLE_ADMIN','MENU_MENU_EDIT','2026-03-24 12:30:38'),
+  (47,'ROLE_ADMIN','MENU_MENU_DELETE','2026-03-24 12:30:38'),
+  (49,'ROLE_ADMIN','MENU_SHOP_POWER_GRANT_LIST','2026-04-09 21:53:35'),
+  (50,'ROLE_ADMIN','MENU_SHOP_POWER_GRANT_ADD','2026-04-09 21:53:35'),
+  (51,'ROLE_SUPER','MENU_MASTER_CONSOLE','2026-04-11 10:47:32'),
+  (54,'ROLE_ADMIN','MENU_MASTER_CONSOLE','2026-04-11 10:47:32'),
+  (57,'ROLE_USER','MENU_MASTER_CONSOLE','2026-04-11 11:17:55'),
+  (60,'ROLE_ADMIN','MENU_SHOP_MANAGE','2026-04-11 22:11:28'),
+  (61,'ROLE_ADMIN','MENU_SHOP_BIND','2026-04-11 22:11:28'),
+  (62,'ROLE_ADMIN','MENU_SHOP_UNBIND','2026-04-11 22:11:28'),
+  (63,'ROLE_USER','MENU_SHOP_MANAGE','2026-04-11 22:11:28'),
+  (64,'ROLE_USER','MENU_SHOP_BIND','2026-04-11 22:11:28'),
+  (65,'ROLE_USER','MENU_SHOP_UNBIND','2026-04-11 22:11:28'),
+  (66,'ROLE_ADMIN','MENU_MT_APP_ORDER','2026-04-12 13:58:23'),
+  (67,'ROLE_SALES','MENU_SALES_MASTER_CONSOLE','2026-04-26 22:25:22'),
+  (70,'ROLE_SALES','MENU_SALES_SHOP_MANAGE','2026-04-26 22:25:22'),
+  (71,'ROLE_SALES','MENU_SALES_SHOP_BIND','2026-04-26 22:25:22'),
+  (72,'ROLE_SALES','MENU_SALES_SHOP_UNBIND','2026-04-26 22:25:22'),
+  (73,'ROLE_SALES','MENU_SALES_CONFIG','2026-04-26 22:25:22'),
+  (74,'ROLE_SALES','MENU_SALES_CONFIG_UPLOAD','2026-04-26 22:25:22'),
+  (75,'ROLE_SALES','MENU_SALES_COMMISSION','2026-04-26 22:25:23'),
+  (76,'ROLE_SUPER','MENU_SALES_COMMISSION','2026-04-26 22:25:23'),
+  (77,'ROLE_SUPER','MENU_SALES_COMMISSION_RATIO_EDIT','2026-04-26 22:25:23'),
+  (78,'ROLE_SUPER','MENU_SALES_COMMISSION_SETTLE','2026-04-26 22:25:23'),
+  (79,'ROLE_SUPER','MENU_SALES_REDEMPTION_CODES','2026-04-26 22:25:23'),
+  (80,'ROLE_SUPER','MENU_SALES_REDEMPTION_CODES_CREATE','2026-04-26 22:25:23'),
+  (81,'ROLE_SUPER','MENU_SALES_REDEMPTION_CODES_RECEIPT_CLEAR','2026-04-26 22:25:23'),
+  (82,'ROLE_SUPER','MENU_POWER_RECHARGE_ORDER','2026-04-26 22:25:43'),
+  (83,'ROLE_SUPER','MENU_YOUZAN_APP_ORDER','2026-04-29 22:58:57'),
+  (84,'ROLE_SUPER','MENU_YOUZAN_APP_ORDER_REDEEM','2026-04-29 22:58:57'),
+  (85,'ROLE_YOUZAN_OPERATOR','MENU_YOUZAN_APP_ORDER','2026-04-29 22:58:57'),
+  (86,'ROLE_YOUZAN_OPERATOR','MENU_YOUZAN_APP_ORDER_REDEEM','2026-04-29 22:58:57'),
+  (92,'ROLE_ADMIN','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
+  (93,'ROLE_SUPER','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
+  (94,'ROLE_SALES','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34');
+/*!40000 ALTER TABLE `ai_role_menu` ENABLE KEYS */;
 
--- 初始化角色数据
-INSERT INTO `ai_role` (`role_id`, `role_code`, `role_name`, `description`, `order_num`, `status`, `create_time`, `update_time`)
-VALUES
-    ('ROLE_SUPER', 'super_admin', '超级管理员', '最高权限，可访问所有功能', 0, 1, NOW(), NOW()),
-    ('ROLE_ADMIN', 'admin', '系统管理员', '系统管理权限', 1, 1, NOW(), NOW()),
-    ('ROLE_USER', 'user', '普通用户', '基本操作权限', 2, 1, NOW(), NOW()),
-    ('ROLE_YOUZAN_OPERATOR', 'youzan_operator', '有赞运营', '查看并核销有赞订购订单', 3, 1, NOW(), NOW()),
-    ('ROLE_SALES', 'sales_user', '网销用户', '网销推广与提成查看权限', 4, 1, NOW(), NOW());
+/*!40000 ALTER TABLE `mt_version_service_mapping` DISABLE KEYS */;
+INSERT IGNORE INTO `mt_version_service_mapping` (`id`, `mt_version`, `service_code`, `enabled`, `sort`, `create_time`, `update_time`) VALUES
+  (1,'v2','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (2,'v1','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (3,'v6','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (4,'v7','MT_APP_OPEN_ONLY',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (5,'v8','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (6,'v9','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (7,'v10','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (8,'v11','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (9,'v12','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (10,'v13','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (11,'v14','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (12,'v15','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (13,'v16','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (14,'v17','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (15,'v18','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (16,'v19','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20'),
+  (17,'v20','H5_PROMOTION',1,0,'2026-04-06 10:59:20','2026-04-06 10:59:20');
+/*!40000 ALTER TABLE `mt_version_service_mapping` ENABLE KEYS */;
 
--- 超级管理员分配所有菜单权限（实际上超级管理员会跳过权限检查，这里只是为了数据完整性）
-INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
-SELECT 'ROLE_SUPER', menu_id, NOW() FROM `ai_menu`;
+/*!40000 ALTER TABLE `ai_user` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_user` (`id`, `user_id`, `username`, `nickname`, `email`, `phone`, `password`, `auth_provider`, `avatar`, `status`, `create_time`, `update_time`) VALUES
+  (1,'1','admin','超级管理员','admin@waimaimaster.com',NULL,'$2a$10$kyEHbvzE6GzelFAasRfFpe7queowCsPpwL95I8OJFplnqOaeDwCry','PASSWORD',NULL,1,'2026-03-24 12:30:38','2026-04-11 10:53:46');
+/*!40000 ALTER TABLE `ai_user` ENABLE KEYS */;
 
--- 系统管理员分配权限管理相关菜单
-INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
-VALUES
-    ('ROLE_ADMIN', 'MENU_MASTER_CONSOLE', NOW()),
-    ('ROLE_ADMIN', 'MENU_MASTER_CONSOLE_CONFIG', NOW()),
-    ('ROLE_ADMIN', 'MENU_MASTER_CONSOLE_LOG', NOW()),
-    ('ROLE_ADMIN', 'MENU_SHOP_MANAGE', NOW()),
-    ('ROLE_ADMIN', 'MENU_SHOP_BIND', NOW()),
-    ('ROLE_ADMIN', 'MENU_SHOP_UNBIND', NOW()),
-    ('ROLE_ADMIN', 'MENU_SHOP_POWER_GRANT_LIST', NOW()),
-    ('ROLE_ADMIN', 'MENU_SHOP_POWER_GRANT_ADD', NOW()),
-    ('ROLE_ADMIN', 'MENU_MT_APP_ORDER', NOW()),
-    ('ROLE_ADMIN', 'MENU_SYSTEM', NOW()),
-    ('ROLE_ADMIN', 'MENU_USER_LIST', NOW()),
-    ('ROLE_ADMIN', 'MENU_USER_ADD', NOW()),
-    ('ROLE_ADMIN', 'MENU_USER_EDIT', NOW()),
-    ('ROLE_ADMIN', 'MENU_USER_DELETE', NOW()),
-    ('ROLE_ADMIN', 'MENU_USER_ASSIGN', NOW()),
-    ('ROLE_ADMIN', 'MENU_ROLE_LIST', NOW()),
-    ('ROLE_ADMIN', 'MENU_ROLE_ADD', NOW()),
-    ('ROLE_ADMIN', 'MENU_ROLE_EDIT', NOW()),
-    ('ROLE_ADMIN', 'MENU_ROLE_DELETE', NOW()),
-    ('ROLE_ADMIN', 'MENU_ROLE_ASSIGN', NOW()),
-    ('ROLE_ADMIN', 'MENU_MENU_LIST', NOW()),
-    ('ROLE_ADMIN', 'MENU_MENU_ADD', NOW()),
-    ('ROLE_ADMIN', 'MENU_MENU_EDIT', NOW()),
-    ('ROLE_ADMIN', 'MENU_MENU_DELETE', NOW());
+/*!40000 ALTER TABLE `ai_user_role` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_user_role` (`id`, `user_id`, `role_id`, `create_time`) VALUES
+  (1,'1','ROLE_SUPER','2026-03-24 12:30:38');
+/*!40000 ALTER TABLE `ai_user_role` ENABLE KEYS */;
 
--- 普通用户默认仅分配欢迎页
-INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
-VALUES
-    ('ROLE_USER', 'MENU_MASTER_CONSOLE', NOW()),
-    ('ROLE_USER', 'MENU_MASTER_CONSOLE_CONFIG', NOW()),
-    ('ROLE_USER', 'MENU_MASTER_CONSOLE_LOG', NOW()),
-    ('ROLE_USER', 'MENU_SHOP_MANAGE', NOW()),
-    ('ROLE_USER', 'MENU_SHOP_BIND', NOW()),
-    ('ROLE_USER', 'MENU_SHOP_UNBIND', NOW());
+/*!40000 ALTER TABLE `ai_user_data_scope` DISABLE KEYS */;
+INSERT IGNORE INTO `ai_user_data_scope` (`id`, `user_id`, `scope_type`, `create_time`, `update_time`) VALUES
+  (1,'1','ALL','2026-04-11 23:48:19','2026-04-11 23:48:19');
+/*!40000 ALTER TABLE `ai_user_data_scope` ENABLE KEYS */;
 
-INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
-VALUES
-    ('ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER', NOW()),
-    ('ROLE_YOUZAN_OPERATOR', 'MENU_YOUZAN_APP_ORDER_REDEEM', NOW());
 
-INSERT INTO `ai_role_menu` (`role_id`, `menu_id`, `create_time`)
-VALUES
-    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE_VIEW', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_MASTER_CONSOLE_LOG', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_SHOP_MANAGE', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_SHOP_BIND', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_SHOP_UNBIND', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_CONFIG', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_CONFIG_UPLOAD', NOW()),
-    ('ROLE_SALES', 'MENU_SALES_COMMISSION', NOW());
-
--- =============================================
--- 初始化超级管理员用户
--- 默认密码: wukxi4-garwut-tuVhah (BCrypt 加密)
-INSERT INTO ai_user (user_id, username, nickname, email, password, auth_provider, status)
-VALUES ('1', 'admin', '超级管理员', 'admin@waimaimaster.com', '$2a$10$kyEHbvzE6GzelFAasRfFpe7queowCsPpwL95I8OJFplnqOaeDwCry', 'PASSWORD', 1);
-
--- 为超级管理员分配超级管理员角色
-INSERT INTO `ai_user_role` (`user_id`, `role_id`, `create_time`)
-VALUES
-    ('1', 'ROLE_SUPER', NOW());
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;

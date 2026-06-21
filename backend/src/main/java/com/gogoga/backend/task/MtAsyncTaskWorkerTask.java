@@ -7,9 +7,10 @@ import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
 import com.gogoga.backend.service.MtCommentAutoReplyService;
 import com.gogoga.backend.service.RedisDistributedLockService;
-import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
+import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -133,6 +134,12 @@ public class MtAsyncTaskWorkerTask {
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
+        } catch (MtAsyncTaskDryRunException e) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime nextAvailableAt = now.plusSeconds(e.getRescheduleSeconds());
+            mtAsyncTaskService.rescheduleWithoutRetry(task, nextAvailableAt, e.getMessage(), now);
+            log.warn("数据库异步任务 dry run 跳过执行，taskType={}, taskId={}, nextAvailableAt={}",
+                    taskType.name(), taskId, nextAvailableAt);
         } catch (Exception e) {
             log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
             mtAsyncTaskService.handleFailure(task, resolvePolicy(taskType), e.getMessage(), LocalDateTime.now());

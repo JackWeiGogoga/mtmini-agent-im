@@ -272,6 +272,21 @@ public class MtProperties {
         private int pageSize = 20;
 
         /**
+         * 评价查询 dry run。开启后不调用美团查询评价接口。
+         */
+        private boolean queryDryRun = false;
+
+        /**
+         * 评价回复 dry run。开启后不调用美团添加商家回复接口。
+         */
+        private boolean replyDryRun = false;
+
+        /**
+         * dry run 命中已有异步回复任务时的无损重排秒数。
+         */
+        private long dryRunRescheduleSeconds = 3600L;
+
+        /**
          * 自动回复固定文案。
          */
         private String defaultReply = "很好";
