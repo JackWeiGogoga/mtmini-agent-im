@@ -8,7 +8,7 @@ It is based on the current production environment observed on 2026-06-21:
 - Java: OpenJDK 17
 - Node.js: 24.14.0 via root nvm
 - Shell: zsh with Oh My Zsh, zsh-autosuggestions, and zsh-syntax-highlighting for root
-- Caddy: 2.6.4 on app/edge nodes
+- Caddy: 2.6.4 on app and data nodes
 - MySQL: 8.4.x on the data node
 - Redis: 5.0.x on the data node
 - Standard paths:

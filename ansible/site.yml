@@ -329,34 +329,42 @@
         - not ansible_check_mode
         - npm_registry_current.stdout | trim != npm_registry
 
-    - name: Install Caddy repository on app servers
+    - name: Install Caddy repository on web-capable servers
       ansible.builtin.command: dnf copr enable -y @caddy/caddy
       args:
         creates: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:group_caddy:caddy.repo
-      when: "'app' in group_names"
+      when: "'app' in group_names or 'data' in group_names"
+      tags:
+        - caddy
 
-    - name: Install Caddy on app servers
+    - name: Install Caddy on web-capable servers
       ansible.builtin.dnf:
         name: caddy
         state: present
-      when: "'app' in group_names"
+      when: "'app' in group_names or 'data' in group_names"
+      tags:
+        - caddy
 
-    - name: Create Caddy log directory on app servers
+    - name: Create Caddy log directory on web-capable servers
       ansible.builtin.file:
         path: /var/log/caddy
         state: directory
         owner: caddy
         group: caddy
         mode: "0750"
-      when: "'app' in group_names"
+      when: "'app' in group_names or 'data' in group_names"
+      tags:
+        - caddy
 
-    - name: Enable Caddy on app servers
+    - name: Enable Caddy on web-capable servers
       ansible.builtin.systemd:
         name: caddy
         enabled: true
       when:
-        - "'app' in group_names"
+        - "'app' in group_names or 'data' in group_names"
         - not ansible_check_mode
+      tags:
+        - caddy
 
     - name: Install MySQL 8.4 community repository on data servers
       ansible.builtin.dnf:
