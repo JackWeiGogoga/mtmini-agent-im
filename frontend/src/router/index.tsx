@@ -12,6 +12,7 @@ import { BASE_PATH } from "@/utils/env";
 const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
 const OAuthCallback = lazy(() => import("@/pages/oauth"));
+const MasterConsole = lazy(() => import("@/pages/master-console"));
 const MtAppOrderManage = lazy(() => import("@/pages/mt-app-order-manage"));
 const YouzanAppOrderManage = lazy(
   () => import("@/pages/youzan-app-order-manage"),
@@ -114,6 +115,21 @@ const router = createBrowserRouter(
         {
           path: "/welcome",
           element: <Navigate to="/shops" replace />,
+        },
+        {
+          path: "/master-console",
+          element: (
+            <AuthLayout
+              anyPermissions={[
+                "shop:master-console:list",
+                "sales:master-console:list",
+              ]}
+            >
+              <LazyWrapper>
+                <MasterConsole />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
         },
         {
           path: "/mt-app-orders",

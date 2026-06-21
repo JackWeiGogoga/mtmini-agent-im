@@ -163,6 +163,7 @@ interface BreadcrumbItem {
  * 默认路由标题映射（用于菜单树中不存在的路由）
  */
 const defaultRouteTitles: Record<string, string> = {
+  "/master-console": "总控台",
   "/shops": "门店管理",
   "/power-management": "算力管理",
   "/power-recharge-orders": "充值订单",

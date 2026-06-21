@@ -17,6 +17,9 @@ export * from "./role-types";
 // 门店管理类型
 export * from "./shop-manage-types";
 
+// 总控台类型
+export * from "./master-console-types";
+
 // 网销兑换码与提成类型
 export * from "./sales-types";
 
