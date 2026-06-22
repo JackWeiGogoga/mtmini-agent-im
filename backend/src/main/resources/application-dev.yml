@@ -13,6 +13,14 @@ cos:
 sms:
   mock-enabled: ${SMS_MOCK_ENABLED:true}
 
+mt:
+  async-task:
+    enabled: ${MT_ASYNC_TASK_ENABLED:true}
+    worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:true}
+  comment:
+    query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:true}
+    reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:true}
+
 scheduled:
   enabled: ${SCHEDULED_ENABLED:false}
 

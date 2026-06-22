@@ -9,6 +9,14 @@
       }
     },
     {
+      "path": "pages/log/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "日志",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/power/index",
       "style": {
         "navigationStyle": "custom",
