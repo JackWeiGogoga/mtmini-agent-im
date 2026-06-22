@@ -16,7 +16,7 @@
             ></image>
             <text class="shop-name">{{ shopDisplayName }}</text>
           </view>
-          <text class="shop-link" @tap="noop">使用指导 ></text>
+          <text class="shop-link" @tap="openSupportPrompt">使用指导 ></text>
         </view>
 
         <view class="vip-card">
@@ -24,7 +24,7 @@
             <text class="vip-title">高级版</text>
             <text class="vip-date">{{ vipExpireText }}</text>
           </view>
-          <view class="vip-button" @tap="noop">立即续费</view>
+          <view class="vip-button" @tap="openRenewalPage">立即续费</view>
         </view>
       </view>
 
@@ -215,11 +215,35 @@
           </view>
         </view>
 
-        <view class="feedback-link" @tap="noop">建议与反馈</view>
+        <view class="feedback-link" @tap="openSupportPrompt">建议与反馈</view>
       </view>
     </view>
 
     <app-tabbar active-tab="home" />
+
+    <view
+      v-if="supportPromptVisible"
+      class="modal-mask"
+      @tap="closeSupportPrompt"
+    >
+      <view class="support-modal" @tap.stop>
+        <text class="support-modal-title">联系客服了解更多功能</text>
+        <view class="support-modal-qrcode-frame">
+          <image
+            class="support-modal-qrcode"
+            src="/static/images/qrcode.jpg"
+            mode="aspectFit"
+          ></image>
+        </view>
+        <text class="support-modal-subtitle">扫码添加客服/进群咨询</text>
+        <text class="support-modal-footer"
+          >连锁店/多店铺/代运营商家*专人对接</text
+        >
+        <view class="support-modal-button" @tap="closeSupportPrompt"
+          >我知道了</view
+        >
+      </view>
+    </view>
   </view>
 </template>
 
@@ -231,10 +255,13 @@ import {
   getShopInfo,
   updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
+import { showToast } from "../../utils/ui";
 
 const POWER_BALANCE_BAR_MAX = 10000000;
 const POWER_BALANCE_SUFFICIENT_THRESHOLD = 6000000;
 const POWER_BALANCE_TIGHT_THRESHOLD = 1000000;
+const RENEWAL_PAGE_URL =
+  "https://waimaieapp.meituan.com/ad/mycraft/activity?MYCRAFT_PAGE_ID=2486&appId=138";
 
 function toNumber(value, fallback = 0) {
   const result = Number(value);
@@ -326,6 +353,7 @@ export default {
       operationSettingsSubmitting: false,
       statsMode: "comments",
       hasPowerStats: true,
+      supportPromptVisible: false,
       statsRange: "TODAY",
       statsRangeOptions: [
         { label: "今日", value: "TODAY", compareLabel: "较昨日" },
@@ -616,6 +644,28 @@ export default {
       uni.redirectTo({
         url: "/pages/log/index",
       });
+    },
+    openSupportPrompt() {
+      this.supportPromptVisible = true;
+    },
+    closeSupportPrompt() {
+      this.supportPromptVisible = false;
+    },
+    openRenewalPage() {
+      if (typeof window === "undefined") {
+        showToast("请在美团商家端打开续费页面");
+        return;
+      }
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          { action: "isvJumpToSalePage", url: RENEWAL_PAGE_URL },
+          "*",
+        );
+        return;
+      }
+
+      showToast("请在美团商家端打开续费页面");
     },
     noop() {},
   },
@@ -1294,5 +1344,81 @@ export default {
   font-size: 24rpx;
   color: #b2b2b2;
   text-decoration: underline;
+}
+
+.modal-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+}
+
+.support-modal {
+  width: 100%;
+  max-width: 620rpx;
+  padding: 42rpx 32rpx 34rpx;
+  border-radius: 28rpx;
+  background: #f7e6a2;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.support-modal-title {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #2b220f;
+}
+
+.support-modal-qrcode-frame {
+  margin: 38rpx auto 0;
+  display: inline-block;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #e2b62a;
+}
+
+.support-modal-qrcode {
+  width: 320rpx;
+  height: 320rpx;
+  display: block;
+  background: #ffffff;
+}
+
+.support-modal-subtitle {
+  display: block;
+  margin-top: 22rpx;
+  font-size: 28rpx;
+  color: #4d3d19;
+}
+
+.support-modal-footer {
+  display: block;
+  margin-top: 44rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #231c0d;
+}
+
+.support-modal-button {
+  margin-top: 34rpx;
+  height: 84rpx;
+  border-radius: 18rpx;
+  background: #f2ce46;
+  color: #2a2416;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 84rpx;
+  text-align: center;
 }
 </style>
