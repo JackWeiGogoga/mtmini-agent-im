@@ -59,4 +59,11 @@ export interface MasterConsoleShopRow {
   lastAuthFailureAt?: string;
   rightExpireAt?: string;
   bindTime?: string;
+  autoReplyEnabled?: boolean;
+  negativeCommentAppealEnabled?: boolean;
+}
+
+export interface ShopOperationSettingsUpdateParam {
+  autoReplyEnabled: boolean;
+  negativeCommentAppealEnabled: boolean;
 }

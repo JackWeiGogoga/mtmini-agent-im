@@ -52,4 +52,5 @@ public interface MtShopMapper {
      * @return 影响行数
      */
     int updateById(MtShop shop);
+
 }

@@ -6,6 +6,7 @@ import {
   Select,
   Segmented,
   Space,
+  Switch,
   Table,
   Tag,
   Tooltip,
@@ -22,6 +23,7 @@ import {
   exportMasterConsoleShops,
   getMasterConsoleShops,
   getMasterConsoleVisibleUsers,
+  updateMasterConsoleShopOperationSettings,
 } from "@/services/master-console-api";
 import type {
   DashboardStatsRange,
@@ -135,6 +137,7 @@ const MasterConsole: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [visibleUsers, setVisibleUsers] = useState<VisibleUserOption[]>([]);
   const [userLoading, setUserLoading] = useState(false);
+  const [operationSettingShopIds, setOperationSettingShopIds] = useState<number[]>([]);
   const userSearchTimer = useRef<number | null>(null);
 
   const activeRange = useMemo(
@@ -212,6 +215,56 @@ const MasterConsole: React.FC = () => {
       setExporting(false);
     }
   }, [query]);
+
+  const handleOperationSettingsChange = useCallback(
+    async (
+      record: MasterConsoleShopRow,
+      patch: Pick<
+        MasterConsoleShopRow,
+        "autoReplyEnabled" | "negativeCommentAppealEnabled"
+      >,
+    ) => {
+      if (!record.shopId) {
+        return;
+      }
+      const nextSettings = {
+        autoReplyEnabled:
+          patch.autoReplyEnabled ?? (record.autoReplyEnabled !== false),
+        negativeCommentAppealEnabled:
+          patch.negativeCommentAppealEnabled ??
+          Boolean(record.negativeCommentAppealEnabled),
+      };
+      setOperationSettingShopIds((prev) =>
+        prev.includes(record.shopId) ? prev : [...prev, record.shopId],
+      );
+      try {
+        const savedSettings = await updateMasterConsoleShopOperationSettings(
+          record.shopId,
+          nextSettings,
+        );
+        setData((prev) =>
+          prev.map((item) =>
+            item.shopId === record.shopId
+              ? {
+                  ...item,
+                  autoReplyEnabled: savedSettings.autoReplyEnabled,
+                  negativeCommentAppealEnabled:
+                    savedSettings.negativeCommentAppealEnabled,
+                }
+              : item,
+          ),
+        );
+        message.success("开关已保存");
+      } catch (error) {
+        console.error("Failed to update operation settings:", error);
+      } finally {
+        setOperationSettingShopIds((prev) =>
+          prev.filter((shopId) => shopId !== record.shopId),
+        );
+      }
+    },
+    [],
+  );
 
   const columns = useMemo<ColumnsType<MasterConsoleShopRow>>(
     () => [
@@ -340,6 +393,44 @@ const MasterConsole: React.FC = () => {
         render: (value?: string) => formatDateTime(value),
       },
       {
+        title: "系统操作",
+        key: "operationSettings",
+        width: 190,
+        render: (_, record) => {
+          const saving = operationSettingShopIds.includes(record.shopId);
+          return (
+            <Space direction="vertical" size={6}>
+              <Space size={8}>
+                <Text>AI回复</Text>
+                <Switch
+                  size="small"
+                  checked={record.autoReplyEnabled !== false}
+                  loading={saving}
+                  onChange={(checked) =>
+                    void handleOperationSettingsChange(record, {
+                      autoReplyEnabled: checked,
+                    })
+                  }
+                />
+              </Space>
+              <Space size={8}>
+                <Text>差评处理/申诉</Text>
+                <Switch
+                  size="small"
+                  checked={Boolean(record.negativeCommentAppealEnabled)}
+                  loading={saving}
+                  onChange={(checked) =>
+                    void handleOperationSettingsChange(record, {
+                      negativeCommentAppealEnabled: checked,
+                    })
+                  }
+                />
+              </Space>
+            </Space>
+          );
+        },
+      },
+      {
         title: "绑定时间",
         dataIndex: "bindTime",
         key: "bindTime",
@@ -347,7 +438,14 @@ const MasterConsole: React.FC = () => {
         render: (value?: string) => formatDateTime(value),
       },
     ],
-    [activeRange.compareLabel, isCompact, query.sortField, query.sortOrder],
+    [
+      activeRange.compareLabel,
+      handleOperationSettingsChange,
+      isCompact,
+      operationSettingShopIds,
+      query.sortField,
+      query.sortOrder,
+    ],
   );
 
   return (
@@ -433,7 +531,7 @@ const MasterConsole: React.FC = () => {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1690 }}
         pagination={{
           current: query.pageNum,
           pageSize: query.pageSize,

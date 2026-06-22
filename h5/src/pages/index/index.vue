@@ -69,11 +69,11 @@
                 <view
                   class="toggle"
                   :class="{
-                    'toggle-on': serviceEnabled,
-                    'toggle-off': !serviceEnabled,
-                    'toggle-disabled': true,
+                    'toggle-on': autoReplyEnabled,
+                    'toggle-off': !autoReplyEnabled,
+                    'toggle-disabled': operationSettingsSubmitting,
                   }"
-                  @tap="noop"
+                  @tap.stop="toggleAutoReply"
                 >
                   <view class="toggle-dot"></view>
                 </view>
@@ -100,9 +100,17 @@
               <text class="current-bid-subtitle">（已回复{{ repliedBadCommentCount }}条）</text>
             </view>
             <view class="current-bid-value-wrap">
-              <text class="current-bid-value" :class="{ 'current-bid-value-failed': reauthRequired }">
-                {{ serviceStatusText }}
-              </text>
+              <text class="current-bid-value" :class="{ 'current-bid-value-failed': reauthRequired }">{{ serviceStatusText }}</text>
+              <view
+                class="appeal-toggle"
+                :class="{
+                  'appeal-toggle-on': negativeCommentAppealEnabled,
+                  'appeal-toggle-disabled': operationSettingsSubmitting,
+                }"
+                @tap.stop="toggleNegativeCommentAppeal"
+              >
+                <view class="appeal-toggle-dot"></view>
+              </view>
             </view>
           </view>
           <view v-if="reauthRequired" class="promotion-warning">
@@ -221,6 +229,7 @@ import AppTopNotice from "../../components/app-top-notice.vue";
 import {
   getMtH5HomeDashboard,
   getShopInfo,
+  updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
 
 const POWER_BALANCE_BAR_MAX = 10000000;
@@ -312,6 +321,9 @@ export default {
         expireAt: null,
       },
       reauthRequired: false,
+      autoReplyEnabled: true,
+      negativeCommentAppealEnabled: false,
+      operationSettingsSubmitting: false,
       statsMode: "comments",
       hasPowerStats: true,
       statsRange: "TODAY",
@@ -447,11 +459,11 @@ export default {
     vipExpireText() {
       return formatDateText(this.membership.expireAt);
     },
-    serviceEnabled() {
-      return !this.reauthRequired;
-    },
     serviceStatusText() {
-      return this.reauthRequired ? "需重新授权" : "运行中";
+      if (this.reauthRequired) {
+        return "需重新授权";
+      }
+      return this.autoReplyEnabled ? "运行中" : "已关闭";
     },
     knowledgeStatusText() {
       return "已配置";
@@ -524,6 +536,11 @@ export default {
         expireAt: dashboard.membership?.expireAt || null,
       };
       this.reauthRequired = Boolean(dashboard.authorization?.reauthRequired);
+      const operationSettings = dashboard.operationSettings || {};
+      this.autoReplyEnabled = operationSettings.autoReplyEnabled !== false;
+      this.negativeCommentAppealEnabled = Boolean(
+        operationSettings.negativeCommentAppealEnabled,
+      );
       this.commentStats = {
         ...this.commentStats,
         ...(dashboard.commentStats || {}),
@@ -552,6 +569,48 @@ export default {
         return;
       }
       this.statsMode = this.statsMode === "comments" ? "power" : "comments";
+    },
+    async toggleAutoReply() {
+      await this.updateOperationSettings({
+        autoReplyEnabled: !this.autoReplyEnabled,
+        negativeCommentAppealEnabled: this.negativeCommentAppealEnabled,
+      });
+    },
+    async toggleNegativeCommentAppeal() {
+      await this.updateOperationSettings({
+        autoReplyEnabled: this.autoReplyEnabled,
+        negativeCommentAppealEnabled: !this.negativeCommentAppealEnabled,
+      });
+    },
+    async updateOperationSettings(nextSettings) {
+      if (this.operationSettingsSubmitting) {
+        return;
+      }
+      const previousSettings = {
+        autoReplyEnabled: this.autoReplyEnabled,
+        negativeCommentAppealEnabled: this.negativeCommentAppealEnabled,
+      };
+      this.autoReplyEnabled = nextSettings.autoReplyEnabled;
+      this.negativeCommentAppealEnabled = nextSettings.negativeCommentAppealEnabled;
+      this.operationSettingsSubmitting = true;
+      try {
+        const savedSettings = await updateMtH5OperationSettings(nextSettings);
+        this.autoReplyEnabled = savedSettings.autoReplyEnabled !== false;
+        this.negativeCommentAppealEnabled = Boolean(
+          savedSettings.negativeCommentAppealEnabled,
+        );
+        uni.showToast({ title: "已保存", icon: "none" });
+      } catch (error) {
+        this.autoReplyEnabled = previousSettings.autoReplyEnabled;
+        this.negativeCommentAppealEnabled =
+          previousSettings.negativeCommentAppealEnabled;
+        uni.showToast({
+          title: error?.message || "保存失败",
+          icon: "none",
+        });
+      } finally {
+        this.operationSettingsSubmitting = false;
+      }
     },
     goToLogPage() {
       uni.redirectTo({
@@ -862,6 +921,41 @@ export default {
 
 .current-bid-value-failed {
   color: #e5484d;
+}
+
+.appeal-toggle {
+  width: 92rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  position: relative;
+  flex-shrink: 0;
+  background: #d9dbe2;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease;
+}
+
+.appeal-toggle-on {
+  background: #efcb3f;
+}
+
+.appeal-toggle-disabled {
+  opacity: 0.6;
+}
+
+.appeal-toggle-dot {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.12);
+  transition: left 0.2s ease;
+}
+
+.appeal-toggle-on .appeal-toggle-dot {
+  left: calc(100% - 40rpx);
 }
 
 .feature-card {

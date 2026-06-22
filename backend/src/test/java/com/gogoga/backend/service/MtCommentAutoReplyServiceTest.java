@@ -16,6 +16,7 @@ import com.meituan.sdk.internal.exceptions.MtSdkException;
 import com.meituan.sdk.model.wmoperNg.comment.queryCommentList.QueryCommentListRequest;
 import com.meituan.sdk.model.wmoperNg.comment.queryCommentList.QueryCommentListResponse;
 import com.meituan.sdk.model.wmoperNg.comment.wmoperCommentAddReply.WmoperCommentAddReplyRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,11 +50,18 @@ class MtCommentAutoReplyServiceTest {
     private MeituanClient meituanClient;
     @Mock
     private MtAsyncTaskService mtAsyncTaskService;
+    @Mock
+    private ShopOperationSettingsService shopOperationSettingsService;
 
     private final MtProperties mtProperties = new MtProperties();
 
     @InjectMocks
     private MtCommentAutoReplyService service;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(shopOperationSettingsService.isAutoReplyEnabled(any(Long.class))).thenReturn(true);
+    }
 
     @Test
     void syncAndReplyShopSavesCommentAndEnqueuesReplyTask() throws MtSdkException {
@@ -62,7 +71,8 @@ class MtCommentAutoReplyServiceTest {
                 mtCommentMapper,
                 meituanClient,
                 mtProperties,
-                mtAsyncTaskService
+                mtAsyncTaskService,
+                shopOperationSettingsService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -130,7 +140,8 @@ class MtCommentAutoReplyServiceTest {
                 mtCommentMapper,
                 meituanClient,
                 mtProperties,
-                mtAsyncTaskService
+                mtAsyncTaskService,
+                shopOperationSettingsService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -161,6 +172,35 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
+    void scheduledSyncSkipsShopWhenAutoReplyDisabled() throws MtSdkException {
+        service = new MtCommentAutoReplyService(
+                mtAccessTokenMapper,
+                mtShopMapper,
+                mtCommentMapper,
+                meituanClient,
+                mtProperties,
+                mtAsyncTaskService,
+                shopOperationSettingsService
+        );
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        token.setOpBizCode("op-100");
+        when(mtAccessTokenMapper.selectCommentAutoReplyCandidates(any(LocalDateTime.class))).thenReturn(List.of(token));
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+        when(shopOperationSettingsService.isAutoReplyEnabled(100L)).thenReturn(false);
+
+        service.syncAndReplyRecentUnrepliedComments();
+
+        verify(meituanClient, never()).invokeApi(any(QueryCommentListRequest.class), eq("token"));
+        verify(mtCommentMapper, never()).selectPendingAutoReplyByShopId(100L);
+    }
+
+    @Test
     void authBackfillUsesConfiguredSevenDayWindow() throws MtSdkException {
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,
@@ -168,7 +208,8 @@ class MtCommentAutoReplyServiceTest {
                 mtCommentMapper,
                 meituanClient,
                 mtProperties,
-                mtAsyncTaskService
+                mtAsyncTaskService,
+                shopOperationSettingsService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -208,7 +249,8 @@ class MtCommentAutoReplyServiceTest {
                 mtCommentMapper,
                 meituanClient,
                 mtProperties,
-                mtAsyncTaskService
+                mtAsyncTaskService,
+                shopOperationSettingsService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);

@@ -2,18 +2,24 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.service.MtH5GuideStateService;
 import com.gogoga.backend.service.MtH5HomeDashboardService;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.ShopOperationSettingsService;
+import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.MtH5GuideStateVO;
 import com.gogoga.backend.vo.MtH5HomeDashboardVO;
 import com.gogoga.backend.vo.MtH5HomeVO;
 import com.gogoga.backend.vo.MtH5TabStatusVO;
 import com.gogoga.backend.vo.ResultVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,6 +39,7 @@ public class MtH5ShopController {
     private final MtH5HomeDashboardService mtH5HomeDashboardService;
     private final MtH5ShopService mtH5ShopService;
     private final MtH5GuideStateService mtH5GuideStateService;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     /**
      * 获取 H5 首页门店信息
@@ -63,6 +70,22 @@ public class MtH5ShopController {
     @GetMapping("/tab-status")
     public ResultVO<MtH5TabStatusVO> getTabStatus() {
         return ResultVO.success(mtH5HomeDashboardService.getTabStatus());
+    }
+
+    /**
+     * 更新当前门店操作开关。
+     *
+     * @param param 开关参数
+     * @return 更新后的开关
+     */
+    @PutMapping("/operation-settings")
+    public ResultVO<ShopOperationSettingsVO> updateOperationSettings(
+            @Valid @RequestBody ShopOperationSettingsUpdateParam param) {
+        return ResultVO.success(shopOperationSettingsService.updateSettings(
+                mtH5ShopService.getCurrentShop().getId(),
+                param,
+                ShopOperationSettingsService.CHANGE_SOURCE_H5
+        ));
     }
 
     /**

@@ -60,7 +60,9 @@
     <select id="selectCommentAutoReplyCandidates" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
         FROM mt_access_token
-        WHERE shop_id IS NOT NULL
+        LEFT JOIN mt_comment_reply_setting crs ON crs.shop_id = mt_access_token.shop_id
+        WHERE mt_access_token.shop_id IS NOT NULL
+          AND COALESCE(crs.auto_reply_enabled, 1) = 1
           AND access_token IS NOT NULL
           AND access_token != ''
           AND auth_status = 1

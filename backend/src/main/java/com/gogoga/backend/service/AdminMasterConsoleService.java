@@ -5,8 +5,10 @@ import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
+import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.UserShopBindingVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class AdminMasterConsoleService {
     private final MtAccessTokenService mtAccessTokenService;
     private final MtPowerAccountService mtPowerAccountService;
     private final ShopDashboardMetricsService shopDashboardMetricsService;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     public PageInfo<AdminMasterConsoleRowVO> listRows(String keyword,
                                                       String targetUserId,
@@ -82,6 +85,8 @@ public class AdminMasterConsoleService {
                 ExcelExportUtil.column("所属网销", this::resolveExportSalesUserName),
                 ExcelExportUtil.column("网销手机号", AdminMasterConsoleRowVO::getSalesBoundUserPhone),
                 ExcelExportUtil.column("授权状态", AdminMasterConsoleRowVO::getAuthStatusText),
+                ExcelExportUtil.column("AI回复开关", row -> Boolean.FALSE.equals(row.getAutoReplyEnabled()) ? "关闭" : "开启"),
+                ExcelExportUtil.column("差评处理/申诉开关", row -> Boolean.TRUE.equals(row.getNegativeCommentAppealEnabled()) ? "开启" : "关闭"),
                 ExcelExportUtil.column("好评数", AdminMasterConsoleRowVO::getGoodCommentCount),
                 ExcelExportUtil.column("差评数", AdminMasterConsoleRowVO::getBadCommentCount),
                 ExcelExportUtil.column("差评回复率", row -> formatRate(row.getBadCommentReplyRate())),
@@ -93,6 +98,15 @@ public class AdminMasterConsoleService {
 
     public List<VisibleUserOptionVO> listVisibleUsers(String keyword, String bindingDomain) {
         return userShopBindingService.listVisibleUsers(keyword, bindingDomain);
+    }
+
+    public ShopOperationSettingsVO updateOperationSettings(Long shopId, ShopOperationSettingsUpdateParam param) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        return shopOperationSettingsService.updateSettings(
+                shopId,
+                param,
+                ShopOperationSettingsService.CHANGE_SOURCE_ADMIN
+        );
     }
 
     private PageInfo<AdminMasterConsoleRowVO> buildRows(PageInfo<UserShopBindingVO> bindingPage,
@@ -130,6 +144,7 @@ public class AdminMasterConsoleService {
                                              ShopDashboardMetricsService.DashboardStatsSnapshot dashboardStats) {
         MtPowerAccount powerAccount = mtPowerAccountService.getOrCreateAccount(binding.getShopId());
         MtAccessToken accessToken = mtAccessTokenService.findByShopId(binding.getShopId());
+        ShopOperationSettingsVO operationSettings = shopOperationSettingsService.buildSettings(binding.getShopId());
         ShopDashboardMetricsService.DashboardStatsSnapshot safeDashboardStats = dashboardStats == null
                 ? shopDashboardMetricsService.buildDashboardStats(binding.getShopId(), statsRange)
                 : dashboardStats;
@@ -181,6 +196,9 @@ public class AdminMasterConsoleService {
         applyAuthorizationStatus(row, accessToken);
         row.setRightExpireAt(binding.getRightExpireAt());
         row.setBindTime(binding.getBindTime());
+        row.setAutoReplyEnabled(operationSettings == null || operationSettings.getAutoReplyEnabled() != Boolean.FALSE);
+        row.setNegativeCommentAppealEnabled(operationSettings != null
+                && Boolean.TRUE.equals(operationSettings.getNegativeCommentAppealEnabled()));
         return row;
     }
 

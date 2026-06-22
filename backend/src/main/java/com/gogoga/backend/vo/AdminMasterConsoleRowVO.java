@@ -62,6 +62,9 @@ public class AdminMasterConsoleRowVO implements Serializable {
     private LocalDateTime rightExpireAt;
     private LocalDateTime bindTime;
 
+    private Boolean autoReplyEnabled;
+    private Boolean negativeCommentAppealEnabled;
+
     @JsonIgnore
     private Integer ordinaryBindingCount;
 

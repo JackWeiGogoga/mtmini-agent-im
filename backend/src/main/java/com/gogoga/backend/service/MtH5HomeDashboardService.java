@@ -30,6 +30,7 @@ public class MtH5HomeDashboardService {
     private final ShopDashboardMetricsService shopDashboardMetricsService;
     private final MtH5GuideStateService mtH5GuideStateService;
     private final MtAccessTokenService mtAccessTokenService;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     public MtH5HomeDashboardVO getDashboard() {
         return getDashboard(DashboardStatsRangeTypeEnum.LAST_7_DAYS);
@@ -47,6 +48,7 @@ public class MtH5HomeDashboardService {
         dashboard.setTabStatus(buildTabStatus(powerAccount, hidePower));
         dashboard.setGuide(buildGuideSummary(shop.getId()));
         dashboard.setAuthorization(buildLocalAuthorizationStatus(shop.getId()));
+        dashboard.setOperationSettings(shopOperationSettingsService.buildSettings(shop));
         if (!hidePower) {
             dashboard.setPowerStats(buildPowerStats(shop.getId(), powerAccount, statsRange));
         }

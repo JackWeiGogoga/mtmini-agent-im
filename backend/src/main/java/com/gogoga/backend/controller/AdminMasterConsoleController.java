@@ -4,14 +4,20 @@ import com.github.pagehelper.PageInfo;
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.service.AdminMasterConsoleService;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
 import com.gogoga.backend.vo.ResultVO;
+import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -81,5 +87,13 @@ public class AdminMasterConsoleController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String bindingDomain) {
         return ResultVO.success(adminMasterConsoleService.listVisibleUsers(keyword, bindingDomain));
+    }
+
+    @PutMapping("/shops/{shopId}/operation-settings")
+    @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
+    public ResultVO<ShopOperationSettingsVO> updateOperationSettings(
+            @PathVariable Long shopId,
+            @Valid @RequestBody ShopOperationSettingsUpdateParam param) {
+        return ResultVO.success(adminMasterConsoleService.updateOperationSettings(shopId, param));
     }
 }

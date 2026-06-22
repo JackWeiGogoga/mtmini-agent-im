@@ -31,6 +31,8 @@ public class MtH5HomeDashboardVO implements Serializable {
 
     private MtH5AuthorizationStatusVO authorization;
 
+    private ShopOperationSettingsVO operationSettings;
+
     @Data
     public static class ShopSummary implements Serializable {
 

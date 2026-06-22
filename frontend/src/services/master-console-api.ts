@@ -4,6 +4,7 @@ import type {
   MasterConsoleQueryParam,
   MasterConsoleShopRow,
   PageInfo,
+  ShopOperationSettingsUpdateParam,
   VisibleUserOption,
 } from "@/types";
 
@@ -41,5 +42,16 @@ export async function getMasterConsoleVisibleUsers(
       params: { keyword, bindingDomain },
     },
   );
+  return response.data;
+}
+
+export async function updateMasterConsoleShopOperationSettings(
+  shopId: number,
+  params: ShopOperationSettingsUpdateParam,
+): Promise<ShopOperationSettingsUpdateParam & { shopId: number }> {
+  const response = await request.put<
+    unknown,
+    { data: ShopOperationSettingsUpdateParam & { shopId: number } }
+  >(`${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/operation-settings`, params);
   return response.data;
 }

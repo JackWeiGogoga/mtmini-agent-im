@@ -47,6 +47,7 @@ public class MtCommentAutoReplyService {
     private final MeituanClient meituanClient;
     private final MtProperties mtProperties;
     private final MtAsyncTaskService mtAsyncTaskService;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -84,6 +85,10 @@ public class MtCommentAutoReplyService {
         MtShop shop = mtShopMapper.selectById(token.getShopId());
         if (shop == null || StringUtils.isBlank(shop.getEpoiId())) {
             log.warn("评价自动回复跳过门店，原因=缺少门店或 epoiId, shopId={}", token.getShopId());
+            return;
+        }
+        if (!shopOperationSettingsService.isAutoReplyEnabled(shop.getId())) {
+            log.info("评价自动回复跳过门店，原因=AI回复主开关关闭, shopId={}", token.getShopId());
             return;
         }
         LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
@@ -193,6 +198,11 @@ public class MtCommentAutoReplyService {
         MtShop shop = mtShopMapper.selectById(payload.getShopId());
         if (shop == null || StringUtils.isBlank(shop.getEpoiId())) {
             throw new IllegalStateException("COMMENT_AUTO_REPLY_SHOP_INVALID");
+        }
+        if (!shopOperationSettingsService.isAutoReplyEnabled(shop.getId())) {
+            log.info("评价自动回复任务跳过，原因=AI回复主开关关闭, shopId={}, commentId={}",
+                    shop.getId(), comment.getCommentId());
+            return;
         }
         MtAccessToken token = mtAccessTokenMapper.selectByShopId(payload.getShopId());
         if (token == null || StringUtils.isBlank(token.getAccessToken())) {

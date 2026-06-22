@@ -59,6 +59,10 @@ export function getMtH5HomeDashboard(statsRange = 'TODAY') {
   return request('/api/h5/shop/home/dashboard', 'GET', { statsRange })
 }
 
+export function updateMtH5OperationSettings(settings) {
+  return request('/api/h5/shop/operation-settings', 'PUT', settings)
+}
+
 export function reportMtH5BehaviorEvent(eventType, context = undefined) {
   const payload = {
     eventType,

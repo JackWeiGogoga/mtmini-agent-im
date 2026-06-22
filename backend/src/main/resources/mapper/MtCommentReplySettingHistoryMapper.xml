@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtCommentReplySettingHistoryMapper">
+
+    <select id="selectMaxVersionNoByShopId" resultType="java.lang.Integer">
+        SELECT COALESCE(MAX(version_no), 0)
+        FROM mt_comment_reply_setting_history
+        WHERE shop_id = #{shopId}
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtCommentReplySettingHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_comment_reply_setting_history (
+            setting_id, shop_id, version_no, auto_reply_enabled, negative_comment_appeal_enabled,
+            change_source, operator_user_id, operator_name, change_reason,
+            before_snapshot_json, after_snapshot_json, create_time
+        ) VALUES (
+            #{settingId}, #{shopId}, #{versionNo}, #{autoReplyEnabled}, #{negativeCommentAppealEnabled},
+            #{changeSource}, #{operatorUserId}, #{operatorName}, #{changeReason},
+            #{beforeSnapshotJson}, #{afterSnapshotJson}, #{createTime}
+        )
+    </insert>
+
+</mapper>
