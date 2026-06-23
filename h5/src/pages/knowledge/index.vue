@@ -4,13 +4,18 @@
 
     <view class="content">
       <view class="upload-card">
+        <view class="upload-log-entry" @tap="openUploadLogs">
+          上传记录
+          <text v-if="failedDocumentCount > 0" class="upload-log-badge">{{ failedDocumentCount }}</text>
+        </view>
         <view class="card-action" :class="{ disabled: uploading }" @tap="chooseDocument">
           {{ uploading ? '上传中...' : '+添加文档' }}
         </view>
         <text class="upload-tip">(*支持WORD/TXT/EXCEL文本)</text>
         <view v-if="documents.length > 0" class="doc-grid">
-          <view v-for="doc in documents" :key="doc.id" class="doc-chip">
+          <view v-for="doc in documents" :key="doc.id" class="doc-chip" :class="documentStatusClass(doc.parseStatus)" @tap="openDocumentDetail(doc)">
             <text class="doc-name">{{ shortFileName(doc.fileName) }}</text>
+            <text v-if="doc.parseStatus === 'FAILED'" class="doc-status-dot">!</text>
             <text class="doc-close" @tap.stop="confirmRemoveDocument(doc)">×</text>
           </view>
         </view>
@@ -39,7 +44,6 @@
             </view>
             <text class="row-question">Q：{{ row.question }}</text>
             <text v-if="row.type === 'QA' && expandedQaId === row.id" class="row-answer">A：{{ row.answer }}</text>
-            <text v-if="row.type === 'DOC'" class="row-answer">{{ row.answer }}</text>
             <view class="row-foot">
               <text class="sentiment-badge" :class="sentimentClass(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</text>
               <text v-if="row.statusText" class="status-text">{{ row.statusText }}</text>
@@ -85,6 +89,97 @@
         </view>
       </view>
     </view>
+
+    <view v-if="uploadLogsVisible" class="modal-mask doc-detail-mask" @tap="closeUploadLogs">
+      <view class="upload-log-modal" @tap.stop>
+        <view class="doc-detail-head">
+          <view class="doc-detail-title-wrap">
+            <text class="doc-detail-title">上传记录</text>
+            <text class="doc-detail-subtitle">点击记录可查看解析片段</text>
+          </view>
+          <text class="doc-detail-close" @tap="closeUploadLogs">×</text>
+        </view>
+
+        <scroll-view class="upload-log-list" scroll-y>
+          <view v-if="documents.length === 0" class="chunk-empty">暂无上传记录</view>
+          <view v-for="doc in documents" v-else :key="doc.id" class="upload-log-row" @tap="openDocumentDetailFromLog(doc)">
+            <view class="upload-log-main">
+              <text class="upload-log-name">{{ doc.fileName || '文档' }}</text>
+              <text class="upload-log-meta">
+                {{ doc.fileType || '文档' }} · 片段 {{ doc.chunkCount || 0 }}
+              </text>
+              <text v-if="doc.parseError" class="upload-log-error">{{ doc.parseError }}</text>
+            </view>
+            <view class="upload-log-side">
+              <text class="upload-log-status" :class="documentStatusTextClass(doc.parseStatus)">
+                {{ parseStatusText(doc.parseStatus) || '-' }}
+              </text>
+              <text class="upload-log-delete" @tap.stop="confirmRemoveDocument(doc)">删除</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
+    <view v-if="docDetailVisible" class="modal-mask doc-detail-mask" @tap="closeDocumentDetail">
+      <view class="doc-detail-modal" @tap.stop>
+        <view class="doc-detail-head">
+          <view class="doc-detail-title-wrap">
+            <text class="doc-detail-title">{{ selectedDocument?.fileName || '文档详情' }}</text>
+            <text class="doc-detail-subtitle">{{ parseStatusText(selectedDocument?.parseStatus) }}</text>
+          </view>
+          <text class="doc-detail-close" @tap="closeDocumentDetail">×</text>
+        </view>
+
+        <view class="doc-summary">
+          <view class="summary-item">
+            <text class="summary-label">片段数</text>
+            <text class="summary-value">{{ selectedDocument?.chunkCount || 0 }}</text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">类型</text>
+            <text class="summary-value">{{ selectedDocument?.fileType || '-' }}</text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">状态</text>
+            <text class="summary-value" :class="documentStatusTextClass(selectedDocument?.parseStatus)">
+              {{ parseStatusText(selectedDocument?.parseStatus) || '-' }}
+            </text>
+          </view>
+        </view>
+
+        <text v-if="selectedDocument?.parseError" class="doc-error">失败原因：{{ selectedDocument.parseError }}</text>
+
+        <view class="chunk-toolbar">
+          <text class="chunk-title">解析片段</text>
+          <text class="chunk-refresh" @tap="reloadDocumentDetail">刷新</text>
+        </view>
+
+        <scroll-view class="chunk-list" scroll-y>
+          <view v-if="loadingChunks" class="chunk-empty">加载中...</view>
+          <view v-else-if="documentChunks.length === 0" class="chunk-empty">暂无可用片段</view>
+          <view v-else>
+            <view v-for="chunk in documentChunks" :key="chunk.id" class="chunk-card" :class="{ 'chunk-disabled': !chunk.enabled }">
+              <view class="chunk-head">
+                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
+                <text class="chunk-enabled">{{ chunk.enabled ? '启用中' : '已停用' }}</text>
+              </view>
+              <text class="chunk-text">{{ chunk.chunkText }}</text>
+              <view class="chunk-actions">
+                <text class="chunk-action" @tap="changeChunkSentiment(chunk)">改类型</text>
+                <text class="chunk-action" @tap="toggleChunkEnabled(chunk)">{{ chunk.enabled ? '停用' : '启用' }}</text>
+                <text class="chunk-action danger" @tap="removeChunk(chunk)">删除</text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="doc-detail-actions">
+          <button class="delete-doc-btn" @tap="confirmRemoveDocument(selectedDocument)">删除文档</button>
+          <button class="close-doc-btn" @tap="closeDocumentDetail">关闭</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -95,9 +190,13 @@ import {
   clearCommentReplyKnowledge,
   createCommentReplyQaItem,
   deleteCommentReplyDocument,
+  deleteCommentReplyChunk,
   deleteCommentReplyQaItem,
+  getCommentReplyDocumentChunks,
   getCommentReplyDocuments,
   getCommentReplyQaItems,
+  updateCommentReplyChunkEnabled,
+  updateCommentReplyChunkSentiment,
   updateCommentReplyQaItem,
   uploadCommentReplyDocument,
 } from '@/utils/mt-auth'
@@ -113,6 +212,11 @@ const documents = ref([])
 const uploading = ref(false)
 const savingQa = ref(false)
 const qaFormVisible = ref(false)
+const uploadLogsVisible = ref(false)
+const docDetailVisible = ref(false)
+const selectedDocument = ref(null)
+const documentChunks = ref([])
+const loadingChunks = ref(false)
 const editingQaId = ref(null)
 const expandedQaId = ref(null)
 const sentimentIndex = ref(0)
@@ -124,7 +228,7 @@ const qaForm = reactive({
 })
 
 const knowledgeRows = computed(() => {
-  const qaRows = qaItems.value.map((item) => ({
+  return qaItems.value.map((item) => ({
     rowKey: `qa-${item.id}`,
     type: 'QA',
     id: item.id,
@@ -134,17 +238,10 @@ const knowledgeRows = computed(() => {
     sentiment: item.sentiment,
     raw: item,
   }))
-  const docRows = documents.value.map((doc) => ({
-    rowKey: `doc-${doc.id}`,
-    type: 'DOC',
-    id: doc.id,
-    title: doc.fileName || '文档知识',
-    question: `已上传 ${doc.fileType || '文档'}，AI会根据解析后的知识内容回复顾客评论`,
-    answer: doc.parseError ? `解析失败：${doc.parseError}` : `片段数：${doc.chunkCount || 0}`,
-    sentiment: 'UNKNOWN',
-    statusText: parseStatusText(doc.parseStatus),
-  }))
-  return [...qaRows, ...docRows]
+})
+
+const failedDocumentCount = computed(() => {
+  return documents.value.filter((doc) => doc.parseStatus === 'FAILED').length
 })
 
 onMounted(() => {
@@ -175,9 +272,10 @@ function chooseDocument() {
       }
       uploading.value = true
       try {
-        await uploadCommentReplyDocument(file.path)
-        uni.showToast({ title: '上传成功', icon: 'success' })
+        const uploaded = await uploadCommentReplyDocument(file.path)
+        uni.showToast({ title: '上传成功，解析中', icon: 'none' })
         await refresh()
+        await pollDocumentParse(uploaded?.id)
       } catch (error) {
         uni.showToast({ title: error.message || '上传失败', icon: 'none' })
       } finally {
@@ -188,6 +286,9 @@ function chooseDocument() {
 }
 
 function confirmRemoveDocument(doc) {
+  if (!doc?.id) {
+    return
+  }
   uni.showModal({
     title: '确认删除文档？',
     content: doc.fileName || '删除后 AI 将不再使用该文档知识。',
@@ -199,7 +300,140 @@ function confirmRemoveDocument(doc) {
       }
       try {
         await deleteCommentReplyDocument(doc.id)
+        if (selectedDocument.value?.id === doc.id) {
+          closeDocumentDetail()
+        }
         await refresh()
+      } catch (error) {
+        uni.showToast({ title: error.message || '删除失败', icon: 'none' })
+      }
+    },
+  })
+}
+
+async function pollDocumentParse(documentId) {
+  if (!documentId) {
+    return
+  }
+  for (let index = 0; index < 8; index += 1) {
+    await sleep(900)
+    await refresh()
+    const latest = documents.value.find((doc) => doc.id === documentId)
+    if (!latest) {
+      return
+    }
+    if (latest.parseStatus === 'SUCCESS') {
+      uni.showToast({ title: `已学习${latest.chunkCount || 0}条`, icon: 'success' })
+      return
+    }
+    if (latest.parseStatus === 'FAILED') {
+      uni.showToast({ title: latest.parseError || '解析失败', icon: 'none' })
+      return
+    }
+  }
+  uni.showToast({ title: '文档仍在解析，可点文档查看进度', icon: 'none' })
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+async function openDocumentDetail(doc) {
+  selectedDocument.value = doc
+  docDetailVisible.value = true
+  await loadDocumentChunks(doc.id)
+}
+
+async function openDocumentDetailFromLog(doc) {
+  uploadLogsVisible.value = false
+  await openDocumentDetail(doc)
+}
+
+function closeDocumentDetail() {
+  docDetailVisible.value = false
+  selectedDocument.value = null
+  documentChunks.value = []
+}
+
+function openUploadLogs() {
+  uploadLogsVisible.value = true
+}
+
+function closeUploadLogs() {
+  uploadLogsVisible.value = false
+}
+
+async function reloadDocumentDetail() {
+  if (!selectedDocument.value?.id) {
+    return
+  }
+  await refresh()
+  const latest = documents.value.find((doc) => doc.id === selectedDocument.value.id)
+  if (latest) {
+    selectedDocument.value = latest
+  }
+  await loadDocumentChunks(selectedDocument.value.id)
+}
+
+async function loadDocumentChunks(documentId) {
+  loadingChunks.value = true
+  try {
+    documentChunks.value = await getCommentReplyDocumentChunks(documentId) || []
+  } catch (error) {
+    uni.showToast({ title: error.message || '加载片段失败', icon: 'none' })
+  } finally {
+    loadingChunks.value = false
+  }
+}
+
+function changeChunkSentiment(chunk) {
+  const options = [
+    { label: '好评', value: 'GOOD' },
+    { label: '中评', value: 'NEUTRAL' },
+    { label: '差评', value: 'BAD' },
+    { label: '通用', value: 'UNKNOWN' },
+  ]
+  uni.showActionSheet({
+    itemList: options.map((item) => item.label),
+    success: async (res) => {
+      const sentiment = options[res.tapIndex]?.value
+      if (!sentiment || sentiment === chunk.sentiment) {
+        return
+      }
+      try {
+        await updateCommentReplyChunkSentiment(chunk.id, sentiment)
+        await reloadDocumentDetail()
+      } catch (error) {
+        uni.showToast({ title: error.message || '修改失败', icon: 'none' })
+      }
+    },
+  })
+}
+
+async function toggleChunkEnabled(chunk) {
+  try {
+    await updateCommentReplyChunkEnabled(chunk.id, !chunk.enabled)
+    await reloadDocumentDetail()
+  } catch (error) {
+    uni.showToast({ title: error.message || '操作失败', icon: 'none' })
+  }
+}
+
+function removeChunk(chunk) {
+  uni.showModal({
+    title: '确认删除片段？',
+    content: '删除后 AI 将不再使用这段知识。',
+    confirmText: '确认',
+    cancelText: '取消',
+    success: async (res) => {
+      if (!res.confirm) {
+        return
+      }
+      try {
+        await deleteCommentReplyChunk(chunk.id)
+        await reloadDocumentDetail()
       } catch (error) {
         uni.showToast({ title: error.message || '删除失败', icon: 'none' })
       }
@@ -332,6 +566,24 @@ function parseStatusText(value) {
   }[value] || value || ''
 }
 
+function documentStatusClass(value) {
+  return {
+    SUCCESS: 'doc-chip-success',
+    FAILED: 'doc-chip-failed',
+    PARSING: 'doc-chip-parsing',
+    PENDING: 'doc-chip-parsing',
+  }[value] || ''
+}
+
+function documentStatusTextClass(value) {
+  return {
+    SUCCESS: 'status-success',
+    FAILED: 'status-failed',
+    PARSING: 'status-parsing',
+    PENDING: 'status-parsing',
+  }[value] || ''
+}
+
 function shortFileName(value) {
   const name = value || '文档'
   return name.length > 9 ? `${name.slice(0, 6)}...` : name
@@ -363,9 +615,38 @@ function shortFileName(value) {
 }
 
 .upload-card {
+  position: relative;
   min-height: 132px;
   padding: 20px 16px 18px;
   text-align: center;
+}
+
+.upload-log-entry {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #111111;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.upload-log-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #cf2d23;
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 15px;
+  box-sizing: border-box;
+  text-decoration: none;
 }
 
 .card-action {
@@ -418,6 +699,19 @@ function shortFileName(value) {
   background: #ffffff;
 }
 
+.doc-chip-success {
+  border-color: #138a3d;
+}
+
+.doc-chip-failed {
+  border-color: #cf2d23;
+  background: #fff5f4;
+}
+
+.doc-chip-parsing {
+  border-color: #e6b72e;
+}
+
 .doc-name {
   flex: 1;
   min-width: 0;
@@ -425,6 +719,20 @@ function shortFileName(value) {
   font-size: 12px;
   overflow: hidden;
   white-space: nowrap;
+}
+
+.doc-status-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 999px;
+  background: #cf2d23;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .doc-close {
@@ -740,5 +1048,301 @@ function shortFileName(value) {
 .cancel-btn {
   color: #6f5e32;
   background: #f7f1df;
+}
+
+.doc-detail-mask {
+  align-items: flex-end;
+  padding: 0 12px 18px;
+}
+
+.doc-detail-modal {
+  width: 100%;
+  max-width: 351px;
+  max-height: 84vh;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.upload-log-modal {
+  width: 100%;
+  max-width: 351px;
+  max-height: 78vh;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.doc-detail-head,
+.doc-summary,
+.summary-item,
+.chunk-toolbar,
+.chunk-head,
+.chunk-actions,
+.doc-detail-actions {
+  display: flex;
+  align-items: center;
+}
+
+.doc-detail-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.doc-detail-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-detail-title {
+  display: block;
+  color: #111111;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.doc-detail-subtitle {
+  display: block;
+  margin-top: 3px;
+  color: #888888;
+  font-size: 12px;
+}
+
+.doc-detail-close {
+  flex-shrink: 0;
+  color: #111111;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.doc-summary {
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.summary-item {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  height: 54px;
+  border-radius: 10px;
+  background: #f6f7fb;
+}
+
+.summary-label {
+  color: #888888;
+  font-size: 11px;
+}
+
+.summary-value {
+  max-width: 100%;
+  margin-top: 4px;
+  color: #111111;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-success {
+  color: #138a3d;
+}
+
+.status-failed {
+  color: #cf2d23;
+}
+
+.status-parsing {
+  color: #9a6a00;
+}
+
+.doc-error {
+  display: block;
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #fff5f4;
+  color: #cf2d23;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chunk-toolbar {
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.chunk-title {
+  color: #111111;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chunk-refresh {
+  color: #111111;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.chunk-list {
+  max-height: 48vh;
+  margin-top: 10px;
+}
+
+.chunk-empty {
+  padding: 22px 0;
+  color: #888888;
+  font-size: 13px;
+  text-align: center;
+}
+
+.chunk-card {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.chunk-card:last-child {
+  border-bottom: 0;
+}
+
+.chunk-disabled {
+  opacity: 0.55;
+}
+
+.chunk-head {
+  justify-content: space-between;
+}
+
+.chunk-enabled {
+  color: #888888;
+  font-size: 12px;
+}
+
+.chunk-text {
+  display: block;
+  margin-top: 8px;
+  color: #111111;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.chunk-actions {
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 9px;
+}
+
+.chunk-action {
+  color: #111111;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.chunk-action.danger {
+  color: #cf2d23;
+}
+
+.doc-detail-actions {
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.delete-doc-btn,
+.close-doc-btn {
+  width: 86px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 32px;
+}
+
+.delete-doc-btn {
+  color: #cf2d23;
+  background: #fff5f4;
+}
+
+.close-doc-btn {
+  color: #111111;
+  background: linear-gradient(180deg, #f5cd59 0%, #e6b72e 100%);
+  font-weight: 700;
+}
+
+.upload-log-list {
+  max-height: 62vh;
+  margin-top: 12px;
+}
+
+.upload-log-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.upload-log-row:last-child {
+  border-bottom: 0;
+}
+
+.upload-log-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-log-name {
+  display: block;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.upload-log-meta {
+  display: block;
+  margin-top: 4px;
+  color: #888888;
+  font-size: 12px;
+}
+
+.upload-log-error {
+  display: block;
+  margin-top: 5px;
+  color: #cf2d23;
+  font-size: 12px;
+  line-height: 17px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.upload-log-side {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.upload-log-status {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.upload-log-delete {
+  color: #cf2d23;
+  font-size: 12px;
+  text-decoration: underline;
 }
 </style>
