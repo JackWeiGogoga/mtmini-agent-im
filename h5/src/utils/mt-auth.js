@@ -63,6 +63,10 @@ export function updateMtH5OperationSettings(settings) {
   return request('/api/h5/shop/operation-settings', 'PUT', settings)
 }
 
+export function getMtH5CommentReplyLogs(pageNum = 1, pageSize = 20) {
+  return request('/api/h5/comment-reply/logs', 'GET', { pageNum, pageSize })
+}
+
 export function getCommentReplyQaItems() {
   return request('/api/h5/comment-reply-knowledge/items', 'GET')
 }

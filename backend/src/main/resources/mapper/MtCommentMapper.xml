@@ -85,6 +85,13 @@
         ORDER BY comment_time ASC, id ASC
     </select>
 
+    <select id="selectLogsByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_comment
+        WHERE shop_id = #{shopId}
+        ORDER BY auto_reply_at DESC, comment_time DESC, create_time DESC, id DESC
+    </select>
+
     <select id="selectStatsByShopIdAndCreateTimeBetween"
             resultType="com.gogoga.backend.entity.mt.MtCommentStatsAggregate">
         SELECT
