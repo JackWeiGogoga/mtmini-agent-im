@@ -31,4 +31,6 @@ public interface MtReplyKnowledgeItemMapper {
     int updateById(MtReplyKnowledgeItem item);
 
     int softDeleteByIdAndShopId(@Param("id") Long id, @Param("shopId") Long shopId);
+
+    int softDeleteByShopId(@Param("shopId") Long shopId);
 }

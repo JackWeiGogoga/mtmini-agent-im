@@ -9,6 +9,8 @@ import com.gogoga.backend.enums.CommentReplyKnowledgeSourceTypeEnum;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtReplyKnowledgeItemMapper;
+import com.gogoga.backend.mapper.MtReplyKnowledgeChunkMapper;
+import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
@@ -32,6 +34,8 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
 
     private final MtH5ShopService mtH5ShopService;
     private final MtReplyKnowledgeItemMapper mtReplyKnowledgeItemMapper;
+    private final MtReplyKnowledgeDocumentMapper mtReplyKnowledgeDocumentMapper;
+    private final MtReplyKnowledgeChunkMapper mtReplyKnowledgeChunkMapper;
     private final CommentReplyEmbeddingService commentReplyEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final MtProperties mtProperties;
@@ -97,6 +101,16 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
         MtReplyKnowledgeItem item = requireCurrentShopQa(id, shop.getId());
         mtReplyKnowledgeItemMapper.softDeleteByIdAndShopId(item.getId(), shop.getId());
         knowledgeVectorStore.deleteBySource(CommentReplyKnowledgeSourceTypeEnum.QA.name(), item.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void clearCurrentShopKnowledge() {
+        MtShop shop = mtH5ShopService.getCurrentShop();
+        LocalDateTime now = LocalDateTime.now();
+        mtReplyKnowledgeItemMapper.softDeleteByShopId(shop.getId());
+        mtReplyKnowledgeDocumentMapper.softDeleteByShopId(shop.getId(), now);
+        mtReplyKnowledgeChunkMapper.softDeleteByShopId(shop.getId(), now);
     }
 
     private void rebuildQaChunk(MtReplyKnowledgeItem item) {

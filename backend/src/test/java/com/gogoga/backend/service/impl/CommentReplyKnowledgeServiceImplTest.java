@@ -5,6 +5,8 @@ import com.gogoga.backend.entity.mt.MtReplyKnowledgeChunk;
 import com.gogoga.backend.entity.mt.MtReplyKnowledgeItem;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.mapper.MtReplyKnowledgeChunkMapper;
+import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.mapper.MtReplyKnowledgeItemMapper;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
@@ -34,6 +36,10 @@ class CommentReplyKnowledgeServiceImplTest {
     @Mock
     private MtReplyKnowledgeItemMapper mtReplyKnowledgeItemMapper;
     @Mock
+    private MtReplyKnowledgeDocumentMapper mtReplyKnowledgeDocumentMapper;
+    @Mock
+    private MtReplyKnowledgeChunkMapper mtReplyKnowledgeChunkMapper;
+    @Mock
     private CommentReplyEmbeddingService commentReplyEmbeddingService;
     @Mock
     private KnowledgeVectorStore knowledgeVectorStore;
@@ -48,6 +54,8 @@ class CommentReplyKnowledgeServiceImplTest {
         service = new CommentReplyKnowledgeServiceImpl(
                 mtH5ShopService,
                 mtReplyKnowledgeItemMapper,
+                mtReplyKnowledgeDocumentMapper,
+                mtReplyKnowledgeChunkMapper,
                 commentReplyEmbeddingService,
                 knowledgeVectorStore,
                 new MtProperties()
@@ -110,6 +118,15 @@ class CommentReplyKnowledgeServiceImplTest {
 
         verify(knowledgeVectorStore).deleteBySource("QA", 8L);
         verify(knowledgeVectorStore, never()).upsertChunk(any());
+    }
+
+    @Test
+    void clearCurrentShopKnowledgeSoftDeletesShopKnowledgeOnly() {
+        service.clearCurrentShopKnowledge();
+
+        verify(mtReplyKnowledgeItemMapper).softDeleteByShopId(100L);
+        verify(mtReplyKnowledgeDocumentMapper).softDeleteByShopId(eq(100L), any());
+        verify(mtReplyKnowledgeChunkMapper).softDeleteByShopId(eq(100L), any());
     }
 
     private CommentReplyQaKnowledgeParam param(boolean enabled) {

@@ -14,4 +14,6 @@ public interface CommentReplyKnowledgeService {
     CommentReplyKnowledgeItemVO updateCurrentShopQa(Long id, CommentReplyQaKnowledgeParam param);
 
     void deleteCurrentShopQa(Long id);
+
+    void clearCurrentShopKnowledge();
 }

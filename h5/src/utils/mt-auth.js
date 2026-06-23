@@ -79,6 +79,10 @@ export function deleteCommentReplyQaItem(id) {
   return request(`/api/h5/comment-reply-knowledge/items/${id}`, 'DELETE')
 }
 
+export function clearCommentReplyKnowledge() {
+  return request('/api/h5/comment-reply-knowledge/items/all', 'DELETE')
+}
+
 export function getCommentReplyDocuments() {
   return request('/api/h5/comment-reply-knowledge/documents', 'GET')
 }

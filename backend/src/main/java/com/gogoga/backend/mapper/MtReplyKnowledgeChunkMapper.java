@@ -51,4 +51,6 @@ public interface MtReplyKnowledgeChunkMapper {
     );
 
     int softDeleteByIdAndShopId(@Param("id") Long id, @Param("shopId") Long shopId, @Param("updateTime") LocalDateTime updateTime);
+
+    int softDeleteByShopId(@Param("shopId") Long shopId, @Param("updateTime") LocalDateTime updateTime);
 }

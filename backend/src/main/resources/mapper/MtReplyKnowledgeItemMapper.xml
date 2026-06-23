@@ -121,4 +121,13 @@
         WHERE id = #{id}
           AND shop_id = #{shopId}
     </update>
+
+    <update id="softDeleteByShopId">
+        UPDATE mt_reply_knowledge_item
+        SET deleted = 1,
+            enabled = 0,
+            update_time = NOW()
+        WHERE shop_id = #{shopId}
+          AND deleted = 0
+    </update>
 </mapper>

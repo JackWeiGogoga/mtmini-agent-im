@@ -50,6 +50,12 @@ public class CommentReplyKnowledgeController {
         return ResultVO.success(commentReplyKnowledgeService.updateCurrentShopQa(id, param));
     }
 
+    @DeleteMapping("/all")
+    public ResultVO<Void> clearAllKnowledge() {
+        commentReplyKnowledgeService.clearCurrentShopKnowledge();
+        return ResultVO.success();
+    }
+
     @DeleteMapping("/{id}")
     public ResultVO<Void> deleteQa(@PathVariable Long id) {
         commentReplyKnowledgeService.deleteCurrentShopQa(id);
