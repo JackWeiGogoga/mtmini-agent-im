@@ -37,7 +37,26 @@ public interface MtCommentMapper {
             @Param("updateTime") LocalDateTime updateTime
     );
 
+    int markAutoReplySuccessWithGeneration(
+            @Param("id") Long id,
+            @Param("replyContent") String replyContent,
+            @Param("autoReplyAt") LocalDateTime autoReplyAt,
+            @Param("replySource") String replySource,
+            @Param("replySentiment") String replySentiment,
+            @Param("generationId") Long generationId,
+            @Param("knowledgeHitJson") String knowledgeHitJson,
+            @Param("replyModel") String replyModel,
+            @Param("powerAmount") Integer powerAmount,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
     int markAutoReplyFailed(
+            @Param("id") Long id,
+            @Param("error") String error,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int markAutoReplySkipped(
             @Param("id") Long id,
             @Param("error") String error,
             @Param("updateTime") LocalDateTime updateTime

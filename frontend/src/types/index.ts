@@ -38,6 +38,9 @@ export * from "./youzan-app-order-types";
 // 用户行为统计类型
 export * from "./user-behavior-analytics-types";
 
+// 评论回复知识库类型
+export * from "./comment-reply-knowledge-types";
+
 // 菜单管理类型
 export type {
   Menu,

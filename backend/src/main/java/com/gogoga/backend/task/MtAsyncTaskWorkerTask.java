@@ -6,11 +6,13 @@ import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
 import com.gogoga.backend.service.MtCommentAutoReplyService;
+import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,12 +38,14 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
             MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL,
-            MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY
+            MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+            MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE
     );
 
     private final MtAsyncTaskService mtAsyncTaskService;
     private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
     private final MtCommentAutoReplyService mtCommentAutoReplyService;
+    private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
 
@@ -54,6 +58,7 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskService mtAsyncTaskService,
             MtAuthAsyncTaskService mtAuthAsyncTaskService,
             MtCommentAutoReplyService mtCommentAutoReplyService,
+            CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
             @Qualifier("mtAsyncTaskExecutor") Executor mtAsyncTaskExecutor
@@ -61,6 +66,7 @@ public class MtAsyncTaskWorkerTask {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
         this.mtCommentAutoReplyService = mtCommentAutoReplyService;
+        this.commentReplyKnowledgeDocumentService = commentReplyKnowledgeDocumentService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
         this.mtAsyncTaskExecutor = mtAsyncTaskExecutor;
@@ -131,6 +137,7 @@ public class MtAsyncTaskWorkerTask {
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
                 case AUTH_COMMENT_BACKFILL -> executeAuthCommentBackfillTask(task);
                 case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
+                case KNOWLEDGE_DOCUMENT_PARSE -> executeKnowledgeDocumentParseTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
@@ -163,6 +170,11 @@ public class MtAsyncTaskWorkerTask {
         mtCommentAutoReplyService.executeCommentAutoReplyTask(payload);
     }
 
+    private void executeKnowledgeDocumentParseTask(MtAsyncTask task) {
+        MtKnowledgeDocumentParseTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtKnowledgeDocumentParseTaskPayload.class);
+        commentReplyKnowledgeDocumentService.executeDocumentParseTask(payload);
+    }
+
     private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
         MtAuthPostProcessTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtAuthPostProcessTaskPayload.class);
         if (payload == null || payload.getShopId() == null) {
@@ -183,6 +195,7 @@ public class MtAsyncTaskWorkerTask {
                     .maxBackoff(Duration.ofSeconds(60))
                     .build();
             case COMMENT_AUTO_REPLY -> resolvePolicy(asyncTask.getCommentAutoReply());
+            case KNOWLEDGE_DOCUMENT_PARSE -> resolvePolicy(asyncTask.getKnowledgeDocumentParse());
         };
     }
 

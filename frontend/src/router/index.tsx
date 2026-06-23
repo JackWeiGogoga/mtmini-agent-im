@@ -25,6 +25,9 @@ const PowerRechargeOrderManage = lazy(
 const UserBehaviorAnalytics = lazy(
   () => import("@/pages/user-behavior-analytics"),
 );
+const CommentReplyKnowledgeManage = lazy(
+  () => import("@/pages/comment-reply-knowledge"),
+);
 const SalesConfig = lazy(() => import("@/pages/sales-config"));
 const SalesCommissionManage = lazy(
   () => import("@/pages/sales-commission-manage"),
@@ -193,6 +196,16 @@ const router = createBrowserRouter(
             <AuthLayout permission="analytics:user-behavior:list">
               <LazyWrapper>
                 <UserBehaviorAnalytics />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
+        {
+          path: "/comment-reply-knowledge",
+          element: (
+            <AuthLayout permission="comment:reply-knowledge:list">
+              <LazyWrapper>
+                <CommentReplyKnowledgeManage />
               </LazyWrapper>
             </AuthLayout>
           ),

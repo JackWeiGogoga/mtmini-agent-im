@@ -190,6 +190,11 @@ public class MtProperties {
         private TaskPolicy commentAutoReply = new TaskPolicy();
 
         /**
+         * 知识文档解析任务策略
+         */
+        private TaskPolicy knowledgeDocumentParse = new TaskPolicy();
+
+        /**
          * 历史终态任务清理配置
          */
         private Cleanup cleanup = new Cleanup();
@@ -290,5 +295,109 @@ public class MtProperties {
          * 自动回复固定文案。
          */
         private String defaultReply = "很好";
+
+        /**
+         * 评论知识库与 RAG 回复配置。
+         */
+        private Knowledge knowledge = new Knowledge();
+    }
+
+    @Data
+    public static class Knowledge {
+
+        /**
+         * 是否启用知识库 RAG 回复。
+         */
+        private boolean enabled = true;
+
+        /**
+         * 每个商户手工 QA 最大条数。
+         */
+        private int maxQaItemsPerShop = 500;
+
+        /**
+         * 每个商户最大文档数。
+         */
+        private int maxDocumentsPerShop = 10;
+
+        /**
+         * 单个文档最大大小，字节。默认 20MB。
+         */
+        private long maxDocumentBytes = 20L * 1024L * 1024L;
+
+        /**
+         * 每个文档最大切片数。
+         */
+        private int maxChunksPerDocument = 500;
+
+        /**
+         * 单次候选召回数量。
+         */
+        private int maxSearchCandidates = 1000;
+
+        /**
+         * RAG topK。
+         */
+        private int topK = 5;
+
+        /**
+         * 进入 RAG 前要求门店余额大于该值。
+         */
+        private int ragBalanceThreshold = 100000;
+
+        /**
+         * 授权成功赠送算力。
+         */
+        private int authGrantPowerAmount = 800000;
+
+        /**
+         * Chat OpenAI-compatible base URL。
+         */
+        private String modelBaseUrl = "https://tokenhub.tencentmaas.com/v1";
+
+        /**
+         * Chat OpenAI-compatible API Key。
+         */
+        private String modelApiKey;
+
+        /**
+         * Chat 模型。
+         */
+        private String chatModel = "deepseek-v4-flash";
+
+        /**
+         * 向量提供方。
+         */
+        private String embeddingProvider = "DASHSCOPE";
+
+        /**
+         * Embedding OpenAI-compatible base URL。
+         */
+        private String embeddingBaseUrl = "https://llm-kz8j7o34hwdm6nb4.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+
+        /**
+         * Embedding OpenAI-compatible API Key。
+         */
+        private String embeddingApiKey;
+
+        /**
+         * 向量模型。默认使用阿里百炼 text-embedding-v4。
+         */
+        private String embeddingModel = "text-embedding-v4";
+
+        /**
+         * 向量维度。
+         */
+        private int embeddingDim = 1024;
+
+        /**
+         * 知识文档 COS key 前缀。
+         */
+        private String documentKeyPrefix = "comment-knowledge/documents";
+
+        /**
+         * RAG 回复估算算力消耗，后续可按真实 token 计费替换。
+         */
+        private int fallbackRagPowerAmount = 1000;
     }
 }

@@ -9,6 +9,7 @@ import com.gogoga.backend.mapper.MtShopMapper;
 import com.meituan.sdk.auth.MeituanTokenData;
 import com.meituan.sdk.model.wmoperNg.poi.wmoperngQueryPoiDetail.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
  * 美团店铺服务
@@ -153,7 +153,7 @@ public class MtShopService {
         }
 
         MtPowerGrant grant = new MtPowerGrant();
-        grant.setGrantNo(buildGrantNo());
+        grant.setGrantNo(buildGrantNo(shopId));
         grant.setShopId(shopId);
         grant.setPowerAmount(grantAmount);
         grant.setGrantReason(AUTHORIZED_SHOP_GRANT_REASON);
@@ -163,8 +163,12 @@ public class MtShopService {
         grant.setStatus(AUTHORIZED_SHOP_GRANT_STATUS_SUCCESS);
         grant.setCreateTime(now);
         grant.setUpdateTime(now);
-        mtPowerGrantMapper.insert(grant);
-        mtPowerAccountService.addAdminGrant(shopId, grantAmount);
+        try {
+            mtPowerGrantMapper.insert(grant);
+            mtPowerAccountService.addAdminGrant(shopId, grantAmount);
+        } catch (DuplicateKeyException ignored) {
+            // 授权回调可能重复触发，固定 grantNo 保证授权赠送幂等。
+        }
     }
 
     /**
@@ -292,7 +296,7 @@ public class MtShopService {
         return null;
     }
 
-    private String buildGrantNo() {
-        return "PG" + System.currentTimeMillis() + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    private String buildGrantNo(Long shopId) {
+        return "AUTH_BONUS:" + shopId;
     }
 }

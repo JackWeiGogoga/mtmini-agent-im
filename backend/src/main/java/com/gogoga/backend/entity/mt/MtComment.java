@@ -47,6 +47,12 @@ public class MtComment {
     private String autoReplyContent;
     private LocalDateTime autoReplyAt;
     private String autoReplyError;
+    private String autoReplySource;
+    private String autoReplySentiment;
+    private Long autoReplyGenerationId;
+    private String autoReplyKnowledgeHitJson;
+    private String autoReplyModel;
+    private Integer autoReplyPowerAmount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

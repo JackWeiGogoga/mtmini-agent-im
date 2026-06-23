@@ -68,6 +68,32 @@ public class CosStorageService {
         }
     }
 
+    public StoredObject uploadObject(String keyPrefix, String ownerKey, MultipartFile file) {
+        ensureEnabled();
+        if (StringUtils.isBlank(ownerKey)) {
+            throw new BusinessException("上传文件失败，缺少归属标识");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("请先选择文件");
+        }
+        String objectKey = buildObjectKey(keyPrefix, ownerKey, file);
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(file.getSize());
+        metadata.setContentType(StringUtils.trimToEmpty(file.getContentType()));
+        try (InputStream inputStream = file.getInputStream()) {
+            requireCosClient().putObject(new PutObjectRequest(properties.getBucket(), objectKey, inputStream, metadata));
+            return StoredObject.builder()
+                    .objectKey(objectKey)
+                    .accessUrl(resolveObjectAccessUrl(objectKey, null))
+                    .build();
+        } catch (IOException e) {
+            throw new BusinessException("读取上传文件失败", e);
+        } catch (Exception e) {
+            log.error("上传文件到 COS 失败, ownerKey={}, objectKey={}", ownerKey, objectKey, e);
+            throw new BusinessException("上传文件失败，请稍后重试", e);
+        }
+    }
+
     public void deleteReceiptCodeObject(String objectKey) {
         if (StringUtils.isBlank(objectKey)) {
             return;
@@ -81,6 +107,22 @@ public class CosStorageService {
         } catch (Exception e) {
             log.error("删除 COS 收款码失败, objectKey={}", objectKey, e);
             throw new BusinessException("删除收款码文件失败，请稍后重试", e);
+        }
+    }
+
+    public void deleteObject(String objectKey) {
+        if (StringUtils.isBlank(objectKey)) {
+            return;
+        }
+        if (!properties.isEnabled()) {
+            log.warn("COS 未启用，跳过删除对象, objectKey={}", objectKey);
+            return;
+        }
+        try {
+            requireCosClient().deleteObject(properties.getBucket(), objectKey);
+        } catch (Exception e) {
+            log.error("删除 COS 对象失败, objectKey={}", objectKey, e);
+            throw new BusinessException("删除文件失败，请稍后重试", e);
         }
     }
 
@@ -107,6 +149,26 @@ public class CosStorageService {
         }
     }
 
+    public String resolveObjectAccessUrl(String objectKey, String fallbackUrl) {
+        if (StringUtils.isBlank(objectKey)) {
+            return StringUtils.trimToNull(fallbackUrl);
+        }
+        if (!properties.isEnabled()) {
+            return StringUtils.trimToNull(fallbackUrl);
+        }
+        try {
+            String customBase = StringUtils.trimToNull(properties.getPublicAccessUrlBase());
+            if (customBase != null) {
+                return customBase.endsWith("/") ? customBase + objectKey : customBase + "/" + objectKey;
+            }
+            URL url = requireCosClient().getObjectUrl(properties.getBucket(), objectKey);
+            return url == null ? StringUtils.trimToNull(fallbackUrl) : url.toString();
+        } catch (Exception e) {
+            log.warn("生成 COS 对象访问地址失败, objectKey={}", objectKey, e);
+            return StringUtils.trimToNull(fallbackUrl);
+        }
+    }
+
     public StoredObjectContent loadReceiptCodeObject(String objectKey) {
         ensureEnabled();
         if (StringUtils.isBlank(objectKey)) {
@@ -125,6 +187,27 @@ public class CosStorageService {
         } catch (Exception e) {
             log.error("读取 COS 收款码失败, objectKey={}", objectKey, e);
             throw new BusinessException(404, "收款码文件不存在或无法读取");
+        }
+    }
+
+    public StoredObjectContent loadObject(String objectKey) {
+        ensureEnabled();
+        if (StringUtils.isBlank(objectKey)) {
+            throw new BusinessException("对象不存在");
+        }
+        try (COSObject cosObject = requireCosClient().getObject(new GetObjectRequest(properties.getBucket(), objectKey));
+             InputStream inputStream = cosObject.getObjectContent()) {
+            ObjectMetadata metadata = cosObject.getObjectMetadata();
+            return StoredObjectContent.builder()
+                    .content(inputStream.readAllBytes())
+                    .contentType(resolveContentType(metadata, objectKey))
+                    .fileName(resolveFileName(objectKey))
+                    .build();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("读取 COS 对象失败, objectKey={}", objectKey, e);
+            throw new BusinessException(404, "文件不存在或无法读取");
         }
     }
 
@@ -167,6 +250,30 @@ public class CosStorageService {
                 + "/"
                 + UUID.randomUUID().toString().replace("-", "")
                 + extension;
+    }
+
+    private String buildObjectKey(String keyPrefix, String ownerKey, MultipartFile file) {
+        String normalizedPrefix = StringUtils.defaultIfBlank(keyPrefix, "uploads");
+        normalizedPrefix = StringUtils.stripEnd(normalizedPrefix, "/");
+        String extension = resolveOriginalExtension(file);
+        return normalizedPrefix
+                + "/"
+                + ownerKey
+                + "/"
+                + LocalDate.now().format(DATE_PATH_FORMATTER)
+                + "/"
+                + UUID.randomUUID().toString().replace("-", "")
+                + extension;
+    }
+
+    private String resolveOriginalExtension(MultipartFile file) {
+        String originalFilename = file == null ? null : file.getOriginalFilename();
+        String safeName = StringUtils.defaultString(originalFilename);
+        int dotIndex = safeName.lastIndexOf('.');
+        if (dotIndex >= 0 && dotIndex < safeName.length() - 1) {
+            return "." + StringUtils.lowerCase(safeName.substring(dotIndex + 1), Locale.ROOT);
+        }
+        return "";
     }
 
     private String resolveExtension(MultipartFile file) {

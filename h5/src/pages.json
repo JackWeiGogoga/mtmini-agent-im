@@ -31,6 +31,13 @@
       }
     },
     {
+      "path": "pages/knowledge/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "知识库"
+      }
+    },
+    {
       "path": "pages/auth/callback/index",
       "style": {
         "navigationStyle": "custom",

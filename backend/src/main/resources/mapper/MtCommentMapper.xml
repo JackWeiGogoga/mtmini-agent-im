@@ -40,6 +40,12 @@
         <result column="auto_reply_content" property="autoReplyContent"/>
         <result column="auto_reply_at" property="autoReplyAt"/>
         <result column="auto_reply_error" property="autoReplyError"/>
+        <result column="auto_reply_source" property="autoReplySource"/>
+        <result column="auto_reply_sentiment" property="autoReplySentiment"/>
+        <result column="auto_reply_generation_id" property="autoReplyGenerationId"/>
+        <result column="auto_reply_knowledge_hit_json" property="autoReplyKnowledgeHitJson"/>
+        <result column="auto_reply_model" property="autoReplyModel"/>
+        <result column="auto_reply_power_amount" property="autoReplyPowerAmount"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -51,7 +57,9 @@
         critic_food_list, reply_status, comment_order_detail_json, e_reply_content, e_reply_time,
         comment_type, valid, user_id, over_delivery_time_desc, comment_score_type, product_score,
         biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
-        auto_reply_content, auto_reply_at, auto_reply_error, create_time, update_time
+        auto_reply_content, auto_reply_at, auto_reply_error, auto_reply_source,
+        auto_reply_sentiment, auto_reply_generation_id, auto_reply_knowledge_hit_json,
+        auto_reply_model, auto_reply_power_amount, create_time, update_time
     </sql>
 
     <select id="selectByCommentId" resultMap="BaseResultMap">
@@ -98,7 +106,9 @@
             critic_food_list, reply_status, comment_order_detail_json, e_reply_content, e_reply_time,
             comment_type, valid, user_id, over_delivery_time_desc, comment_score_type, product_score,
             biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
-            auto_reply_content, auto_reply_at, auto_reply_error, create_time, update_time
+            auto_reply_content, auto_reply_at, auto_reply_error, auto_reply_source,
+            auto_reply_sentiment, auto_reply_generation_id, auto_reply_knowledge_hit_json,
+            auto_reply_model, auto_reply_power_amount, create_time, update_time
         ) VALUES (
             #{shopId}, #{epoiId}, #{poiId}, #{commentId}, #{result}, #{commentContent}, #{orderCommentScore},
             #{foodCommentScore}, #{deliveryCommentScore}, #{addComment}, #{addCommentTime}, #{packingScore},
@@ -106,7 +116,9 @@
             #{criticFoodList}, #{replyStatus}, #{commentOrderDetailJson}, #{eReplyContent}, #{eReplyTime},
             #{commentType}, #{valid}, #{userId}, #{overDeliveryTimeDesc}, #{commentScoreType}, #{productScore},
             #{bizCode}, #{queryStartTime}, #{queryEndTime}, #{rawPayloadJson}, #{autoReplyStatus},
-            #{autoReplyContent}, #{autoReplyAt}, #{autoReplyError}, #{createTime}, #{updateTime}
+            #{autoReplyContent}, #{autoReplyAt}, #{autoReplyError}, #{autoReplySource},
+            #{autoReplySentiment}, #{autoReplyGenerationId}, #{autoReplyKnowledgeHitJson},
+            #{autoReplyModel}, #{autoReplyPowerAmount}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -155,9 +167,34 @@
         WHERE id = #{id}
     </update>
 
+    <update id="markAutoReplySuccessWithGeneration">
+        UPDATE mt_comment
+        SET reply_status = 1,
+            auto_reply_status = 'SUCCESS',
+            auto_reply_content = #{replyContent},
+            auto_reply_at = #{autoReplyAt},
+            auto_reply_error = NULL,
+            auto_reply_source = #{replySource},
+            auto_reply_sentiment = #{replySentiment},
+            auto_reply_generation_id = #{generationId},
+            auto_reply_knowledge_hit_json = #{knowledgeHitJson},
+            auto_reply_model = #{replyModel},
+            auto_reply_power_amount = #{powerAmount},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
     <update id="markAutoReplyFailed">
         UPDATE mt_comment
         SET auto_reply_status = 'FAILED',
+            auto_reply_error = #{error},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markAutoReplySkipped">
+        UPDATE mt_comment
+        SET auto_reply_status = 'SKIPPED',
             auto_reply_error = #{error},
             update_time = #{updateTime}
         WHERE id = #{id}

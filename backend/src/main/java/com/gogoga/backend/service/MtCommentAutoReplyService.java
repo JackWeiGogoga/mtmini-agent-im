@@ -1,6 +1,7 @@
 package com.gogoga.backend.service;
 
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
@@ -48,6 +49,7 @@ public class MtCommentAutoReplyService {
     private final MtProperties mtProperties;
     private final MtAsyncTaskService mtAsyncTaskService;
     private final ShopOperationSettingsService shopOperationSettingsService;
+    private final MtCommentReplyContentService mtCommentReplyContentService;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -208,7 +210,15 @@ public class MtCommentAutoReplyService {
         if (token == null || StringUtils.isBlank(token.getAccessToken())) {
             throw new IllegalStateException("COMMENT_AUTO_REPLY_TOKEN_MISSING");
         }
-        String reply = StringUtils.defaultIfBlank(mtProperties.getComment().getDefaultReply(), "很好");
+        CommentReplyContentResultDTO replyResult = mtCommentReplyContentService.generateReply(shop, comment);
+        if (replyResult == null || !replyResult.isShouldReply()) {
+            String reason = replyResult == null ? "COMMENT_REPLY_GENERATION_SKIPPED" : replyResult.getSkipReason();
+            mtCommentMapper.markAutoReplySkipped(comment.getId(), StringUtils.left(reason, 1000), LocalDateTime.now());
+            log.warn("评价自动回复任务跳过，原因=回复内容生成跳过, shopId={}, commentId={}, reason={}",
+                    shop.getId(), comment.getCommentId(), reason);
+            return;
+        }
+        String reply = StringUtils.defaultIfBlank(replyResult.getReplyContent(), mtProperties.getComment().getDefaultReply());
         if (mtProperties.getComment().isReplyDryRun()) {
             log.warn("评价回复 dry run 已开启，跳过美团添加商家回复接口，shopId={}, commentId={}",
                     shop.getId(), comment.getCommentId());
@@ -229,7 +239,18 @@ public class MtCommentAutoReplyService {
                 throw new IllegalStateException("评价自动回复失败：" + error);
             }
             LocalDateTime now = LocalDateTime.now();
-            mtCommentMapper.markAutoReplySuccess(comment.getId(), reply, now, now);
+            mtCommentMapper.markAutoReplySuccessWithGeneration(
+                    comment.getId(),
+                    reply,
+                    now,
+                    replyResult.getReplySource(),
+                    replyResult.getSentiment(),
+                    replyResult.getGenerationId(),
+                    replyResult.getKnowledgeHitJson(),
+                    replyResult.getModel(),
+                    replyResult.getPowerAmount(),
+                    now
+            );
         } catch (MtSdkException e) {
             mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
             log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);

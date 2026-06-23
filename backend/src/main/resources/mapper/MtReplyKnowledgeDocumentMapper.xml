@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtReplyKnowledgeDocument">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="file_name" property="fileName"/>
+        <result column="file_type" property="fileType"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="storage_provider" property="storageProvider"/>
+        <result column="object_key" property="objectKey"/>
+        <result column="parse_status" property="parseStatus"/>
+        <result column="parse_error" property="parseError"/>
+        <result column="chunk_count" property="chunkCount"/>
+        <result column="enabled" property="enabled"/>
+        <result column="deleted" property="deleted"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, file_name, file_type, file_size, storage_provider, object_key,
+        parse_status, parse_error, chunk_count, enabled, deleted, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_reply_knowledge_document
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectByIdAndShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_reply_knowledge_document
+        WHERE id = #{id}
+          AND shop_id = #{shopId}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_reply_knowledge_document
+        WHERE shop_id = #{shopId}
+          AND deleted = 0
+        ORDER BY id DESC
+    </select>
+
+    <select id="countAvailableByShopId" resultType="int">
+        SELECT COUNT(1)
+        FROM mt_reply_knowledge_document
+        WHERE shop_id = #{shopId}
+          AND deleted = 0
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtReplyKnowledgeDocument" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_reply_knowledge_document (
+            shop_id, file_name, file_type, file_size, storage_provider, object_key,
+            parse_status, parse_error, chunk_count, enabled, deleted, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{fileName}, #{fileType}, #{fileSize}, #{storageProvider}, #{objectKey},
+            #{parseStatus}, #{parseError}, #{chunkCount}, #{enabled}, #{deleted}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateParseStatus">
+        UPDATE mt_reply_knowledge_document
+        SET parse_status = #{parseStatus},
+            parse_error = #{parseError},
+            chunk_count = #{chunkCount},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="softDeleteByIdAndShopId">
+        UPDATE mt_reply_knowledge_document
+        SET deleted = 1,
+            enabled = 0,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND shop_id = #{shopId}
+    </update>
+</mapper>

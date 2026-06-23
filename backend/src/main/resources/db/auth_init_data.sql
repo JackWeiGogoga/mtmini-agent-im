@@ -54,7 +54,11 @@ INSERT IGNORE INTO `ai_menu` (`id`, `menu_id`, `parent_id`, `menu_name`, `path`,
   (41,'MENU_POWER_RECHARGE_ORDER','0','充值订单','/power-recharge-orders','pages/power-recharge-order-manage/PowerRechargeOrderManage','system:power-recharge-order:list','CreditCardOutlined','C',9,1,1,'2026-04-26 22:25:43','2026-04-26 22:25:43'),
   (42,'MENU_YOUZAN_APP_ORDER','0','有赞订单','/youzan-app-orders','pages/youzan-app-order-manage/YouzanAppOrderManage','youzan:app-order:list','ProfileOutlined','C',9,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
   (43,'MENU_YOUZAN_APP_ORDER_REDEEM','MENU_YOUZAN_APP_ORDER','核销有赞订单',NULL,NULL,'youzan:app-order:redeem',NULL,'F',0,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
-  (45,'MENU_USER_BEHAVIOR_ANALYTICS','0','行为统计','/analytics/user-behavior','pages/user-behavior-analytics/UserBehaviorAnalytics','analytics:user-behavior:list','LineChartOutlined','C',11,1,1,'2026-05-24 12:32:34','2026-05-24 12:32:34');
+  (45,'MENU_USER_BEHAVIOR_ANALYTICS','0','行为统计','/analytics/user-behavior','pages/user-behavior-analytics/UserBehaviorAnalytics','analytics:user-behavior:list','LineChartOutlined','C',11,1,1,'2026-05-24 12:32:34','2026-05-24 12:32:34'),
+  (46,'MENU_COMMENT_REPLY_KNOWLEDGE','0','回复文案','/comment-reply-knowledge','pages/comment-reply-knowledge/CommentReplyKnowledgeManage','comment:reply-knowledge:list','MessageOutlined','C',12,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
+  (47,'MENU_COMMENT_REPLY_KNOWLEDGE_ADD','MENU_COMMENT_REPLY_KNOWLEDGE','新增回复文案',NULL,NULL,'comment:reply-knowledge:add',NULL,'F',0,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
+  (48,'MENU_COMMENT_REPLY_KNOWLEDGE_EDIT','MENU_COMMENT_REPLY_KNOWLEDGE','编辑回复文案',NULL,NULL,'comment:reply-knowledge:edit',NULL,'F',1,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
+  (49,'MENU_COMMENT_REPLY_KNOWLEDGE_DELETE','MENU_COMMENT_REPLY_KNOWLEDGE','删除回复文案',NULL,NULL,'comment:reply-knowledge:delete',NULL,'F',2,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00');
 /*!40000 ALTER TABLE `ai_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `ai_role` DISABLE KEYS */;
@@ -130,7 +134,11 @@ INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VA
   (86,'ROLE_YOUZAN_OPERATOR','MENU_YOUZAN_APP_ORDER_REDEEM','2026-04-29 22:58:57'),
   (92,'ROLE_ADMIN','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
   (93,'ROLE_SUPER','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
-  (94,'ROLE_SALES','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34');
+  (94,'ROLE_SALES','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
+  (95,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE','2026-06-23 01:00:00'),
+  (96,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_ADD','2026-06-23 01:00:00'),
+  (97,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_EDIT','2026-06-23 01:00:00'),
+  (98,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_DELETE','2026-06-23 01:00:00');
 /*!40000 ALTER TABLE `ai_role_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `mt_version_service_mapping` DISABLE KEYS */;

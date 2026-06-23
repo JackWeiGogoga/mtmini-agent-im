@@ -136,7 +136,7 @@
                   <text class="feature-name">让AI学习知识库</text>
                   <text class="feature-desc feature-desc-inline">让AI根据知识库内容回复</text>
                 </view>
-                <view class="outline-button" @tap="noop">配置</view>
+                <view class="outline-button" @tap="goToKnowledgePage">配置</view>
               </view>
             </view>
           </view>
@@ -645,6 +645,11 @@ export default {
         url: "/pages/log/index",
       });
     },
+    goToKnowledgePage() {
+      uni.navigateTo({
+        url: "/pages/knowledge/index",
+      });
+    },
     openSupportPrompt() {
       this.supportPromptVisible = true;
     },
@@ -667,7 +672,6 @@ export default {
 
       showToast("请在美团商家端打开续费页面");
     },
-    noop() {},
   },
 };
 </script>

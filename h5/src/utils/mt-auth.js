@@ -63,6 +63,75 @@ export function updateMtH5OperationSettings(settings) {
   return request('/api/h5/shop/operation-settings', 'PUT', settings)
 }
 
+export function getCommentReplyQaItems() {
+  return request('/api/h5/comment-reply-knowledge/items', 'GET')
+}
+
+export function createCommentReplyQaItem(payload) {
+  return request('/api/h5/comment-reply-knowledge/items', 'POST', payload)
+}
+
+export function updateCommentReplyQaItem(id, payload) {
+  return request(`/api/h5/comment-reply-knowledge/items/${id}`, 'PUT', payload)
+}
+
+export function deleteCommentReplyQaItem(id) {
+  return request(`/api/h5/comment-reply-knowledge/items/${id}`, 'DELETE')
+}
+
+export function getCommentReplyDocuments() {
+  return request('/api/h5/comment-reply-knowledge/documents', 'GET')
+}
+
+export function deleteCommentReplyDocument(id) {
+  return request(`/api/h5/comment-reply-knowledge/documents/${id}`, 'DELETE')
+}
+
+export function getCommentReplyDocumentChunks(id) {
+  return request(`/api/h5/comment-reply-knowledge/documents/${id}/chunks`, 'GET')
+}
+
+export function updateCommentReplyChunkSentiment(chunkId, sentiment) {
+  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}/sentiment`, 'PUT', { sentiment })
+}
+
+export function updateCommentReplyChunkEnabled(chunkId, enabled) {
+  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}/enabled?enabled=${enabled ? 'true' : 'false'}`, 'PUT')
+}
+
+export function deleteCommentReplyChunk(chunkId) {
+  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}`, 'DELETE')
+}
+
+export function uploadCommentReplyDocument(filePath, name = 'file') {
+  const token = getToken()
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: '/api/h5/comment-reply-knowledge/documents/upload',
+      filePath,
+      name,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (response) => {
+        let body = response.data
+        if (typeof body === 'string') {
+          try {
+            body = JSON.parse(body)
+          } catch (error) {
+            reject(new Error('上传响应解析失败'))
+            return
+          }
+        }
+        if (response.statusCode !== 200 || body?.code !== 200) {
+          reject(new Error(body?.msg || '上传失败'))
+          return
+        }
+        resolve(body.data)
+      },
+      fail: (error) => reject(new Error(error?.errMsg || '上传失败')),
+    })
+  })
+}
+
 export function reportMtH5BehaviorEvent(eventType, context = undefined) {
   const payload = {
     eventType,
