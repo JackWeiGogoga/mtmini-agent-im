@@ -254,7 +254,7 @@ power:
       - 10000000
       - 50000000
       - 100000000
-    regular-recharge-recommended-packages:
+    regular-recommended-packages:
       - 6000000
       - 10000000
       - 50000000

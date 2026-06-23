@@ -16,6 +16,11 @@ import org.springframework.stereotype.Component;
 public class OAuthProperties {
 
     /**
+     * 登录成功后跳转地址
+     */
+    private String successUrl = "http://localhost:5173";
+
+    /**
      * Google OAuth 配置
      */
     private GoogleConfig google = new GoogleConfig();

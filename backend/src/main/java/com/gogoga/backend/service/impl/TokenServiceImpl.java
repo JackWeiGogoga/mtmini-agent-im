@@ -1,7 +1,6 @@
 package com.gogoga.backend.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -38,8 +37,11 @@ public class TokenServiceImpl implements TokenService {
      */
     private static final long REFRESH_THRESHOLD = 24 * 60 * 60 * 1000;
 
-    @Autowired
-    private StringRedisTemplate redisTemplate;
+    private final StringRedisTemplate redisTemplate;
+
+    public TokenServiceImpl(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     @Override
     public String createToken(LoginUser loginUser) {

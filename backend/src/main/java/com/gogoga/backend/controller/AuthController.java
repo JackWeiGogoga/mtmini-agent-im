@@ -4,8 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,23 +59,23 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private LoginService loginService;
+    private final LoginService loginService;
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
-    @Autowired
-    private BackendPortalService backendPortalService;
+    private final BackendPortalService backendPortalService;
 
-    @Autowired
-    private OAuthProperties oAuthProperties;
+    private final OAuthProperties oAuthProperties;
 
-    /**
-     * 登录成功后跳转地址
-     */
-    @Value("${oauth.success-url:http://localhost:5173}")
-    private String successUrl;
+    public AuthController(LoginService loginService,
+                          AuthService authService,
+                          BackendPortalService backendPortalService,
+                          OAuthProperties oAuthProperties) {
+        this.loginService = loginService;
+        this.authService = authService;
+        this.backendPortalService = backendPortalService;
+        this.oAuthProperties = oAuthProperties;
+    }
 
     // ==================== 邮箱密码认证 ====================
 
@@ -363,10 +361,10 @@ public class AuthController {
         if (result.isSuccess()) {
             setAuthCookie(response, result.getSessionToken(), 
                     result.getSessionExpireSeconds().intValue());
-            response.sendRedirect(successUrl);
+            response.sendRedirect(oAuthProperties.getSuccessUrl());
         } else {
             String errorMsg = URLEncoder.encode(result.getErrorMessage(), StandardCharsets.UTF_8);
-            response.sendRedirect(successUrl + "?error=" + result.getErrorCode() + "&message=" + errorMsg);
+            response.sendRedirect(oAuthProperties.getSuccessUrl() + "?error=" + result.getErrorCode() + "&message=" + errorMsg);
         }
     }
 

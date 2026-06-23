@@ -16,7 +16,6 @@ import com.gogoga.backend.util.PhoneUtil;
 import com.gogoga.backend.vo.UserVO;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,14 +34,17 @@ import java.util.stream.Collectors;
 @Service
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private UserMapper userMapper;
+    private final UserMapper userMapper;
 
-    @Autowired
-    private UserRoleMapper userRoleMapper;
+    private final UserRoleMapper userRoleMapper;
 
-    @Autowired
-    private RoleMapper roleMapper;
+    private final RoleMapper roleMapper;
+
+    public UserServiceImpl(UserMapper userMapper, UserRoleMapper userRoleMapper, RoleMapper roleMapper) {
+        this.userMapper = userMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.roleMapper = roleMapper;
+    }
 
     @Override
     @Transactional

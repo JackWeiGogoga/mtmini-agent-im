@@ -14,7 +14,6 @@ import com.gogoga.backend.service.RoleService;
 import com.gogoga.backend.vo.RoleVO;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,14 +31,17 @@ import java.util.UUID;
 @Service
 public class RoleServiceImpl implements RoleService {
 
-    @Autowired
-    private RoleMapper roleMapper;
+    private final RoleMapper roleMapper;
 
-    @Autowired
-    private RoleMenuMapper roleMenuMapper;
+    private final RoleMenuMapper roleMenuMapper;
 
-    @Autowired
-    private UserRoleMapper userRoleMapper;
+    private final UserRoleMapper userRoleMapper;
+
+    public RoleServiceImpl(RoleMapper roleMapper, RoleMenuMapper roleMenuMapper, UserRoleMapper userRoleMapper) {
+        this.roleMapper = roleMapper;
+        this.roleMenuMapper = roleMenuMapper;
+        this.userRoleMapper = userRoleMapper;
+    }
 
     @Override
     @Transactional

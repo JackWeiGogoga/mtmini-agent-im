@@ -1,6 +1,5 @@
 package com.gogoga.backend.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -18,14 +17,19 @@ import com.gogoga.backend.interceptor.ShopRightInterceptor;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Autowired
-    private LoginInterceptor loginInterceptor;
+    private final LoginInterceptor loginInterceptor;
 
-    @Autowired
-    private PermissionInterceptor permissionInterceptor;
+    private final PermissionInterceptor permissionInterceptor;
 
-    @Autowired
-    private ShopRightInterceptor shopRightInterceptor;
+    private final ShopRightInterceptor shopRightInterceptor;
+
+    public WebMvcConfig(LoginInterceptor loginInterceptor,
+                        PermissionInterceptor permissionInterceptor,
+                        ShopRightInterceptor shopRightInterceptor) {
+        this.loginInterceptor = loginInterceptor;
+        this.permissionInterceptor = permissionInterceptor;
+        this.shopRightInterceptor = shopRightInterceptor;
+    }
 
     /**
      * 不需要拦截的路径

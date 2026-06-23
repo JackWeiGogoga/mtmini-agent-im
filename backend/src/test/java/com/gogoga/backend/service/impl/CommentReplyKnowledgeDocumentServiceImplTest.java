@@ -129,9 +129,7 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        List<MtReplyKnowledgeChunk> chunks = captureUpsertedChunks();
         assertEquals(9, chunks.size());
         assertEquals("GOOD", chunks.get(0).getSentiment());
         assertEquals("NEUTRAL", chunks.get(1).getSentiment());
@@ -158,9 +156,7 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        List<MtReplyKnowledgeChunk> chunks = captureUpsertedChunks();
         assertEquals(2, chunks.size());
         assertEquals("NEUTRAL", chunks.get(0).getSentiment());
         assertEquals("BAD", chunks.get(1).getSentiment());
@@ -184,9 +180,7 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        List<MtReplyKnowledgeChunk> chunks = captureUpsertedChunks();
         assertEquals(2, chunks.size());
         assertEquals("GOOD", chunks.get(0).getSentiment());
         assertEquals("BAD", chunks.get(1).getSentiment());
@@ -210,9 +204,7 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        List<MtReplyKnowledgeChunk> chunks = captureUpsertedChunks();
         assertEquals(3, chunks.size());
         assertEquals("GOOD", chunks.get(0).getSentiment());
         assertEquals("NEUTRAL", chunks.get(1).getSentiment());
@@ -235,9 +227,7 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        List<MtReplyKnowledgeChunk> chunks = captureUpsertedChunks();
         assertEquals(3, chunks.size());
         assertEquals("GOOD", chunks.get(0).getSentiment());
         assertEquals("NEUTRAL", chunks.get(1).getSentiment());
@@ -292,10 +282,19 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
         payload.setDocumentId(7L);
         service.executeDocumentParseTask(payload);
 
-        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
-        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
-        assertEquals(expectedSentiment, chunksCaptor.getValue().get(0).getSentiment());
+        assertEquals(expectedSentiment, captureUpsertedChunks().get(0).getSentiment());
         clearInvocations(knowledgeVectorStore, mtReplyKnowledgeDocumentMapper, cosStorageService, commentReplyEmbeddingService);
+    }
+
+    private List<MtReplyKnowledgeChunk> captureUpsertedChunks() {
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = replyKnowledgeChunkListCaptor();
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        return chunksCaptor.getValue();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ArgumentCaptor<List<MtReplyKnowledgeChunk>> replyKnowledgeChunkListCaptor() {
+        return ArgumentCaptor.forClass((Class) List.class);
     }
 
     private MtReplyKnowledgeDocument document(String fileType, String filename) {

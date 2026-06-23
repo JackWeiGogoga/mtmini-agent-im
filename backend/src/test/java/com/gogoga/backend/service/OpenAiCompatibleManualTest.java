@@ -5,8 +5,8 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestConstructor;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,11 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>mvn -Dtest=OpenAiCompatibleManualTest test</p>
  */
 @SpringBootTest
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Disabled("手动联调测试，按需单独移除 Disabled 后执行")
 class OpenAiCompatibleManualTest {
 
-    @Autowired
-    private OpenAiCompatibleChatService openAiCompatibleChatService;
+    private final OpenAiCompatibleChatService openAiCompatibleChatService;
+
+    OpenAiCompatibleManualTest(OpenAiCompatibleChatService openAiCompatibleChatService) {
+        this.openAiCompatibleChatService = openAiCompatibleChatService;
+    }
 
     @Test
     void shouldCallCompatibleChatApiWhenLiveTestEnabled() {

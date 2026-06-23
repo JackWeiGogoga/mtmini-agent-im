@@ -3,7 +3,6 @@ package com.gogoga.backend.interceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -38,17 +37,23 @@ import java.util.Set;
 @Component
 public class LoginInterceptor implements HandlerInterceptor {
 
-    @Autowired
-    private TokenService tokenService;
+    private final TokenService tokenService;
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
-    @Autowired
-    private LoginService loginService;
+    private final LoginService loginService;
 
-    @Autowired
-    private BackendPortalService backendPortalService;
+    private final BackendPortalService backendPortalService;
+
+    public LoginInterceptor(TokenService tokenService,
+                            AuthService authService,
+                            LoginService loginService,
+                            BackendPortalService backendPortalService) {
+        this.tokenService = tokenService;
+        this.authService = authService;
+        this.loginService = loginService;
+        this.backendPortalService = backendPortalService;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {

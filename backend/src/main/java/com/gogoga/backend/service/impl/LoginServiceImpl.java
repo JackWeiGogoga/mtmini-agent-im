@@ -17,7 +17,6 @@ import com.gogoga.backend.service.TokenService;
 import com.gogoga.backend.util.UserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.apache.commons.lang3.StringUtils;
@@ -39,23 +38,31 @@ import java.util.stream.Collectors;
 @Service
 public class LoginServiceImpl implements LoginService {
 
-    @Autowired
-    private UserMapper userMapper;
+    private final UserMapper userMapper;
 
-    @Autowired
-    private RoleMapper roleMapper;
+    private final RoleMapper roleMapper;
 
-    @Autowired
-    private MenuMapper menuMapper;
+    private final MenuMapper menuMapper;
 
-    @Autowired
-    private TokenService tokenService;
+    private final TokenService tokenService;
 
-    @Autowired
-    private UserRoleMapper userRoleMapper;
+    private final UserRoleMapper userRoleMapper;
 
-    @Autowired
-    private BackendPortalService backendPortalService;
+    private final BackendPortalService backendPortalService;
+
+    public LoginServiceImpl(UserMapper userMapper,
+                            RoleMapper roleMapper,
+                            MenuMapper menuMapper,
+                            TokenService tokenService,
+                            UserRoleMapper userRoleMapper,
+                            BackendPortalService backendPortalService) {
+        this.userMapper = userMapper;
+        this.roleMapper = roleMapper;
+        this.menuMapper = menuMapper;
+        this.tokenService = tokenService;
+        this.userRoleMapper = userRoleMapper;
+        this.backendPortalService = backendPortalService;
+    }
 
     /**
      * 默认角色ID（普通用户）

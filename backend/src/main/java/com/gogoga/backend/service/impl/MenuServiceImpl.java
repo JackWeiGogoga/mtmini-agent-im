@@ -1,7 +1,6 @@
 package com.gogoga.backend.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,11 +30,14 @@ import java.util.stream.Collectors;
 @Service
 public class MenuServiceImpl implements MenuService {
 
-    @Autowired
-    private MenuMapper menuMapper;
+    private final MenuMapper menuMapper;
 
-    @Autowired
-    private RoleMenuMapper roleMenuMapper;
+    private final RoleMenuMapper roleMenuMapper;
+
+    public MenuServiceImpl(MenuMapper menuMapper, RoleMenuMapper roleMenuMapper) {
+        this.menuMapper = menuMapper;
+        this.roleMenuMapper = roleMenuMapper;
+    }
 
     @Override
     @Transactional

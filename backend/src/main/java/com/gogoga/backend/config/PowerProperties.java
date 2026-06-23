@@ -1,8 +1,8 @@
 package com.gogoga.backend.config;
 
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -25,9 +25,8 @@ import java.util.Set;
 @Data
 @Component
 @ConfigurationProperties(prefix = "power")
-public class PowerProperties {
+public class PowerProperties implements EnvironmentAware {
 
-    @Autowired
     private Environment environment;
 
     /**
@@ -69,6 +68,11 @@ public class PowerProperties {
      * 算力计费配置
      */
     private Billing billing = new Billing();
+
+    @Override
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
+    }
 
     @PostConstruct
     public void validate() {
