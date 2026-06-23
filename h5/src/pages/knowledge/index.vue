@@ -741,9 +741,9 @@ function formatFileSize(value) {
 
 <style scoped>
 .page {
+  width: 100%;
   min-height: 100vh;
-  max-width: 375px;
-  margin: 0 auto;
+  box-sizing: border-box;
   background: #f6f7fb;
   overflow-x: hidden;
 }
