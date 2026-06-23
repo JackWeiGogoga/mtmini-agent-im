@@ -179,6 +179,8 @@ INSERT IGNORE INTO `mt_version_service_mapping` (`id`, `mt_version`, `service_co
 /*!40000 ALTER TABLE `mt_version_service_mapping` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `ai_user` DISABLE KEYS */;
+-- 初始化超级管理员用户
+-- 默认密码: wukxi4-garwut-tuVhah (BCrypt 加密)
 INSERT IGNORE INTO `ai_user` (`id`, `user_id`, `username`, `nickname`, `email`, `phone`, `password`, `auth_provider`, `avatar`, `status`, `create_time`, `update_time`) VALUES
   (1,'1','admin','超级管理员','admin@waimaimaster.com',NULL,'$2a$10$kyEHbvzE6GzelFAasRfFpe7queowCsPpwL95I8OJFplnqOaeDwCry','PASSWORD',NULL,1,'2026-03-24 12:30:38','2026-04-11 10:53:46');
 /*!40000 ALTER TABLE `ai_user` ENABLE KEYS */;
