@@ -34,6 +34,10 @@ public class BackendPortalService {
     private static final Set<String> SHARED_PORTAL_PERMISSIONS = Set.of(
             "analytics:user-behavior:list"
     );
+    private static final Set<String> ORDINARY_PORTAL_PERMISSION_PREFIXES = Set.of(
+            "shop:",
+            "comment:merchant-knowledge:"
+    );
     private static final Set<String> ORDINARY_PORTAL_HIDDEN_PERMISSION_PREFIXES = Set.of(
             "shop:power-management:",
             "shop:mt-app-order:"
@@ -119,10 +123,8 @@ public class BackendPortalService {
         if (activePortal == null || activePortal == BackendPortalType.ADMIN) {
             return permissions;
         }
-        String prefix = permissionPrefix(activePortal);
         return permissions.stream()
-                .filter(permission -> StringUtils.startsWith(permission, prefix)
-                        || isSharedPortalPermission(permission, activePortal))
+                .filter(permission -> supportsPermission(permission, activePortal))
                 .filter(permission -> !isHiddenInPortal(permission, activePortal))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
@@ -157,10 +159,20 @@ public class BackendPortalService {
             return true;
         }
         String permission = StringUtils.trimToNull(menu.getPermission());
-        return permission != null
-                && (StringUtils.startsWith(permission, permissionPrefix(activePortal))
-                || isSharedPortalPermission(permission, activePortal))
+        return supportsPermission(permission, activePortal)
                 && !isHiddenInPortal(permission, activePortal);
+    }
+
+    private boolean supportsPermission(String permission, BackendPortalType activePortal) {
+        permission = StringUtils.trimToNull(permission);
+        if (permission == null) {
+            return false;
+        }
+        if (activePortal == BackendPortalType.ORDINARY) {
+            return startsWithAny(permission, ORDINARY_PORTAL_PERMISSION_PREFIXES);
+        }
+        return StringUtils.startsWith(permission, permissionPrefix(activePortal))
+                || isSharedPortalPermission(permission, activePortal);
     }
 
     private boolean isSharedPortalPermission(String permission, BackendPortalType activePortal) {

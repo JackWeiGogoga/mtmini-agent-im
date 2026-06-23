@@ -116,11 +116,11 @@ const router = createBrowserRouter(
       children: [
         {
           path: "/",
-          element: <Navigate to="/shops" replace />,
+          element: <Navigate to="/master-console" replace />,
         },
         {
           path: "/welcome",
-          element: <Navigate to="/shops" replace />,
+          element: <Navigate to="/master-console" replace />,
         },
         {
           path: "/master-console",

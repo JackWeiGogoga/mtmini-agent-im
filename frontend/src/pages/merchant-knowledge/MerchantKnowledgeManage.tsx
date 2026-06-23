@@ -30,6 +30,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import PageContainer from "@/components/PageContainer";
 import { message } from "@/components/AppMessageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getBoundShops } from "@/services/shop-manage-api";
 import {
   clearMerchantReplyKnowledge,
@@ -300,6 +301,10 @@ function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
 
 export default function MerchantKnowledgeManage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.roles?.includes("super_admin") ?? false;
+  const canUseBindingDomain =
+    currentUser?.activePortal === "ADMIN" && isSuperAdmin;
   const [qaForm] = Form.useForm<CommentReplyQaKnowledgeParam>();
   const [replyTestForm] = Form.useForm<ReplyTestFormValues>();
   const [shops, setShops] = useState<UserShopBinding[]>([]);
@@ -377,8 +382,8 @@ export default function MerchantKnowledgeManage() {
       try {
         const page = await getBoundShops({
           keyword,
-          bindingDomain: "ALL",
-          bindingStatus: "ALL",
+          bindingDomain: canUseBindingDomain ? "ALL" : undefined,
+          bindingStatus: canUseBindingDomain ? "ALL" : undefined,
           pageNum: 1,
           pageSize: 30,
         });
@@ -400,7 +405,7 @@ export default function MerchantKnowledgeManage() {
         setShopLoading(false);
       }
     },
-    [selectedShopId, setSearchParams],
+    [canUseBindingDomain, selectedShopId, setSearchParams],
   );
 
   const loadKnowledge = useCallback(async () => {

@@ -12,6 +12,7 @@ import {
   Tooltip,
   Typography,
 } from "antd";
+import { createStyles } from "antd-style";
 import type { ColumnsType } from "antd/es/table";
 import type { SortOrder } from "antd/es/table/interface";
 import { DatabaseOutlined, DownloadOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
@@ -19,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
 import { message } from "@/components/AppMessageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useResponsive } from "@/hooks";
 import {
   exportMasterConsoleShops,
@@ -69,6 +71,28 @@ const DEFAULT_QUERY: MasterConsoleQueryParam = {
   bindingStatus: "ALL",
   statsRange: "LAST_7_DAYS",
 };
+
+const useMasterConsoleStyles = createStyles(() => ({
+  toolbar: {
+    alignItems: "center",
+    gap: 16,
+  },
+  searchForm: {
+    alignItems: "center",
+    gap: 16,
+    "& .ant-form-item": {
+      marginBottom: 0,
+    },
+  },
+  toolbarActions: {
+    alignItems: "center",
+    marginLeft: "auto",
+    "& .ant-space-item": {
+      display: "flex",
+      alignItems: "center",
+    },
+  },
+}));
 
 function formatDateTime(value?: string) {
   if (!value) {
@@ -131,7 +155,12 @@ const MasterConsole: React.FC = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm<MasterConsoleQueryParam>();
   const { styles } = usePageStyles();
+  const { styles: masterConsoleStyles, cx } = useMasterConsoleStyles();
   const { isCompact } = useResponsive();
+  const { currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.roles?.includes("super_admin") ?? false;
+  const canUseBindingDomain =
+    currentUser?.activePortal === "ADMIN" && isSuperAdmin;
   const [query, setQuery] = useState<MasterConsoleQueryParam>(DEFAULT_QUERY);
   const [data, setData] = useState<MasterConsoleShopRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -151,6 +180,10 @@ const MasterConsole: React.FC = () => {
 
   const fetchVisibleUsers = useCallback(
     async (keyword?: string, bindingDomain?: string) => {
+      if (!canUseBindingDomain) {
+        setVisibleUsers([]);
+        return;
+      }
       setUserLoading(true);
       try {
         const users = await getMasterConsoleVisibleUsers(keyword, bindingDomain);
@@ -161,30 +194,49 @@ const MasterConsole: React.FC = () => {
         setUserLoading(false);
       }
     },
-    [],
+    [canUseBindingDomain],
   );
 
-  const fetchData = useCallback(async (nextQuery: MasterConsoleQueryParam) => {
-    setLoading(true);
-    try {
-      const page = await getMasterConsoleShops(nextQuery);
-      setData(page.list || []);
-      setTotal(page.total || 0);
-    } catch (error) {
-      console.error("Failed to load master console:", error);
-      message.error("加载总控台失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const buildRequestQuery = useCallback(
+    (nextQuery: MasterConsoleQueryParam): MasterConsoleQueryParam => {
+      if (canUseBindingDomain) {
+        return nextQuery;
+      }
+      const requestQuery = { ...nextQuery };
+      delete requestQuery.bindingDomain;
+      delete requestQuery.bindingStatus;
+      delete requestQuery.targetUserId;
+      return requestQuery;
+    },
+    [canUseBindingDomain],
+  );
+
+  const fetchData = useCallback(
+    async (nextQuery: MasterConsoleQueryParam) => {
+      setLoading(true);
+      try {
+        const page = await getMasterConsoleShops(buildRequestQuery(nextQuery));
+        setData(page.list || []);
+        setTotal(page.total || 0);
+      } catch (error) {
+        console.error("Failed to load master console:", error);
+        message.error("加载总控台失败");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildRequestQuery],
+  );
 
   useEffect(() => {
     void fetchData(query);
   }, [fetchData, query]);
 
   useEffect(() => {
-    void fetchVisibleUsers(undefined, query.bindingDomain);
-  }, [fetchVisibleUsers, query.bindingDomain]);
+    if (canUseBindingDomain) {
+      void fetchVisibleUsers(undefined, query.bindingDomain);
+    }
+  }, [canUseBindingDomain, fetchVisibleUsers, query.bindingDomain]);
 
   const updateQuery = useCallback((patch: Partial<MasterConsoleQueryParam>) => {
     setQuery((prev) => ({
@@ -198,11 +250,15 @@ const MasterConsole: React.FC = () => {
     const values = form.getFieldsValue();
     updateQuery({
       keyword: values.keyword?.trim() || undefined,
-      targetUserId: values.targetUserId,
-      bindingDomain: values.bindingDomain || "ALL",
-      bindingStatus: values.bindingStatus || "ALL",
+      targetUserId: canUseBindingDomain ? values.targetUserId : undefined,
+      bindingDomain: canUseBindingDomain
+        ? values.bindingDomain || "ALL"
+        : undefined,
+      bindingStatus: canUseBindingDomain
+        ? values.bindingStatus || "ALL"
+        : undefined,
     });
-  }, [form, updateQuery]);
+  }, [canUseBindingDomain, form, updateQuery]);
 
   const handleReset = useCallback(() => {
     form.setFieldsValue(DEFAULT_QUERY);
@@ -212,11 +268,11 @@ const MasterConsole: React.FC = () => {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      await exportMasterConsoleShops(query);
+      await exportMasterConsoleShops(buildRequestQuery(query));
     } finally {
       setExporting(false);
     }
-  }, [query]);
+  }, [buildRequestQuery, query]);
 
   const handleOperationSettingsChange = useCallback(
     async (
@@ -468,51 +524,57 @@ const MasterConsole: React.FC = () => {
 
   return (
     <PageContainer title="总控台">
-      <div className={styles.toolbar}>
+      <div className={cx(styles.toolbar, masterConsoleStyles.toolbar)}>
         <Form
           form={form}
-          className={styles.searchForm}
+          className={cx(styles.searchForm, masterConsoleStyles.searchForm)}
           initialValues={DEFAULT_QUERY}
           onFinish={handleSearch}
         >
           <Form.Item name="keyword">
             <Input allowClear placeholder="搜索门店名称 / 门店ID" />
           </Form.Item>
-          <Form.Item name="bindingDomain">
-            <Select
-              options={BINDING_DOMAIN_OPTIONS}
-              style={{ width: 130 }}
-              onChange={(value) => {
-                form.setFieldValue("targetUserId", undefined);
-                void fetchVisibleUsers(undefined, value);
-              }}
-            />
-          </Form.Item>
-          <Form.Item name="bindingStatus">
-            <Select options={BINDING_STATUS_OPTIONS} style={{ width: 130 }} />
-          </Form.Item>
-          <Form.Item name="targetUserId">
-            <Select
-              allowClear
-              showSearch
-              filterOption={false}
-              loading={userLoading}
-              placeholder="所属用户"
-              style={{ width: 180 }}
-              options={visibleUsers.map((user) => ({
-                label: buildUserLabel(user),
-                value: user.userId,
-              }))}
-              onSearch={(value) => {
-                if (userSearchTimer.current) {
-                  window.clearTimeout(userSearchTimer.current);
-                }
-                userSearchTimer.current = window.setTimeout(() => {
-                  void fetchVisibleUsers(value, form.getFieldValue("bindingDomain"));
-                }, USER_SEARCH_DEBOUNCE_MS);
-              }}
-            />
-          </Form.Item>
+          {canUseBindingDomain ? (
+            <Form.Item name="bindingDomain">
+              <Select
+                options={BINDING_DOMAIN_OPTIONS}
+                style={{ width: 130 }}
+                onChange={(value) => {
+                  form.setFieldValue("targetUserId", undefined);
+                  void fetchVisibleUsers(undefined, value);
+                }}
+              />
+            </Form.Item>
+          ) : null}
+          {canUseBindingDomain ? (
+            <Form.Item name="bindingStatus">
+              <Select options={BINDING_STATUS_OPTIONS} style={{ width: 130 }} />
+            </Form.Item>
+          ) : null}
+          {canUseBindingDomain ? (
+            <Form.Item name="targetUserId">
+              <Select
+                allowClear
+                showSearch
+                filterOption={false}
+                loading={userLoading}
+                placeholder="所属用户"
+                style={{ width: 180 }}
+                options={visibleUsers.map((user) => ({
+                  label: buildUserLabel(user),
+                  value: user.userId,
+                }))}
+                onSearch={(value) => {
+                  if (userSearchTimer.current) {
+                    window.clearTimeout(userSearchTimer.current);
+                  }
+                  userSearchTimer.current = window.setTimeout(() => {
+                    void fetchVisibleUsers(value, form.getFieldValue("bindingDomain"));
+                  }, USER_SEARCH_DEBOUNCE_MS);
+                }}
+              />
+            </Form.Item>
+          ) : null}
           <Space className={styles.searchActions}>
             <Button type="primary" htmlType="submit">
               查询
@@ -520,7 +582,7 @@ const MasterConsole: React.FC = () => {
             <Button onClick={handleReset}>重置</Button>
           </Space>
         </Form>
-        <Space wrap>
+        <Space wrap className={masterConsoleStyles.toolbarActions}>
           <Segmented
             value={query.statsRange}
             options={DASHBOARD_STATS_RANGE_OPTIONS.map((item) => ({

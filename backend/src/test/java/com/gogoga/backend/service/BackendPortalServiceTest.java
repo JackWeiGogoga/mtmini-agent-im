@@ -97,33 +97,36 @@ class BackendPortalServiceTest {
     }
 
     @Test
-    void shouldHideAdminShopMenusInOrdinaryPortal() {
+    void shouldKeepOrdinaryMasterConsoleAndMerchantKnowledgeInOrdinaryPortal() {
         Menu ordinaryMasterConsole = menu("MENU_MASTER_CONSOLE", "/master-console", "shop:master-console:list");
         Menu ordinaryShops = menu("MENU_SHOP_MANAGE", "/shops", "shop:binding:list");
         Menu powerManagement = menu("MENU_POWER_MANAGE", "/power-management", "shop:power-management:list");
         Menu mtAppOrders = menu("MENU_MT_APP_ORDER", "/mt-app-orders", "shop:mt-app-order:list");
+        Menu merchantKnowledge = menu("MENU_MERCHANT_KNOWLEDGE", "/merchant-knowledge", "comment:merchant-knowledge:list");
         Menu behaviorAnalytics = menu("MENU_USER_BEHAVIOR_ANALYTICS", "/analytics/user-behavior", "analytics:user-behavior:list");
 
         List<Menu> filteredMenus = backendPortalService.filterMenus(
-                List.of(ordinaryMasterConsole, ordinaryShops, powerManagement, mtAppOrders, behaviorAnalytics),
+                List.of(ordinaryMasterConsole, ordinaryShops, powerManagement, mtAppOrders, merchantKnowledge, behaviorAnalytics),
                 BackendPortalType.ORDINARY
         );
 
         Set<String> menuIds = filteredMenus.stream().map(Menu::getMenuId).collect(java.util.stream.Collectors.toSet());
-        assertEquals(2, filteredMenus.size());
+        assertEquals(3, filteredMenus.size());
         assertTrue(menuIds.contains("MENU_MASTER_CONSOLE"));
         assertTrue(menuIds.contains("MENU_SHOP_MANAGE"));
+        assertTrue(menuIds.contains("MENU_MERCHANT_KNOWLEDGE"));
         assertFalse(menuIds.contains("MENU_POWER_MANAGE"));
         assertFalse(menuIds.contains("MENU_MT_APP_ORDER"));
         assertFalse(menuIds.contains("MENU_USER_BEHAVIOR_ANALYTICS"));
         assertEquals(
-                Set.of("shop:master-console:list", "shop:binding:list"),
+                Set.of("shop:master-console:list", "shop:binding:list", "comment:merchant-knowledge:list"),
                 backendPortalService.filterPermissions(
                         Set.of(
                                 "shop:master-console:list",
                                 "shop:binding:list",
                                 "shop:power-management:list",
                                 "shop:mt-app-order:list",
+                                "comment:merchant-knowledge:list",
                                 "analytics:user-behavior:list"
                         ),
                         BackendPortalType.ORDINARY
