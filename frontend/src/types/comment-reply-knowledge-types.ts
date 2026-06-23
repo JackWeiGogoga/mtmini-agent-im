@@ -72,6 +72,8 @@ export interface CommentReplyQaKnowledgeParam {
 export interface CommentReplyTestParam {
   foodCommentScore: number;
   commentContent: string;
+  commentPictures?: string[];
+  imageSummaryText?: string;
 }
 
 export interface CommentReplyTestResult {
@@ -84,6 +86,20 @@ export interface CommentReplyTestResult {
   knowledgeHitJson?: string;
   model?: string;
   powerAmount?: number;
+  imageSummaryStatus?: string;
+  imageSummaryText?: string;
+  imageSummaryJson?: string;
+  imageSummaryErrorMessage?: string;
+  imagePromptTokens?: number;
+  imageCompletionTokens?: number;
+  imageTotalTokens?: number;
+  imagePowerAmount?: number;
+}
+
+export interface CommentReplyImageUploadResult {
+  fileName: string;
+  objectKey: string;
+  url: string;
 }
 
 export interface CommentReplyOfficialTemplateImportResult {

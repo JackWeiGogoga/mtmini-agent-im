@@ -1,6 +1,7 @@
 package com.gogoga.backend.service.impl;
 
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.dto.CommentImageSummaryResultDTO;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.dto.KnowledgeSearchHitDTO;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
@@ -15,6 +16,7 @@ import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtCommentReplyGenerationMapper;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyOfficialTemplateService;
+import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtCommentReplyContentService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
@@ -45,6 +47,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
 
     private final MtProperties mtProperties;
     private final CommentReplyOfficialTemplateService officialTemplateService;
+    private final CommentImageVisionService commentImageVisionService;
     private final CommentReplyEmbeddingService commentReplyEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final OpenAiCompatibleChatService openAiCompatibleChatService;
@@ -87,17 +90,19 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "POWER_BALANCE_NOT_ENOUGH", null, persistGeneration);
         }
 
+        CommentImageSummaryResultDTO imageSummary = null;
         try {
-            String queryText = buildQueryText(comment);
+            imageSummary = commentImageVisionService.resolveForReply(shop, comment, true);
+            String queryText = buildQueryText(comment, imageSummary);
             float[] queryEmbedding = commentReplyEmbeddingService.embed(queryText);
             List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shop.getId(), sentiment, queryEmbedding);
             if (hits.isEmpty()) {
-                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_NO_HIT", null, persistGeneration);
+                return attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_NO_HIT", null, persistGeneration), imageSummary);
             }
             String knowledgeHitJson = toHitJson(hits);
-            String reply = callChatModel(sentiment, comment, hits);
+            String reply = callChatModel(sentiment, comment, imageSummary, hits);
             if (StringUtils.isBlank(reply)) {
-                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_EMPTY_REPLY", null, persistGeneration);
+                return attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_EMPTY_REPLY", null, persistGeneration), imageSummary);
             }
             int powerAmount = Math.max(knowledge.getFallbackRagPowerAmount(), 1);
             if (persistGeneration) {
@@ -118,10 +123,10 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             if (persistGeneration) {
                 mtCommentReplyGenerationMapper.insert(generation);
             }
-            return toResult(generation, true, null);
+            return attachImageSummary(toResult(generation, true, null), imageSummary);
         } catch (Exception e) {
             log.error("RAG 评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
-            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_ERROR", e.getMessage(), persistGeneration);
+            return attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_ERROR", e.getMessage(), persistGeneration), imageSummary);
         }
     }
 
@@ -154,12 +159,15 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         return toResult(generation, true, null);
     }
 
-    private String callChatModel(CommentReplySentimentEnum sentiment, MtComment comment, List<KnowledgeSearchHitDTO> hits) {
+    private String callChatModel(CommentReplySentimentEnum sentiment,
+                                 MtComment comment,
+                                 CommentImageSummaryResultDTO imageSummary,
+                                 List<KnowledgeSearchHitDTO> hits) {
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
         ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                 .model(knowledge.getChatModel())
                 .addSystemMessage(buildSystemPrompt(sentiment))
-                .addUserMessage(buildUserPrompt(comment, hits))
+                .addUserMessage(buildUserPrompt(comment, imageSummary, hits))
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
                 knowledge.getModelBaseUrl(),
@@ -186,21 +194,25 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 + strategy;
     }
 
-    private String buildUserPrompt(MtComment comment, List<KnowledgeSearchHitDTO> hits) {
+    private String buildUserPrompt(MtComment comment, CommentImageSummaryResultDTO imageSummary, List<KnowledgeSearchHitDTO> hits) {
         String contexts = hits.stream()
                 .map(hit -> "- " + hit.getChunk().getChunkText())
                 .collect(Collectors.joining("\n"));
-        return "顾客评价：\n" + buildQueryText(comment)
+        return "顾客评价：\n" + buildQueryText(comment, imageSummary)
                 + "\n\n可用商户知识：\n" + contexts
                 + "\n\n请生成一条商家回复。";
     }
 
-    private String buildQueryText(MtComment comment) {
-        return "评价内容：" + StringUtils.defaultString(comment.getCommentContent()) + "\n"
+    private String buildQueryText(MtComment comment, CommentImageSummaryResultDTO imageSummary) {
+        String text = "评价内容：" + StringUtils.defaultString(comment.getCommentContent()) + "\n"
                 + "追加评价：" + StringUtils.defaultString(comment.getAddComment()) + "\n"
                 + "评价标签：" + StringUtils.defaultString(comment.getCommentLables()) + "\n"
                 + "点赞菜品：" + StringUtils.defaultString(comment.getPraiseFoodList()) + "\n"
                 + "差评菜品：" + StringUtils.defaultString(comment.getCriticFoodList());
+        if (imageSummary == null || StringUtils.isBlank(imageSummary.getSummaryText())) {
+            return text;
+        }
+        return text + "\n评价图片摘要：" + imageSummary.getSummaryText();
     }
 
     private String toHitJson(List<KnowledgeSearchHitDTO> hits) {
@@ -277,6 +289,21 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         result.setKnowledgeHitJson(generation.getKnowledgeHitJson());
         result.setModel(Optional.ofNullable(generation.getLlmModel()).orElse(generation.getEmbeddingModel()));
         result.setPowerAmount(generation.getPowerAmount());
+        return result;
+    }
+
+    private CommentReplyContentResultDTO attachImageSummary(CommentReplyContentResultDTO result, CommentImageSummaryResultDTO imageSummary) {
+        if (result == null || imageSummary == null) {
+            return result;
+        }
+        result.setImageSummaryStatus(imageSummary.getStatus());
+        result.setImageSummaryText(imageSummary.getSummaryText());
+        result.setImageSummaryJson(imageSummary.getSummaryJson());
+        result.setImageSummaryErrorMessage(imageSummary.getErrorMessage());
+        result.setImagePromptTokens(imageSummary.getPromptTokens());
+        result.setImageCompletionTokens(imageSummary.getCompletionTokens());
+        result.setImageTotalTokens(imageSummary.getTotalTokens());
+        result.setImagePowerAmount(imageSummary.getPowerAmount());
         return result;
     }
 }

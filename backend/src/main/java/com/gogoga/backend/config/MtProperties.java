@@ -396,6 +396,46 @@ public class MtProperties {
         private String documentKeyPrefix = "comment-knowledge/documents";
 
         /**
+         * 是否启用评价图片多模态识别。
+         */
+        private boolean visionEnabled = true;
+
+        /**
+         * 图片识别 OpenAI-compatible base URL。
+         */
+        private String visionModelBaseUrl = "https://tokenhub.tencentmaas.com/v1";
+
+        /**
+         * 图片识别 OpenAI-compatible API Key。
+         */
+        private String visionModelApiKey;
+
+        /**
+         * 图片识别模型。
+         */
+        private String visionModel = "qwen3.5-flash";
+
+        /**
+         * 单条评价最多识别图片数量。
+         */
+        private int visionMaxImageCount = 3;
+
+        /**
+         * 图片识别超时时间，秒。
+         */
+        private long visionTimeoutSeconds = 30L;
+
+        /**
+         * 图片识别 usage 缺失时的兜底算力消耗。
+         */
+        private int visionFallbackPowerAmount = 1000;
+
+        /**
+         * 测试图片上传 COS key 前缀。
+         */
+        private String visionImageKeyPrefix = "comment-knowledge/vision-images";
+
+        /**
          * RAG 回复估算算力消耗，后续可按真实 token 计费替换。
          */
         private int fallbackRagPowerAmount = 1000;

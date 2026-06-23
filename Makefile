@@ -46,7 +46,10 @@ env-check:
 		echo "MT_COMMENT_QUERY_DRY_RUN=$${MT_COMMENT_QUERY_DRY_RUN:-true}"; \
 		echo "MT_COMMENT_REPLY_DRY_RUN=$${MT_COMMENT_REPLY_DRY_RUN:-true}"; \
 		if [ -n "$${DASHSCOPE_API_KEY:-$${MT_COMMENT_KNOWLEDGE_EMBEDDING_API_KEY:-}}" ]; then echo "Embedding key: configured"; else echo "Embedding key: missing"; fi; \
-		if [ -n "$${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:-}" ]; then echo "Chat model key: configured"; else echo "Chat model key: missing"; fi \
+		if [ -n "$${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:-}" ]; then echo "Chat model key: configured"; else echo "Chat model key: missing"; fi; \
+		echo "MT_COMMENT_KNOWLEDGE_VISION_ENABLED=$${MT_COMMENT_KNOWLEDGE_VISION_ENABLED:-true}"; \
+		echo "MT_COMMENT_KNOWLEDGE_VISION_MODEL=$${MT_COMMENT_KNOWLEDGE_VISION_MODEL:-qwen3.5-flash}"; \
+		if [ -n "$${MT_COMMENT_KNOWLEDGE_VISION_MODEL_API_KEY:-$${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:-}}" ]; then echo "Vision model key: configured"; else echo "Vision model key: missing"; fi \
 	)
 
 backend-dev:

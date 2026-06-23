@@ -217,6 +217,14 @@ mt:
       embedding-model: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_MODEL:text-embedding-v4}
       embedding-dim: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_DIM:1024}
       document-key-prefix: ${MT_COMMENT_KNOWLEDGE_DOCUMENT_KEY_PREFIX:comment-knowledge/documents}
+      vision-enabled: ${MT_COMMENT_KNOWLEDGE_VISION_ENABLED:true}
+      vision-model-base-url: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
+      vision-model-api-key: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_API_KEY:${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}}
+      vision-model: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL:qwen3.5-flash}
+      vision-max-image-count: ${MT_COMMENT_KNOWLEDGE_VISION_MAX_IMAGE_COUNT:3}
+      vision-timeout-seconds: ${MT_COMMENT_KNOWLEDGE_VISION_TIMEOUT_SECONDS:30}
+      vision-fallback-power-amount: ${MT_COMMENT_KNOWLEDGE_VISION_FALLBACK_POWER_AMOUNT:1000}
+      vision-image-key-prefix: ${MT_COMMENT_KNOWLEDGE_VISION_IMAGE_KEY_PREFIX:comment-knowledge/vision-images}
       fallback-rag-power-amount: ${MT_COMMENT_KNOWLEDGE_FALLBACK_RAG_POWER_AMOUNT:1000}
 
 youzan:

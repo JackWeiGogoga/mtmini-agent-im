@@ -11,7 +11,6 @@ import {
   Popconfirm,
   Select,
   Space,
-  Statistic,
   Switch,
   Table,
   Tabs,
@@ -46,6 +45,7 @@ import {
   updateMerchantReplyChunkEnabled,
   updateMerchantReplyChunkSentiment,
   updateMerchantReplyQa,
+  uploadMerchantReplyTestImages,
   uploadMerchantReplyDocument,
 } from "@/services/comment-reply-knowledge-api";
 import type {
@@ -60,16 +60,17 @@ import type {
   UserShopBinding,
 } from "@/types";
 
-const sentimentOptions: { label: string; value: Exclude<CommentReplySentiment, "UNKNOWN"> }[] = [
+const sentimentOptions: {
+  label: string;
+  value: Exclude<CommentReplySentiment, "UNKNOWN">;
+}[] = [
   { label: "好评（4-5星）", value: "GOOD" },
   { label: "中评（3星）", value: "NEUTRAL" },
   { label: "差评（0-2星）", value: "BAD" },
 ];
 
-const chunkSentimentOptions: { label: string; value: CommentReplySentiment }[] = [
-  ...sentimentOptions,
-  { label: "通用", value: "UNKNOWN" },
-];
+const chunkSentimentOptions: { label: string; value: CommentReplySentiment }[] =
+  [...sentimentOptions, { label: "通用", value: "UNKNOWN" }];
 
 const sentimentText: Record<string, string> = {
   GOOD: "好评",
@@ -99,6 +100,7 @@ const knowledgeSourceTypeText: Record<string, string> = {
 };
 
 const SHOP_SEARCH_DEBOUNCE_MS = 300;
+const REPLY_TEST_PANEL_HEIGHT = "clamp(520px, calc(100vh - 410px), 760px)";
 
 interface KnowledgeHitRow {
   key: string;
@@ -113,6 +115,12 @@ interface KnowledgeHitRow {
   score?: number;
   cosineScore?: number;
 }
+
+interface ReplyTestFormValues extends CommentReplyTestParam {
+  commentPicturesText?: string;
+}
+
+type ReplyImageInputMode = "url" | "upload" | "summary";
 
 function formatDateTime(value?: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
@@ -133,7 +141,25 @@ function buildShopLabel(shop: UserShopBinding) {
 }
 
 function formatHitScore(value?: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(4) : "-";
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(4)
+    : "-";
+}
+
+function parseReplyImageUrls(value?: string) {
+  if (!value) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,，\s]+/)
+        .map((item) => item.trim())
+        .filter(
+          (item) => item.startsWith("http://") || item.startsWith("https://"),
+        ),
+    ),
+  );
 }
 
 function parseKnowledgeHits(value?: string): KnowledgeHitRow[] {
@@ -146,19 +172,28 @@ function parseKnowledgeHits(value?: string): KnowledgeHitRow[] {
       return [];
     }
     return parsed.map((item, index) => {
-      const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      const row =
+        item && typeof item === "object"
+          ? (item as Record<string, unknown>)
+          : {};
       return {
         key: String(row.chunkId || index),
         chunkId: typeof row.chunkId === "number" ? row.chunkId : undefined,
-        sourceType: typeof row.sourceType === "string" ? row.sourceType : undefined,
+        sourceType:
+          typeof row.sourceType === "string" ? row.sourceType : undefined,
         sourceId: typeof row.sourceId === "number" ? row.sourceId : undefined,
         itemId: typeof row.itemId === "number" ? row.itemId : undefined,
-        documentId: typeof row.documentId === "number" ? row.documentId : undefined,
-        sentiment: typeof row.sentiment === "string" ? row.sentiment : undefined,
-        chunkText: typeof row.chunkText === "string" ? row.chunkText : undefined,
-        tokenCount: typeof row.tokenCount === "number" ? row.tokenCount : undefined,
+        documentId:
+          typeof row.documentId === "number" ? row.documentId : undefined,
+        sentiment:
+          typeof row.sentiment === "string" ? row.sentiment : undefined,
+        chunkText:
+          typeof row.chunkText === "string" ? row.chunkText : undefined,
+        tokenCount:
+          typeof row.tokenCount === "number" ? row.tokenCount : undefined,
         score: typeof row.score === "number" ? row.score : undefined,
-        cosineScore: typeof row.cosineScore === "number" ? row.cosineScore : undefined,
+        cosineScore:
+          typeof row.cosineScore === "number" ? row.cosineScore : undefined,
       };
     });
   } catch {
@@ -167,7 +202,10 @@ function parseKnowledgeHits(value?: string): KnowledgeHitRow[] {
 }
 
 function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
-  const rows = useMemo(() => parseKnowledgeHits(knowledgeHitJson), [knowledgeHitJson]);
+  const rows = useMemo(
+    () => parseKnowledgeHits(knowledgeHitJson),
+    [knowledgeHitJson],
+  );
 
   if (!knowledgeHitJson) {
     return null;
@@ -177,7 +215,9 @@ function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
     return (
       <details>
         <summary>查看命中知识</summary>
-        <pre style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>{knowledgeHitJson}</pre>
+        <pre style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+          {knowledgeHitJson}
+        </pre>
       </details>
     );
   }
@@ -185,36 +225,38 @@ function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
   const columns: ColumnsType<KnowledgeHitRow> = [
     {
       title: "排序",
-      width: 72,
+      width: 60,
       render: (_value, _record, index) => index + 1,
     },
     {
       title: "类型",
       dataIndex: "sourceType",
-      width: 110,
-      render: (value?: string) => value ? <Tag>{knowledgeSourceTypeText[value] || value}</Tag> : "-",
+      width: 80,
+      render: (value?: string) =>
+        value ? <Tag>{knowledgeSourceTypeText[value] || value}</Tag> : "-",
     },
     {
       title: "情绪",
       dataIndex: "sentiment",
-      width: 90,
-      render: (value?: string) => value ? <Tag>{sentimentText[value] || value}</Tag> : "-",
+      width: 50,
+      render: (value?: string) =>
+        value ? <Tag>{sentimentText[value] || value}</Tag> : "-",
     },
     {
       title: "综合分",
       dataIndex: "score",
-      width: 100,
+      width: 80,
       render: (value?: number) => formatHitScore(value),
     },
     {
       title: "余弦分",
       dataIndex: "cosineScore",
-      width: 100,
+      width: 80,
       render: (value?: number) => formatHitScore(value),
     },
     {
       title: "来源",
-      width: 180,
+      width: 100,
       render: (_value, record) => {
         const id = record.itemId || record.documentId || record.sourceId;
         if (!record.sourceType || !id) {
@@ -226,15 +268,24 @@ function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
     {
       title: "命中片段",
       dataIndex: "chunkText",
-      render: (value?: string) => value ? (
-        <div style={{ whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}>{value}</div>
-      ) : "-",
+      render: (value?: string) =>
+        value ? (
+          <div
+            style={{ whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}
+          >
+            {value}
+          </div>
+        ) : (
+          "-"
+        ),
     },
   ];
 
   return (
     <details open>
-      <summary style={{ cursor: "pointer" }}>查看命中知识（{rows.length} 条）</summary>
+      <summary style={{ cursor: "pointer" }}>
+        查看命中知识（{rows.length} 条）
+      </summary>
       <Table
         style={{ marginTop: 8 }}
         size="small"
@@ -250,43 +301,65 @@ function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
 export default function MerchantKnowledgeManage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [qaForm] = Form.useForm<CommentReplyQaKnowledgeParam>();
-  const [replyTestForm] = Form.useForm<CommentReplyTestParam>();
+  const [replyTestForm] = Form.useForm<ReplyTestFormValues>();
   const [shops, setShops] = useState<UserShopBinding[]>([]);
-  const [selectedShopId, setSelectedShopId] = useState<number | undefined>(() => {
-    const rawShopId = Number(searchParams.get("shopId"));
-    return Number.isFinite(rawShopId) && rawShopId > 0 ? rawShopId : undefined;
-  });
+  const [selectedShopId, setSelectedShopId] = useState<number | undefined>(
+    () => {
+      const rawShopId = Number(searchParams.get("shopId"));
+      return Number.isFinite(rawShopId) && rawShopId > 0
+        ? rawShopId
+        : undefined;
+    },
+  );
   const [shopLoading, setShopLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [qaItems, setQaItems] = useState<CommentReplyKnowledgeItem[]>([]);
-  const [documents, setDocuments] = useState<CommentReplyKnowledgeDocument[]>([]);
+  const [documents, setDocuments] = useState<CommentReplyKnowledgeDocument[]>(
+    [],
+  );
   const [qaModalOpen, setQaModalOpen] = useState(false);
   const [uploadPreviewOpen, setUploadPreviewOpen] = useState(false);
   const [previewingUpload, setPreviewingUpload] = useState(false);
   const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<CommentReplyKnowledgeDocumentPreview | null>(null);
-  const [editingQa, setEditingQa] = useState<CommentReplyKnowledgeItem | null>(null);
+  const [uploadPreview, setUploadPreview] =
+    useState<CommentReplyKnowledgeDocumentPreview | null>(null);
+  const [editingQa, setEditingQa] = useState<CommentReplyKnowledgeItem | null>(
+    null,
+  );
   const [savingQa, setSavingQa] = useState(false);
   const [testingReply, setTestingReply] = useState(false);
-  const [replyTestResult, setReplyTestResult] = useState<CommentReplyTestResult | null>(null);
+  const [uploadingReplyTestImages, setUploadingReplyTestImages] =
+    useState(false);
+  const [replyImageInputMode, setReplyImageInputMode] =
+    useState<ReplyImageInputMode>("url");
+  const [replyTestResult, setReplyTestResult] =
+    useState<CommentReplyTestResult | null>(null);
   const [chunkDrawerOpen, setChunkDrawerOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<CommentReplyKnowledgeDocument | null>(null);
+  const [selectedDocument, setSelectedDocument] =
+    useState<CommentReplyKnowledgeDocument | null>(null);
   const [chunks, setChunks] = useState<CommentReplyKnowledgeChunk[]>([]);
   const [chunksLoading, setChunksLoading] = useState(false);
   const shopSearchTimer = useRef<number | null>(null);
 
-  const selectedShop = useMemo(
-    () => shops.find((shop) => shop.shopId === selectedShopId),
-    [selectedShopId, shops],
-  );
-
   const stats = useMemo(() => {
     const enabledQaCount = qaItems.filter((item) => item.enabled).length;
-    const successDocumentCount = documents.filter((item) => item.parseStatus === "SUCCESS").length;
-    const failedDocumentCount = documents.filter((item) => item.parseStatus === "FAILED").length;
-    const chunkCount = documents.reduce((sum, item) => sum + (item.chunkCount || 0), 0);
-    return { enabledQaCount, successDocumentCount, failedDocumentCount, chunkCount };
+    const successDocumentCount = documents.filter(
+      (item) => item.parseStatus === "SUCCESS",
+    ).length;
+    const failedDocumentCount = documents.filter(
+      (item) => item.parseStatus === "FAILED",
+    ).length;
+    const chunkCount = documents.reduce(
+      (sum, item) => sum + (item.chunkCount || 0),
+      0,
+    );
+    return {
+      enabledQaCount,
+      successDocumentCount,
+      failedDocumentCount,
+      chunkCount,
+    };
   }, [documents, qaItems]);
 
   const uploadPreviewSummary = useMemo(() => {
@@ -320,7 +393,9 @@ export default function MerchantKnowledgeManage() {
           setSearchParams({ shopId: String(list[0].shopId) });
         }
       } catch (error) {
-        message.error(error instanceof Error ? error.message : "加载商户列表失败");
+        message.error(
+          error instanceof Error ? error.message : "加载商户列表失败",
+        );
       } finally {
         setShopLoading(false);
       }
@@ -364,7 +439,10 @@ export default function MerchantKnowledgeManage() {
 
   const openCreateQa = () => {
     setEditingQa(null);
-    qaForm.setFieldsValue({ sentiment: "GOOD", enabled: true } as CommentReplyQaKnowledgeParam);
+    qaForm.setFieldsValue({
+      sentiment: "GOOD",
+      enabled: true,
+    } as CommentReplyQaKnowledgeParam);
     setQaModalOpen(true);
   };
 
@@ -409,7 +487,11 @@ export default function MerchantKnowledgeManage() {
       return false;
     }
     const lowerName = file.name.toLowerCase();
-    if (!lowerName.endsWith(".txt") && !lowerName.endsWith(".docx") && !lowerName.endsWith(".xlsx")) {
+    if (
+      !lowerName.endsWith(".txt") &&
+      !lowerName.endsWith(".docx") &&
+      !lowerName.endsWith(".xlsx")
+    ) {
       message.error("仅支持 txt、docx、xlsx 文件");
       return false;
     }
@@ -418,7 +500,9 @@ export default function MerchantKnowledgeManage() {
     setUploadPreviewOpen(true);
     setPreviewingUpload(true);
     try {
-      setUploadPreview(await previewMerchantReplyDocument(selectedShopId, file));
+      setUploadPreview(
+        await previewMerchantReplyDocument(selectedShopId, file),
+      );
     } catch (error) {
       message.error(error instanceof Error ? error.message : "解析预览失败");
     } finally {
@@ -428,13 +512,20 @@ export default function MerchantKnowledgeManage() {
   };
 
   const confirmPreviewUpload = async () => {
-    if (!selectedShopId || !pendingUploadFile || !uploadPreview?.chunks?.length) {
+    if (
+      !selectedShopId ||
+      !pendingUploadFile ||
+      !uploadPreview?.chunks?.length
+    ) {
       message.warning("请先完成解析预览");
       return;
     }
     setUploading(true);
     try {
-      const uploaded = await uploadMerchantReplyDocument(selectedShopId, pendingUploadFile);
+      const uploaded = await uploadMerchantReplyDocument(
+        selectedShopId,
+        pendingUploadFile,
+      );
       message.success("上传成功，正在解析");
       setUploadPreviewOpen(false);
       setPendingUploadFile(null);
@@ -457,11 +548,56 @@ export default function MerchantKnowledgeManage() {
     setTestingReply(true);
     setReplyTestResult(null);
     try {
-      setReplyTestResult(await testMerchantReply(selectedShopId, values));
+      const useSummary = replyImageInputMode === "summary";
+      const usePictures =
+        replyImageInputMode === "url" || replyImageInputMode === "upload";
+      setReplyTestResult(
+        await testMerchantReply(selectedShopId, {
+          foodCommentScore: values.foodCommentScore,
+          commentContent: values.commentContent,
+          commentPictures: usePictures
+            ? parseReplyImageUrls(values.commentPicturesText)
+            : [],
+          imageSummaryText: useSummary ? values.imageSummaryText : undefined,
+        }),
+      );
     } catch (error) {
       message.error(error instanceof Error ? error.message : "测试回复失败");
     } finally {
       setTestingReply(false);
+    }
+  };
+
+  const handleReplyTestImageUpload = async (files: File[]) => {
+    if (!selectedShopId) {
+      message.warning("请先选择商户");
+      return;
+    }
+    if (!files.length) {
+      return;
+    }
+    setUploadingReplyTestImages(true);
+    try {
+      const uploaded = await uploadMerchantReplyTestImages(
+        selectedShopId,
+        files,
+      );
+      const current = replyTestForm.getFieldValue("commentPicturesText");
+      const urls = [
+        ...parseReplyImageUrls(current),
+        ...uploaded.map((item) => item.url).filter(Boolean),
+      ];
+      replyTestForm.setFieldValue(
+        "commentPicturesText",
+        Array.from(new Set(urls)).join("\n"),
+      );
+      message.success(`已上传 ${uploaded.length} 张图片`);
+    } catch (error) {
+      message.error(
+        error instanceof Error ? error.message : "上传测试图片失败",
+      );
+    } finally {
+      setUploadingReplyTestImages(false);
     }
   };
 
@@ -494,7 +630,10 @@ export default function MerchantKnowledgeManage() {
     setChunkDrawerOpen(true);
     setChunksLoading(true);
     try {
-      const list = await listMerchantReplyDocumentChunks(selectedShopId, record.id);
+      const list = await listMerchantReplyDocumentChunks(
+        selectedShopId,
+        record.id,
+      );
       setChunks(list || []);
     } catch (error) {
       message.error(error instanceof Error ? error.message : "加载片段失败");
@@ -536,7 +675,11 @@ export default function MerchantKnowledgeManage() {
       title: "状态",
       dataIndex: "enabled",
       width: 90,
-      render: (enabled) => <Tag color={enabled ? "green" : "default"}>{enabled ? "启用" : "停用"}</Tag>,
+      render: (enabled) => (
+        <Tag color={enabled ? "green" : "default"}>
+          {enabled ? "启用" : "停用"}
+        </Tag>
+      ),
     },
     {
       title: "更新时间",
@@ -549,7 +692,11 @@ export default function MerchantKnowledgeManage() {
       width: 150,
       render: (_, record) => (
         <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => openEditQa(record)}>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => openEditQa(record)}
+          >
             编辑
           </Button>
           <Popconfirm
@@ -576,7 +723,11 @@ export default function MerchantKnowledgeManage() {
       dataIndex: "fileName",
       ellipsis: true,
       render: (value, record) => (
-        <Button type="link" icon={<FileTextOutlined />} onClick={() => void openChunkDrawer(record)}>
+        <Button
+          type="link"
+          icon={<FileTextOutlined />}
+          onClick={() => void openChunkDrawer(record)}
+        >
           {value || "文档"}
         </Button>
       ),
@@ -596,7 +747,11 @@ export default function MerchantKnowledgeManage() {
       title: "解析状态",
       dataIndex: "parseStatus",
       width: 120,
-      render: (value) => <Tag color={parseStatusColor[value] || "default"}>{parseStatusText[value] || value}</Tag>,
+      render: (value) => (
+        <Tag color={parseStatusColor[value] || "default"}>
+          {parseStatusText[value] || value}
+        </Tag>
+      ),
     },
     {
       title: "片段数",
@@ -608,7 +763,8 @@ export default function MerchantKnowledgeManage() {
       title: "失败原因",
       dataIndex: "parseError",
       ellipsis: true,
-      render: (value) => (value ? <Tooltip title={value}>{value}</Tooltip> : "-"),
+      render: (value) =>
+        value ? <Tooltip title={value}>{value}</Tooltip> : "-",
     },
     {
       title: "上传时间",
@@ -656,7 +812,11 @@ export default function MerchantKnowledgeManage() {
           options={chunkSentimentOptions}
           onChange={async (nextValue) => {
             if (!selectedShopId) return;
-            await updateMerchantReplyChunkSentiment(selectedShopId, record.id, nextValue);
+            await updateMerchantReplyChunkSentiment(
+              selectedShopId,
+              record.id,
+              nextValue,
+            );
             message.success("类型已更新");
             await reloadChunks();
           }}
@@ -678,7 +838,11 @@ export default function MerchantKnowledgeManage() {
           checked={enabled}
           onChange={async (checked) => {
             if (!selectedShopId) return;
-            await updateMerchantReplyChunkEnabled(selectedShopId, record.id, checked);
+            await updateMerchantReplyChunkEnabled(
+              selectedShopId,
+              record.id,
+              checked,
+            );
             message.success("状态已更新");
             await reloadChunks();
           }}
@@ -708,75 +872,66 @@ export default function MerchantKnowledgeManage() {
 
   return (
     <PageContainer title="知识库管理">
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        <Card>
-          <Space direction="vertical" size={12} style={{ width: "100%" }}>
-            <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-              <Space wrap>
-                <Select
-                  showSearch
-                  filterOption={false}
-                  loading={shopLoading}
-                  placeholder="选择商户"
-                  style={{ minWidth: 320 }}
-                  value={selectedShopId}
-                  options={shops.map((shop) => ({
-                    label: buildShopLabel(shop),
-                    value: shop.shopId,
-                  }))}
-                  onChange={handleShopChange}
-                  onSearch={(value) => {
-                    if (shopSearchTimer.current) {
-                      window.clearTimeout(shopSearchTimer.current);
-                    }
-                    shopSearchTimer.current = window.setTimeout(() => {
-                      void fetchShops(value);
-                    }, SHOP_SEARCH_DEBOUNCE_MS);
-                  }}
-                />
-                <Button icon={<ReloadOutlined />} onClick={() => void loadKnowledge()} disabled={!selectedShopId}>
-                  刷新知识库
-                </Button>
-              </Space>
-              <Popconfirm
-                title="确认清空该商户所有知识？"
-                description="会删除手工问答、上传文档和解析片段。"
-                onConfirm={async () => {
-                  if (!selectedShopId) return;
-                  await clearMerchantReplyKnowledge(selectedShopId);
-                  message.success("已清空");
-                  await loadKnowledge();
-                }}
-                disabled={!selectedShopId}
-              >
-                <Button danger disabled={!selectedShopId}>
-                  清空知识库
-                </Button>
-              </Popconfirm>
-            </Space>
-            {selectedShop ? (
-              <Descriptions size="small" column={3}>
-                <Descriptions.Item label="商户">{selectedShop.shopName || "-"}</Descriptions.Item>
-                <Descriptions.Item label="门店ID">{selectedShop.poiId || "-"}</Descriptions.Item>
-                <Descriptions.Item label="绑定用户">{selectedShop.boundUserName || selectedShop.boundUserId || "-"}</Descriptions.Item>
-              </Descriptions>
-            ) : null}
+      <Space direction="vertical" size={10} style={{ width: "100%" }}>
+        <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
+          <Space wrap>
+            <Select
+              showSearch
+              filterOption={false}
+              loading={shopLoading}
+              placeholder="选择商户"
+              style={{ minWidth: 320 }}
+              value={selectedShopId}
+              options={shops.map((shop) => ({
+                label: buildShopLabel(shop),
+                value: shop.shopId,
+              }))}
+              onChange={handleShopChange}
+              onSearch={(value) => {
+                if (shopSearchTimer.current) {
+                  window.clearTimeout(shopSearchTimer.current);
+                }
+                shopSearchTimer.current = window.setTimeout(() => {
+                  void fetchShops(value);
+                }, SHOP_SEARCH_DEBOUNCE_MS);
+              }}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => void loadKnowledge()}
+              disabled={!selectedShopId}
+            >
+              刷新知识库
+            </Button>
           </Space>
-        </Card>
+          <Popconfirm
+            title="确认清空该商户所有知识？"
+            description="会删除手工问答、上传文档和解析片段。"
+            onConfirm={async () => {
+              if (!selectedShopId) return;
+              await clearMerchantReplyKnowledge(selectedShopId);
+              message.success("已清空");
+              await loadKnowledge();
+            }}
+            disabled={!selectedShopId}
+          >
+            <Button danger disabled={!selectedShopId}>
+              清空知识库
+            </Button>
+          </Popconfirm>
+        </Space>
 
-        <Space size={16} wrap>
-          <Card style={{ width: 180 }}>
-            <Statistic title="手工问答" value={qaItems.length} suffix={`/ ${stats.enabledQaCount} 启用`} />
-          </Card>
-          <Card style={{ width: 180 }}>
-            <Statistic title="上传文档" value={documents.length} suffix={`/ ${stats.successDocumentCount} 已学习`} />
-          </Card>
-          <Card style={{ width: 180 }}>
-            <Statistic title="解析片段" value={stats.chunkCount} />
-          </Card>
-          <Card style={{ width: 180 }}>
-            <Statistic title="解析失败" value={stats.failedDocumentCount} valueStyle={{ color: stats.failedDocumentCount ? "#cf1322" : undefined }} />
-          </Card>
+        <Space size={8} wrap>
+          <Tag>
+            手工问答 {qaItems.length} / 启用 {stats.enabledQaCount}
+          </Tag>
+          <Tag>
+            上传文档 {documents.length} / 已学习 {stats.successDocumentCount}
+          </Tag>
+          <Tag>解析片段 {stats.chunkCount}</Tag>
+          <Tag color={stats.failedDocumentCount ? "red" : "default"}>
+            解析失败 {stats.failedDocumentCount}
+          </Tag>
         </Space>
 
         <Card>
@@ -787,10 +942,23 @@ export default function MerchantKnowledgeManage() {
                   key: "qa",
                   label: "手工问答",
                   children: (
-                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                      <Space style={{ justifyContent: "space-between", width: "100%" }}>
+                    <Space
+                      direction="vertical"
+                      size={12}
+                      style={{ width: "100%" }}
+                    >
+                      <Space
+                        style={{
+                          justifyContent: "space-between",
+                          width: "100%",
+                        }}
+                      >
                         <span>最多 500 条，适合确定的顾客问题和回复话术。</span>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateQa}>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={openCreateQa}
+                        >
                           新增问答
                         </Button>
                       </Space>
@@ -808,11 +976,31 @@ export default function MerchantKnowledgeManage() {
                   key: "documents",
                   label: "上传文档",
                   children: (
-                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                      <Space style={{ justifyContent: "space-between", width: "100%" }}>
-                        <span>支持 txt、docx、xlsx，每个商户最多 10 个文档，单个最大 20M。</span>
-                        <Upload accept=".txt,.docx,.xlsx" showUploadList={false} beforeUpload={handleUpload}>
-                          <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                    <Space
+                      direction="vertical"
+                      size={12}
+                      style={{ width: "100%" }}
+                    >
+                      <Space
+                        style={{
+                          justifyContent: "space-between",
+                          width: "100%",
+                        }}
+                      >
+                        <span>
+                          支持 txt、docx、xlsx，每个商户最多 10 个文档，单个最大
+                          20M。
+                        </span>
+                        <Upload
+                          accept=".txt,.docx,.xlsx"
+                          showUploadList={false}
+                          beforeUpload={handleUpload}
+                        >
+                          <Button
+                            type="primary"
+                            icon={<UploadOutlined />}
+                            loading={uploading}
+                          >
                             上传文档
                           </Button>
                         </Upload>
@@ -831,59 +1019,248 @@ export default function MerchantKnowledgeManage() {
                   key: "reply-test",
                   label: "测试回复效果",
                   children: (
-                    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                      <Form
-                        form={replyTestForm}
-                        layout="vertical"
-                        initialValues={{ foodCommentScore: 5 }}
-                        style={{ maxWidth: 720 }}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "minmax(320px, 420px) minmax(0, 1fr)",
+                        gap: 16,
+                        height: REPLY_TEST_PANEL_HEIGHT,
+                        minHeight: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          minHeight: 0,
+                          overflow: "auto",
+                          paddingRight: 4,
+                        }}
                       >
-                        <Form.Item
-                          name="foodCommentScore"
-                          label="评价星级"
-                          rules={[{ required: true, message: "请选择评价星级" }]}
+                        <Form
+                          form={replyTestForm}
+                          layout="vertical"
+                          initialValues={{ foodCommentScore: 5 }}
                         >
-                          <Select
-                            options={[
-                              { label: "5星（好评）", value: 5 },
-                              { label: "4星（好评）", value: 4 },
-                              { label: "3星（中评）", value: 3 },
-                              { label: "2星（差评）", value: 2 },
-                              { label: "1星（差评）", value: 1 },
-                              { label: "0星（差评）", value: 0 },
+                          <Form.Item
+                            name="foodCommentScore"
+                            label="评价星级"
+                            rules={[
+                              { required: true, message: "请选择评价星级" },
                             ]}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          name="commentContent"
-                          label="评价内容"
-                          rules={[{ required: true, message: "请输入评价内容" }]}
-                        >
-                          <Input.TextArea rows={5} maxLength={1000} showCount placeholder="输入一条顾客评价，测试系统会生成怎样的商家回复" />
-                        </Form.Item>
-                        <Button type="primary" loading={testingReply} onClick={() => void submitReplyTest()}>
-                          生成测试回复
-                        </Button>
-                      </Form>
+                          >
+                            <Select
+                              options={[
+                                { label: "5星（好评）", value: 5 },
+                                { label: "4星（好评）", value: 4 },
+                                { label: "3星（中评）", value: 3 },
+                                { label: "2星（差评）", value: 2 },
+                                { label: "1星（差评）", value: 1 },
+                                { label: "0星（差评）", value: 0 },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name="commentContent"
+                            label="评价内容"
+                            rules={[
+                              { required: true, message: "请输入评价内容" },
+                            ]}
+                          >
+                            <Input.TextArea
+                              rows={5}
+                              maxLength={1000}
+                              showCount
+                              placeholder="输入一条顾客评价，测试系统会生成怎样的商家回复"
+                            />
+                          </Form.Item>
+                          <Form.Item label="图片上下文">
+                            <Tabs
+                              size="small"
+                              activeKey={replyImageInputMode}
+                              onChange={(key) =>
+                                setReplyImageInputMode(
+                                  key as ReplyImageInputMode,
+                                )
+                              }
+                              items={[
+                                {
+                                  key: "url",
+                                  label: "图片 URL",
+                                  children: (
+                                    <Form.Item
+                                      name="commentPicturesText"
+                                      noStyle
+                                    >
+                                      <Input.TextArea
+                                        rows={3}
+                                        placeholder="每行一个图片 URL。真实图片 URL 会调用多模态模型并扣算力。"
+                                      />
+                                    </Form.Item>
+                                  ),
+                                },
+                                {
+                                  key: "upload",
+                                  label: "上传图片",
+                                  children: (
+                                    <Space
+                                      direction="vertical"
+                                      size={8}
+                                      style={{ width: "100%" }}
+                                    >
+                                      <Upload
+                                        multiple
+                                        accept="image/jpeg,image/png,image/webp"
+                                        showUploadList={false}
+                                        beforeUpload={(file) => {
+                                          void handleReplyTestImageUpload([
+                                            file as File,
+                                          ]);
+                                          return Upload.LIST_IGNORE;
+                                        }}
+                                      >
+                                        <Button
+                                          icon={<UploadOutlined />}
+                                          loading={uploadingReplyTestImages}
+                                        >
+                                          上传图片并填入 URL
+                                        </Button>
+                                      </Upload>
+                                      <Form.Item
+                                        name="commentPicturesText"
+                                        noStyle
+                                      >
+                                        <Input.TextArea
+                                          rows={3}
+                                          readOnly
+                                          placeholder="上传成功后会自动填入图片 URL。上传图片测试会调用多模态模型并扣算力。"
+                                        />
+                                      </Form.Item>
+                                    </Space>
+                                  ),
+                                },
+                                {
+                                  key: "summary",
+                                  label: "模拟摘要",
+                                  children: (
+                                    <Form.Item name="imageSummaryText" noStyle>
+                                      <Input.TextArea
+                                        rows={3}
+                                        maxLength={1000}
+                                        placeholder="例如：图片显示餐品包装有汤汁外漏，外包装边缘有明显污渍。填写后不会调用多模态模型。"
+                                      />
+                                    </Form.Item>
+                                  ),
+                                },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Button
+                            type="primary"
+                            loading={testingReply}
+                            onClick={() => void submitReplyTest()}
+                          >
+                            生成测试回复
+                          </Button>
+                        </Form>
+                      </div>
 
-                      {replyTestResult ? (
-                        <Card title="测试结果" size="small">
-                          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                      <Card
+                        title="测试结果"
+                        size="small"
+                        style={{ minHeight: 0, overflow: "hidden" }}
+                        styles={{
+                          body: {
+                            height: "calc(100% - 39px)",
+                            overflow: "auto",
+                          },
+                        }}
+                      >
+                        {replyTestResult ? (
+                          <Space
+                            direction="vertical"
+                            size={12}
+                            style={{ width: "100%" }}
+                          >
                             <Space wrap>
-                              <Tag color={replyTestResult.shouldReply ? "green" : "default"}>
-                                {replyTestResult.shouldReply ? "会回复" : "不回复"}
+                              <Tag
+                                color={
+                                  replyTestResult.shouldReply
+                                    ? "green"
+                                    : "default"
+                                }
+                              >
+                                {replyTestResult.shouldReply
+                                  ? "会回复"
+                                  : "不回复"}
                               </Tag>
-                              {replyTestResult.sentiment ? <Tag>{sentimentText[replyTestResult.sentiment] || replyTestResult.sentiment}</Tag> : null}
-                              {replyTestResult.replySource ? <Tag color="blue">{replyTestResult.replySource}</Tag> : null}
-                              {replyTestResult.model ? <Tag>{replyTestResult.model}</Tag> : null}
-                              {replyTestResult.skipReason ? <Tag color="orange">{replyTestResult.skipReason}</Tag> : null}
+                              {replyTestResult.sentiment ? (
+                                <Tag>
+                                  {sentimentText[replyTestResult.sentiment] ||
+                                    replyTestResult.sentiment}
+                                </Tag>
+                              ) : null}
+                              {replyTestResult.replySource ? (
+                                <Tag color="blue">
+                                  {replyTestResult.replySource}
+                                </Tag>
+                              ) : null}
+                              {replyTestResult.model ? (
+                                <Tag>{replyTestResult.model}</Tag>
+                              ) : null}
+                              {replyTestResult.imageSummaryStatus ? (
+                                <Tag color="purple">
+                                  图片：{replyTestResult.imageSummaryStatus}
+                                </Tag>
+                              ) : null}
+                              {replyTestResult.skipReason ? (
+                                <Tag color="orange">
+                                  {replyTestResult.skipReason}
+                                </Tag>
+                              ) : null}
                             </Space>
-                            <Input.TextArea value={replyTestResult.replyContent || ""} rows={4} readOnly />
-                            <KnowledgeHitList knowledgeHitJson={replyTestResult.knowledgeHitJson} />
+                            {replyTestResult.imageSummaryStatus ? (
+                              <Descriptions size="small" column={4} bordered>
+                                <Descriptions.Item label="图片状态">
+                                  {replyTestResult.imageSummaryStatus}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片输入Token">
+                                  {replyTestResult.imagePromptTokens ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片输出Token">
+                                  {replyTestResult.imageCompletionTokens ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片扣算力">
+                                  {replyTestResult.imagePowerAmount ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片摘要" span={4}>
+                                  {replyTestResult.imageSummaryText || "-"}
+                                </Descriptions.Item>
+                                {replyTestResult.imageSummaryErrorMessage ? (
+                                  <Descriptions.Item
+                                    label="图片识别错误"
+                                    span={4}
+                                  >
+                                    {replyTestResult.imageSummaryErrorMessage}
+                                  </Descriptions.Item>
+                                ) : null}
+                              </Descriptions>
+                            ) : null}
+                            <Input.TextArea
+                              value={replyTestResult.replyContent || ""}
+                              rows={4}
+                              readOnly
+                            />
+                            <KnowledgeHitList
+                              knowledgeHitJson={
+                                replyTestResult.knowledgeHitJson
+                              }
+                            />
                           </Space>
-                        </Card>
-                      ) : null}
-                    </Space>
+                        ) : (
+                          <Empty description="输入评价后生成测试回复" />
+                        )}
+                      </Card>
+                    </div>
                   ),
                 },
               ]}
@@ -902,17 +1279,37 @@ export default function MerchantKnowledgeManage() {
         confirmLoading={savingQa}
         destroyOnHidden
       >
-        <Form form={qaForm} layout="vertical" initialValues={{ sentiment: "GOOD", enabled: true }}>
-          <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
+        <Form
+          form={qaForm}
+          layout="vertical"
+          initialValues={{ sentiment: "GOOD", enabled: true }}
+        >
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: "请输入标题" }]}
+          >
             <Input maxLength={10} showCount />
           </Form.Item>
-          <Form.Item name="sentiment" label="评论类型" rules={[{ required: true, message: "请选择评论类型" }]}>
+          <Form.Item
+            name="sentiment"
+            label="评论类型"
+            rules={[{ required: true, message: "请选择评论类型" }]}
+          >
             <Select options={sentimentOptions} />
           </Form.Item>
-          <Form.Item name="question" label="问题" rules={[{ required: true, message: "请输入问题" }]}>
+          <Form.Item
+            name="question"
+            label="问题"
+            rules={[{ required: true, message: "请输入问题" }]}
+          >
             <Input.TextArea rows={4} maxLength={500} showCount />
           </Form.Item>
-          <Form.Item name="answer" label="回答" rules={[{ required: true, message: "请输入回答" }]}>
+          <Form.Item
+            name="answer"
+            label="回答"
+            rules={[{ required: true, message: "请输入回答" }]}
+          >
             <Input.TextArea rows={4} maxLength={300} showCount />
           </Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked">
@@ -933,17 +1330,29 @@ export default function MerchantKnowledgeManage() {
         }}
         onOk={() => void confirmPreviewUpload()}
         okText="确认上传"
-        okButtonProps={{ disabled: previewingUpload || !uploadPreview?.chunks?.length }}
+        okButtonProps={{
+          disabled: previewingUpload || !uploadPreview?.chunks?.length,
+        }}
         confirmLoading={uploading}
         width={760}
         destroyOnHidden
       >
         <Space direction="vertical" size={12} style={{ width: "100%" }}>
           <Descriptions size="small" column={3} bordered>
-            <Descriptions.Item label="文件名">{uploadPreview?.fileName || pendingUploadFile?.name || "-"}</Descriptions.Item>
-            <Descriptions.Item label="格式">{uploadPreview?.fileType || "-"}</Descriptions.Item>
-            <Descriptions.Item label="大小">{formatFileSize(uploadPreview?.fileSize || pendingUploadFile?.size)}</Descriptions.Item>
-            <Descriptions.Item label="片段数">{uploadPreviewSummary}</Descriptions.Item>
+            <Descriptions.Item label="文件名">
+              {uploadPreview?.fileName || pendingUploadFile?.name || "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="格式">
+              {uploadPreview?.fileType || "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="大小">
+              {formatFileSize(
+                uploadPreview?.fileSize || pendingUploadFile?.size,
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="片段数">
+              {uploadPreviewSummary}
+            </Descriptions.Item>
           </Descriptions>
           <Table
             rowKey="index"
@@ -958,12 +1367,16 @@ export default function MerchantKnowledgeManage() {
                 title: "类型",
                 dataIndex: "sentiment",
                 width: 100,
-                render: (value: string) => <Tag>{sentimentText[value] || value}</Tag>,
+                render: (value: string) => (
+                  <Tag>{sentimentText[value] || value}</Tag>
+                ),
               },
               {
                 title: "内容",
                 dataIndex: "chunkText",
-                render: (value: string) => <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>,
+                render: (value: string) => (
+                  <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>
+                ),
               },
             ]}
             dataSource={uploadPreview?.chunks || []}
@@ -987,15 +1400,30 @@ export default function MerchantKnowledgeManage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <Descriptions size="small" column={2} bordered>
               <Descriptions.Item label="解析状态">
-                <Tag color={parseStatusColor[selectedDocument.parseStatus] || "default"}>
-                  {parseStatusText[selectedDocument.parseStatus] || selectedDocument.parseStatus}
+                <Tag
+                  color={
+                    parseStatusColor[selectedDocument.parseStatus] || "default"
+                  }
+                >
+                  {parseStatusText[selectedDocument.parseStatus] ||
+                    selectedDocument.parseStatus}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="片段数">{selectedDocument.chunkCount || 0}</Descriptions.Item>
-              <Descriptions.Item label="文件类型">{selectedDocument.fileType || "-"}</Descriptions.Item>
-              <Descriptions.Item label="文件大小">{formatFileSize(selectedDocument.fileSize)}</Descriptions.Item>
-              <Descriptions.Item label="上传时间">{formatDateTime(selectedDocument.createTime)}</Descriptions.Item>
-              <Descriptions.Item label="更新时间">{formatDateTime(selectedDocument.updateTime)}</Descriptions.Item>
+              <Descriptions.Item label="片段数">
+                {selectedDocument.chunkCount || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="文件类型">
+                {selectedDocument.fileType || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="文件大小">
+                {formatFileSize(selectedDocument.fileSize)}
+              </Descriptions.Item>
+              <Descriptions.Item label="上传时间">
+                {formatDateTime(selectedDocument.createTime)}
+              </Descriptions.Item>
+              <Descriptions.Item label="更新时间">
+                {formatDateTime(selectedDocument.updateTime)}
+              </Descriptions.Item>
               {selectedDocument.parseError ? (
                 <Descriptions.Item label="失败原因" span={2}>
                   {selectedDocument.parseError}

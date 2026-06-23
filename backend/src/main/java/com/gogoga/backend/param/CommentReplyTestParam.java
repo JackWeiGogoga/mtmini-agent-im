@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 评论回复测试参数。
  */
@@ -19,4 +21,8 @@ public class CommentReplyTestParam {
 
     @NotBlank(message = "评价内容不能为空")
     private String commentContent;
+
+    private List<String> commentPictures;
+
+    private String imageSummaryText;
 }

@@ -169,6 +169,21 @@ public class CosStorageService {
         }
     }
 
+    public String resolvePresignedObjectAccessUrl(String objectKey, long expireSeconds, String fallbackUrl) {
+        if (StringUtils.isBlank(objectKey)) {
+            return StringUtils.trimToNull(fallbackUrl);
+        }
+        if (!properties.isEnabled()) {
+            return StringUtils.trimToNull(fallbackUrl);
+        }
+        try {
+            return buildPresignedGetUrl(objectKey, expireSeconds);
+        } catch (Exception e) {
+            log.warn("生成 COS 预签名对象访问地址失败, objectKey={}", objectKey, e);
+            return resolveObjectAccessUrl(objectKey, fallbackUrl);
+        }
+    }
+
     public StoredObjectContent loadReceiptCodeObject(String objectKey) {
         ensureEnabled();
         if (StringUtils.isBlank(objectKey)) {
@@ -213,6 +228,11 @@ public class CosStorageService {
 
     private String buildPresignedGetUrl(String objectKey) {
         long expireSeconds = Math.max(properties.getReceiptCode().getAccessUrlExpireSeconds(), 60L);
+        return buildPresignedGetUrl(objectKey, expireSeconds);
+    }
+
+    private String buildPresignedGetUrl(String objectKey, long expireSeconds) {
+        expireSeconds = Math.max(expireSeconds, 60L);
         Date expiration = new Date(System.currentTimeMillis() + expireSeconds * 1000L);
         GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(
                 properties.getBucket(),

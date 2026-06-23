@@ -3,15 +3,20 @@ package com.gogoga.backend.controller;
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
+import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
 import com.gogoga.backend.param.CommentReplyTestParam;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
+import com.gogoga.backend.service.CosStorageService;
 import com.gogoga.backend.service.MtCommentReplyContentService;
 import com.gogoga.backend.service.UserShopBindingService;
+import com.gogoga.backend.util.CommentImageUrlUtil;
+import com.gogoga.backend.vo.CommentReplyImageUploadVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentPreviewVO;
@@ -30,7 +35,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 管理后台商户私有知识库接口。
@@ -42,10 +49,14 @@ import java.util.List;
 @RequiresPermission("comment:merchant-knowledge:list")
 public class AdminMerchantKnowledgeController {
 
+    private static final long REPLY_TEST_IMAGE_URL_EXPIRE_SECONDS = 1800L;
+
     private final UserShopBindingService userShopBindingService;
     private final CommentReplyKnowledgeService commentReplyKnowledgeService;
     private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
+    private final CosStorageService cosStorageService;
+    private final MtProperties mtProperties;
 
     @GetMapping("/items")
     public ResultVO<List<CommentReplyKnowledgeItemVO>> listQa(@RequestParam Long shopId) {
@@ -177,10 +188,64 @@ public class AdminMerchantKnowledgeController {
         comment.setCommentId(System.currentTimeMillis());
         comment.setFoodCommentScore(param.getFoodCommentScore());
         comment.setCommentContent(param.getCommentContent());
+        List<String> imageUrls = CommentImageUrlUtil.parseImageUrls(
+                param.getCommentPictures(),
+                mtProperties.getComment().getKnowledge().getVisionMaxImageCount()
+        );
+        comment.setCommentPictures(String.join(",", imageUrls));
+        comment.setImageSummaryText(param.getImageSummaryText());
         return ResultVO.success(mtCommentReplyContentService.previewReply(shop, comment));
+    }
+
+    @PostMapping("/reply-test/images/upload")
+    @RequiresPermission("comment:merchant-knowledge:add")
+    public ResultVO<List<CommentReplyImageUploadVO>> uploadReplyTestImages(
+            @RequestParam Long shopId,
+            @RequestParam("files") MultipartFile[] files
+    ) {
+        requireVisibleShop(shopId);
+        if (files == null || files.length == 0) {
+            throw new BusinessException("请先选择图片");
+        }
+        int maxCount = mtProperties.getComment().getKnowledge().getVisionMaxImageCount();
+        if (files.length > maxCount) {
+            throw new BusinessException("最多上传 " + maxCount + " 张图片");
+        }
+        List<CommentReplyImageUploadVO> result = new ArrayList<>();
+        for (MultipartFile file : files) {
+            validateImageFile(file);
+            CosStorageService.StoredObject storedObject = cosStorageService.uploadObject(
+                    mtProperties.getComment().getKnowledge().getVisionImageKeyPrefix(),
+                    String.valueOf(shopId),
+                    file
+            );
+            CommentReplyImageUploadVO vo = new CommentReplyImageUploadVO();
+            vo.setFileName(file.getOriginalFilename());
+            vo.setObjectKey(storedObject.getObjectKey());
+            vo.setUrl(cosStorageService.resolvePresignedObjectAccessUrl(
+                    storedObject.getObjectKey(),
+                    REPLY_TEST_IMAGE_URL_EXPIRE_SECONDS,
+                    storedObject.getAccessUrl()
+            ));
+            result.add(vo);
+        }
+        return ResultVO.success(result);
     }
 
     private MtShop requireVisibleShop(Long shopId) {
         return userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+    }
+
+    private void validateImageFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("图片不能为空");
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!List.of("image/jpeg", "image/jpg", "image/png", "image/webp").contains(contentType)) {
+            throw new BusinessException("仅支持 JPG、PNG、WebP 图片");
+        }
+        if (file.getSize() > 10L * 1024L * 1024L) {
+            throw new BusinessException("单张图片最大 10MB");
+        }
     }
 }

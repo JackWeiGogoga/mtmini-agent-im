@@ -17,4 +17,12 @@ public class CommentReplyContentResultDTO {
     private String knowledgeHitJson;
     private String model;
     private Integer powerAmount;
+    private String imageSummaryStatus;
+    private String imageSummaryText;
+    private String imageSummaryJson;
+    private String imageSummaryErrorMessage;
+    private Integer imagePromptTokens;
+    private Integer imageCompletionTokens;
+    private Integer imageTotalTokens;
+    private Integer imagePowerAmount;
 }

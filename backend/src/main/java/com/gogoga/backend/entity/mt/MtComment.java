@@ -27,6 +27,7 @@ public class MtComment {
     private String commentLables;
     private Integer shipTime;
     private String commentPictures;
+    private String imageSummaryText;
     private String praiseFoodList;
     private String criticFoodList;
     private Integer replyStatus;

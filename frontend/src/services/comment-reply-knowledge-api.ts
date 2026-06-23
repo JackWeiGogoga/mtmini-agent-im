@@ -5,6 +5,7 @@ import type {
   CommentReplyKnowledgeDocument,
   CommentReplyKnowledgeDocumentPreview,
   CommentReplyKnowledgeItem,
+  CommentReplyImageUploadResult,
   CommentReplyOfficialTemplateImportResult,
   CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
@@ -200,6 +201,20 @@ export async function testMerchantReply(
     `${MERCHANT_BASE_URL}/reply-test`,
     payload,
     { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function uploadMerchantReplyTestImages(
+  shopId: number,
+  files: File[],
+): Promise<CommentReplyImageUploadResult[]> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  const response = await request.post<unknown, { data: CommentReplyImageUploadResult[] }>(
+    `${MERCHANT_BASE_URL}/reply-test/images/upload`,
+    formData,
+    { params: { shopId }, headers: { "Content-Type": "multipart/form-data" } },
   );
   return response.data;
 }

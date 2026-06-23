@@ -353,7 +353,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       onOpenChange={handleOpenChange}
       onClick={handleMenuClick}
       items={menuItems}
-      style={{ border: "none", marginTop: 8 }}
+      style={{ border: "none" }}
     />
   );
 
@@ -374,7 +374,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   );
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ height: "100vh", overflow: "hidden" }}>
       {!isCompact ? (
         <Sider
           collapsible
@@ -384,6 +384,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           style={{
             background: "#fff",
             boxShadow: "2px 0 8px rgba(0, 0, 0, 0.05)",
+            height: "100vh",
+            overflow: "hidden",
           }}
         >
           <div
@@ -411,10 +413,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </span>
             )}
           </div>
-          {renderMenu()}
+          <div style={{ height: "calc(100vh - 64px)", overflowY: "auto", paddingTop: 8 }}>
+            {renderMenu()}
+          </div>
         </Sider>
       ) : null}
-      <Layout>
+      <Layout style={{ height: "100vh", minWidth: 0, overflow: "hidden" }}>
         <Header
           style={{
             padding: isCompact ? "0 12px" : "0 24px",
@@ -423,6 +427,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             alignItems: "center",
             justifyContent: "space-between",
             boxShadow: "0 1px 4px rgba(0, 0, 0, 0.05)",
+            flex: "0 0 64px",
           }}
         >
           <Space size={isCompact ? "small" : "middle"}>
@@ -481,7 +486,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           style={{
             margin: isCompact ? 12 : 16,
             padding: 0,
-            minHeight: 280,
+            minHeight: 0,
+            flex: 1,
             overflow: "auto",
           }}
         >

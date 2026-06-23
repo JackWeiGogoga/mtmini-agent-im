@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtCommentImageSummaryMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtCommentImageSummary">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="mt_comment_id" property="mtCommentId"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="image_count" property="imageCount"/>
+        <result column="image_urls_json" property="imageUrlsJson"/>
+        <result column="status" property="status"/>
+        <result column="summary_json" property="summaryJson"/>
+        <result column="summary_text" property="summaryText"/>
+        <result column="model_provider" property="modelProvider"/>
+        <result column="model" property="model"/>
+        <result column="prompt_tokens" property="promptTokens"/>
+        <result column="completion_tokens" property="completionTokens"/>
+        <result column="total_tokens" property="totalTokens"/>
+        <result column="power_amount" property="powerAmount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, mt_comment_id, comment_id, image_count, image_urls_json, status,
+        summary_json, summary_text, model_provider, model, prompt_tokens, completion_tokens,
+        total_tokens, power_amount, error_message, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndCommentId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_comment_image_summary
+        WHERE shop_id = #{shopId}
+          AND comment_id = #{commentId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtCommentImageSummary" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_comment_image_summary (
+            shop_id, mt_comment_id, comment_id, image_count, image_urls_json, status,
+            summary_json, summary_text, model_provider, model, prompt_tokens, completion_tokens,
+            total_tokens, power_amount, error_message, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{mtCommentId}, #{commentId}, #{imageCount}, #{imageUrlsJson}, #{status},
+            #{summaryJson}, #{summaryText}, #{modelProvider}, #{model}, #{promptTokens}, #{completionTokens},
+            #{totalTokens}, #{powerAmount}, #{errorMessage}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateResultById" parameterType="com.gogoga.backend.entity.mt.MtCommentImageSummary">
+        UPDATE mt_comment_image_summary
+        SET status = #{status},
+            summary_json = #{summaryJson},
+            summary_text = #{summaryText},
+            model_provider = #{modelProvider},
+            model = #{model},
+            prompt_tokens = #{promptTokens},
+            completion_tokens = #{completionTokens},
+            total_tokens = #{totalTokens},
+            power_amount = #{powerAmount},
+            error_message = #{errorMessage},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateFailureById">
+        UPDATE mt_comment_image_summary
+        SET status = #{status},
+            error_message = #{errorMessage},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+</mapper>
