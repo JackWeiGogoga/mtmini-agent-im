@@ -32,25 +32,27 @@
           <text class="empty-desc">可以上传文档，或手工添加顾客问题和回复内容。</text>
         </view>
 
-        <view v-for="row in knowledgeRows" :key="row.rowKey" class="knowledge-row">
-          <view class="question-icon">?</view>
-          <view class="row-main">
-            <view class="row-head">
-              <text class="row-title">{{ row.title }}</text>
-              <view class="row-actions">
-                <text v-if="row.type === 'QA'" class="row-link" @tap="toggleAnswer(row.id)">查看回答</text>
-                <text v-if="row.type === 'QA'" class="row-close" @tap="removeQa(row.id)">×</text>
+        <scroll-view v-else class="knowledge-list" scroll-y>
+          <view v-for="row in knowledgeRows" :key="row.rowKey" class="knowledge-row">
+            <view class="question-icon">?</view>
+            <view class="row-main">
+              <view class="row-head">
+                <text class="row-title">{{ row.title }}</text>
+                <view class="row-actions">
+                  <text v-if="row.type === 'QA'" class="row-link" @tap="toggleAnswer(row.id)">查看回答</text>
+                  <text v-if="row.type === 'QA'" class="row-close" @tap="removeQa(row.id)">×</text>
+                </view>
+              </view>
+              <text class="row-question">Q：{{ row.question }}</text>
+              <text v-if="row.type === 'QA' && expandedQaId === row.id" class="row-answer">A：{{ row.answer }}</text>
+              <view class="row-foot">
+                <text class="sentiment-badge" :class="sentimentClass(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</text>
+                <text v-if="row.statusText" class="status-text">{{ row.statusText }}</text>
+                <text v-if="row.type === 'QA'" class="edit-link" @tap="openQaForm(row.raw)">编辑</text>
               </view>
             </view>
-            <text class="row-question">Q：{{ row.question }}</text>
-            <text v-if="row.type === 'QA' && expandedQaId === row.id" class="row-answer">A：{{ row.answer }}</text>
-            <view class="row-foot">
-              <text class="sentiment-badge" :class="sentimentClass(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</text>
-              <text v-if="row.statusText" class="status-text">{{ row.statusText }}</text>
-              <text v-if="row.type === 'QA'" class="edit-link" @tap="openQaForm(row.raw)">编辑</text>
-            </view>
           </view>
-        </view>
+        </scroll-view>
       </view>
 
       <view class="clear-card" @tap="confirmClearKnowledge">
@@ -747,6 +749,11 @@ function shortFileName(value) {
   padding: 20px 16px 16px;
 }
 
+.knowledge-list {
+  max-height: 330px;
+  margin-top: 6px;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -917,7 +924,7 @@ function shortFileName(value) {
   justify-content: center;
   gap: 10px;
   min-height: 54px;
-  margin-top: 84px;
+  margin-top: 18px;
 }
 
 .warning-icon {
