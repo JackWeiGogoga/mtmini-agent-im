@@ -260,7 +260,13 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         if (StringUtils.equals(fileType, "XLSX")) {
             return extractXlsxChunks(content);
         }
-        return splitText(cleanText(text));
+        String cleanedText = cleanText(text);
+        List<ParsedDocumentChunk> structuredChunks = extractStructuredTextChunks(cleanedText);
+        if (!structuredChunks.isEmpty()) {
+            return structuredChunks;
+        }
+        List<ParsedDocumentChunk> paragraphChunks = extractParagraphChunks(cleanedText);
+        return paragraphChunks.isEmpty() ? splitText(cleanedText) : paragraphChunks;
     }
 
     private String extractDocxText(byte[] content) throws Exception {
@@ -433,6 +439,205 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
                 .trim();
     }
 
+    private List<ParsedDocumentChunk> extractStructuredTextChunks(String text) {
+        if (StringUtils.isBlank(text)) {
+            return List.of();
+        }
+        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        int maxChunks = Math.max(1, knowledge.getMaxChunksPerDocument());
+        List<String> blocks = splitStructuredBlocks(text);
+        List<ParsedDocumentChunk> chunks = new ArrayList<>();
+        for (String block : blocks) {
+            String cleanedBlock = cleanText(block);
+            if (!isUsefulStructuredBlock(cleanedBlock)) {
+                continue;
+            }
+            chunks.add(new ParsedDocumentChunk(cleanedBlock, extractExplicitSentiment(cleanedBlock)));
+            if (chunks.size() >= maxChunks) {
+                break;
+            }
+        }
+        return chunks;
+    }
+
+    private List<String> splitStructuredBlocks(String text) {
+        List<String> blocks = new ArrayList<>();
+        String[] lines = StringUtils.splitByWholeSeparatorPreserveAllTokens(text, "\n");
+        StringBuilder current = new StringBuilder();
+        List<String> currentKeys = new ArrayList<>();
+        for (String line : lines) {
+            String trimmed = StringUtils.trimToEmpty(line);
+            StructuredLine structuredLine = parseStructuredLine(trimmed);
+            if (StringUtils.isBlank(trimmed)) {
+                if (current.length() > 0 && currentKeys.size() >= 2) {
+                    addIfNotBlank(blocks, current.toString());
+                    current.setLength(0);
+                    currentKeys.clear();
+                }
+                continue;
+            }
+            if (structuredLine != null) {
+                String normalizedKey = normalizeStructureKey(structuredLine.getKey());
+                if (current.length() > 0 && currentKeys.size() >= 2 && currentKeys.contains(normalizedKey)) {
+                    addIfNotBlank(blocks, current.toString());
+                    current.setLength(0);
+                    currentKeys.clear();
+                }
+                currentKeys.add(normalizedKey);
+            }
+            if (current.length() > 0) {
+                current.append('\n');
+            }
+            current.append(trimmed);
+        }
+        addIfNotBlank(blocks, current.toString());
+        return blocks;
+    }
+
+    private boolean isUsefulStructuredBlock(String block) {
+        if (StringUtils.isBlank(block)) {
+            return false;
+        }
+        int structuredLineCount = 0;
+        for (String line : StringUtils.splitByWholeSeparatorPreserveAllTokens(block, "\n")) {
+            if (parseStructuredLine(StringUtils.trimToEmpty(line)) != null) {
+                structuredLineCount++;
+            }
+        }
+        if (structuredLineCount < 2) {
+            return false;
+        }
+        return StringUtils.length(block) >= 20;
+    }
+
+    private StructuredLine parseStructuredLine(String line) {
+        if (StringUtils.isBlank(line)) {
+            return null;
+        }
+        int delimiterIndex = findStructureDelimiter(line);
+        if (delimiterIndex <= 0 || delimiterIndex >= line.length() - 1) {
+            return null;
+        }
+        String key = StringUtils.trimToEmpty(line.substring(0, delimiterIndex));
+        String value = StringUtils.trimToEmpty(line.substring(delimiterIndex + 1));
+        if (StringUtils.isBlank(key) || StringUtils.isBlank(value) || key.length() > 24) {
+            return null;
+        }
+        return new StructuredLine(key, value);
+    }
+
+    private int findStructureDelimiter(String line) {
+        int fullColon = StringUtils.indexOf(line, "：");
+        int halfColon = StringUtils.indexOf(line, ":");
+        int equals = StringUtils.indexOf(line, "=");
+        int result = -1;
+        for (int index : new int[]{fullColon, halfColon, equals}) {
+            if (index >= 0 && (result < 0 || index < result)) {
+                result = index;
+            }
+        }
+        return result;
+    }
+
+    private String normalizeStructureKey(String key) {
+        return StringUtils.lowerCase(StringUtils.trimToEmpty(key), Locale.ROOT)
+                .replaceAll("\\s+", "");
+    }
+
+    private CommentReplySentimentEnum extractExplicitSentiment(String text) {
+        String value = StringUtils.defaultString(text);
+        for (String line : StringUtils.splitByWholeSeparatorPreserveAllTokens(value, "\n")) {
+            StructuredLine structuredLine = parseStructuredLine(StringUtils.trimToEmpty(line));
+            if (structuredLine == null) {
+                continue;
+            }
+            String key = structuredLine.getKey();
+            String fieldValue = structuredLine.getValue();
+            if (StringUtils.containsAny(key, "评论类型", "类型", "评分", "星级", "评价", "情绪", "sentiment", "score", "rating")
+                    || StringUtils.containsAny(fieldValue, "好评", "中评", "差评", "四星", "五星", "三星", "一星", "二星", "4星", "5星", "3星", "1星", "2星", "GOOD", "NEUTRAL", "BAD")) {
+                CommentReplySentimentEnum sentiment = inferSentiment(fieldValue);
+                if (sentiment != CommentReplySentimentEnum.UNKNOWN) {
+                    return sentiment;
+                }
+            }
+        }
+        CommentReplySentimentEnum inferred = inferSentiment(value);
+        return inferred == CommentReplySentimentEnum.UNKNOWN ? null : inferred;
+    }
+
+    private List<ParsedDocumentChunk> extractParagraphChunks(String text) {
+        if (StringUtils.isBlank(text) || !StringUtils.contains(text, "\n\n")) {
+            return List.of();
+        }
+        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        int maxChunks = Math.max(1, knowledge.getMaxChunksPerDocument());
+        List<ParsedDocumentChunk> chunks = new ArrayList<>();
+        for (String paragraph : text.split("\\n\\s*\\n")) {
+            String cleanedParagraph = cleanText(paragraph);
+            if (!isUsefulParagraph(cleanedParagraph) || isMetaTestParagraph(cleanedParagraph)) {
+                continue;
+            }
+            List<ParsedDocumentChunk> lineChunks = extractRuleLineChunks(cleanedParagraph);
+            if (lineChunks.size() >= 2) {
+                chunks.addAll(lineChunks);
+            } else {
+                chunks.add(new ParsedDocumentChunk(cleanedParagraph, null));
+            }
+            if (chunks.size() >= maxChunks) {
+                break;
+            }
+        }
+        List<ParsedDocumentChunk> meaningfulChunks = filterMeaningfulChunks(chunks);
+        return meaningfulChunks.size() >= 2 ? meaningfulChunks : List.of();
+    }
+
+    private boolean isUsefulParagraph(String paragraph) {
+        if (StringUtils.length(paragraph) < 12) {
+            return false;
+        }
+        int chineseOrLetterCount = 0;
+        for (int i = 0; i < paragraph.length(); i++) {
+            char ch = paragraph.charAt(i);
+            if (Character.isLetter(ch) || Character.UnicodeScript.of(ch) == Character.UnicodeScript.HAN) {
+                chineseOrLetterCount++;
+            }
+        }
+        return chineseOrLetterCount >= 8;
+    }
+
+    private boolean isMetaTestParagraph(String paragraph) {
+        String value = StringUtils.defaultString(paragraph);
+        return StringUtils.containsAny(value,
+                "用来测试", "测试情绪", "测试解析", "这份文档故意", "如果系统", "应该分别", "是否容易");
+    }
+
+    private List<ParsedDocumentChunk> extractRuleLineChunks(String paragraph) {
+        List<ParsedDocumentChunk> chunks = new ArrayList<>();
+        String[] lines = StringUtils.splitByWholeSeparatorPreserveAllTokens(paragraph, "\n");
+        int usefulLineCount = 0;
+        for (String line : lines) {
+            String cleanedLine = cleanText(line);
+            if (StringUtils.isBlank(cleanedLine)) {
+                continue;
+            }
+            usefulLineCount++;
+            if (!isRuleLikeLine(cleanedLine)) {
+                return List.of();
+            }
+            chunks.add(new ParsedDocumentChunk(cleanedLine, null));
+        }
+        return usefulLineCount >= 2 ? chunks : List.of();
+    }
+
+    private boolean isRuleLikeLine(String line) {
+        if (!isUsefulParagraph(line) || isMetaTestParagraph(line)) {
+            return false;
+        }
+        String value = StringUtils.trimToEmpty(line);
+        return StringUtils.startsWithAny(value, "顾客", "客户", "用户", "如果顾客", "如果客户", "如果用户",
+                "当顾客", "当客户", "遇到", "评论", "评价", "场景");
+    }
+
     private List<ParsedDocumentChunk> splitText(String text) {
         if (StringUtils.isBlank(text)) {
             throw new BusinessException("知识文档没有可解析文本");
@@ -448,9 +653,51 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             }
             start = Math.max(end - CHUNK_OVERLAP_CHARS, start + 1);
         }
-        return result.stream()
+        return filterMeaningfulChunks(result.stream()
                 .filter(chunk -> StringUtils.isNotBlank(chunk.getText()))
+                .collect(Collectors.toList()));
+    }
+
+    private List<ParsedDocumentChunk> filterMeaningfulChunks(List<ParsedDocumentChunk> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return List.of();
+        }
+        return chunks.stream()
+                .filter(chunk -> isMeaningfulKnowledgeText(chunk.getText()))
                 .collect(Collectors.toList());
+    }
+
+    private boolean isMeaningfulKnowledgeText(String text) {
+        String value = StringUtils.trimToEmpty(text);
+        if (StringUtils.length(value) < 8) {
+            return inferSentiment(value) != CommentReplySentimentEnum.UNKNOWN && StringUtils.length(value) >= 6;
+        }
+        String lower = StringUtils.lowerCase(value, Locale.ROOT);
+        if (StringUtils.containsAny(lower, "asdf", "undefined", "nan", "null null", "unknown unknown")) {
+            return false;
+        }
+        int hanCount = 0;
+        int letterCount = 0;
+        int digitCount = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (Character.UnicodeScript.of(ch) == Character.UnicodeScript.HAN) {
+                hanCount++;
+            } else if (Character.isLetter(ch)) {
+                letterCount++;
+            } else if (Character.isDigit(ch)) {
+                digitCount++;
+            }
+        }
+        if (hanCount >= 8) {
+            return true;
+        }
+        if (hanCount < 4 && letterCount + digitCount > hanCount * 3 + 12) {
+            return false;
+        }
+        return StringUtils.containsAny(value,
+                "顾客", "客户", "用户", "评论", "评价", "回复", "回答", "好评", "中评", "差评",
+                "配送", "包装", "口味", "味道", "漏送", "少送", "满意", "感谢", "抱歉", "门店");
     }
 
     private List<MtReplyKnowledgeChunk> buildChunks(MtReplyKnowledgeDocument document, List<ParsedDocumentChunk> rawChunks) {
@@ -495,9 +742,17 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         CommentReplySentimentEnum sentiment;
     }
 
+    @lombok.Value
+    private static class StructuredLine {
+
+        String key;
+        String value;
+    }
+
     private CommentReplySentimentEnum inferSentiment(String text) {
         String value = StringUtils.defaultString(text);
-        if (StringUtils.containsAny(value, "差评", "一星", "1星", "二星", "2星", "不好", "抱歉", "投诉")) {
+        if (StringUtils.containsAny(value, "差评", "一星", "1星", "二星", "2星", "不好", "抱歉", "投诉",
+                "少送", "漏送", "撒漏", "洒漏", "不满意", "道歉", "退款", "赔付")) {
             return CommentReplySentimentEnum.BAD;
         }
         if (StringUtils.containsAny(value, "中评", "三星", "3星", "一般", "还行")) {

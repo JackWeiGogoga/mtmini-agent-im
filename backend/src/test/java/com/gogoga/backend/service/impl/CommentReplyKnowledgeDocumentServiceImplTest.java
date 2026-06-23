@@ -143,6 +143,128 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
     }
 
     @Test
+    void parsesStructuredTxtQaBlocksIntoSeparateChunks() {
+        MtReplyKnowledgeDocument document = document("TXT", "qa.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/qa.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content(structuredQaText().getBytes(StandardCharsets.UTF_8))
+                        .fileName("qa.txt")
+                        .build());
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        assertEquals(2, chunks.size());
+        assertEquals("NEUTRAL", chunks.get(0).getSentiment());
+        assertEquals("BAD", chunks.get(1).getSentiment());
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(0).getChunkText().contains("标题：配送时间说明"));
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(1).getChunkText().contains("标题：包装破损处理"));
+    }
+
+    @Test
+    void parsesRepeatedCustomStructureIntoSeparateChunks() {
+        MtReplyKnowledgeDocument document = document("TXT", "custom.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/custom.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content(customStructuredText().getBytes(StandardCharsets.UTF_8))
+                        .fileName("custom.txt")
+                        .build());
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        assertEquals(2, chunks.size());
+        assertEquals("GOOD", chunks.get(0).getSentiment());
+        assertEquals("BAD", chunks.get(1).getSentiment());
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(0).getChunkText().contains("场景=味道被夸"));
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(1).getChunkText().contains("场景=漏送投诉"));
+    }
+
+    @Test
+    void parsesFreeTextParagraphsIntoSeparateChunks() {
+        MtReplyKnowledgeDocument document = document("TXT", "free.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/free.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content(freeTextParagraphs().getBytes(StandardCharsets.UTF_8))
+                        .fileName("free.txt")
+                        .build());
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        assertEquals(3, chunks.size());
+        assertEquals("GOOD", chunks.get(0).getSentiment());
+        assertEquals("NEUTRAL", chunks.get(1).getSentiment());
+        assertEquals("BAD", chunks.get(2).getSentiment());
+    }
+
+    @Test
+    void skipsMetaParagraphsAndSplitsMixedEmotionRuleLines() {
+        MtReplyKnowledgeDocument document = document("TXT", "mixed.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/mixed.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content(mixedEmotionText().getBytes(StandardCharsets.UTF_8))
+                        .fileName("mixed.txt")
+                        .build());
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        assertEquals(3, chunks.size());
+        assertEquals("GOOD", chunks.get(0).getSentiment());
+        assertEquals("NEUTRAL", chunks.get(1).getSentiment());
+        assertEquals("BAD", chunks.get(2).getSentiment());
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(0).getChunkText().startsWith("顾客说很好吃"));
+    }
+
+    @Test
+    void meaninglessTextFailsWithoutGeneratingChunks() {
+        MtReplyKnowledgeDocument document = document("TXT", "meaningless.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/meaningless.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content(meaninglessText().getBytes(StandardCharsets.UTF_8))
+                        .fileName("meaningless.txt")
+                        .build());
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        verify(knowledgeVectorStore, org.mockito.Mockito.never()).upsertChunks(any());
+        verify(mtReplyKnowledgeDocumentMapper).updateParseStatus(eq(7L), eq("FAILED"), eq("知识文档没有可用片段"), eq(0), any());
+    }
+
+    @Test
     void updatesChunkSentimentEnabledAndDeleteByCurrentShop() {
         CommentReplyKnowledgeChunkUpdateParam param = new CommentReplyKnowledgeChunkUpdateParam();
         param.setSentiment("BAD");
@@ -244,5 +366,67 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    private String structuredQaText() {
+        return """
+                标题：配送时间说明
+                评论类型：中评
+                问题：顾客问为什么配送这么慢，餐什么时候送到？
+                回答：亲，非常抱歉让您久等了。我们会继续优化出餐和配送衔接。
+
+                标题：包装破损处理
+                评论类型：差评
+                问题：顾客反馈包装破了，汤洒了。
+                回答：亲，非常抱歉给您带来不好的体验。我们会立即检查包装流程。
+                """;
+    }
+
+    private String customStructuredText() {
+        return """
+                场景=味道被夸
+                星级=5星
+                顾客表达=很好吃，下次还来
+                处理建议=感谢认可，欢迎下次光临
+
+                场景=漏送投诉
+                星级=1星
+                顾客表达=少送了东西，非常不满意
+                处理建议=先道歉，再说明会核查并改进
+                """;
+    }
+
+    private String freeTextParagraphs() {
+        return """
+                如果顾客夸味道好、分量足、送得快，可以表达感谢，并邀请下次继续光临。
+
+                如果顾客说包装一般，但是整体还可以，可以先感谢反馈，再说明我们会改进包装细节。
+
+                如果顾客明确表示菜品少送、漏送、撒漏、口味严重不满意，要先道歉，再说明会反馈门店核查和优化。
+                """;
+    }
+
+    private String mixedEmotionText() {
+        return """
+                这份文档故意把好评、中评、差评混在一段里，用来测试情绪识别是否容易偏向差评。
+
+                顾客说很好吃、五星好评、非常喜欢。
+                顾客又说配送慢、包装一般、三星中评。
+                顾客还说漏送、差评、一星、非常抱歉、投诉。
+
+                如果系统只能生成一个片段，这段大概率会被识别成差评；如果拆分更细，应该分别进入不同情绪。
+                """;
+    }
+
+    private String meaninglessText() {
+        return """
+                asdfasdfasdf
+                123123123123
+                ！！！！！！！！！！！
+                、、、、、、、、、、、
+                火星菜单 蓝色香蕉 门店量子波动
+                GOOD BAD NEUTRAL UNKNOWN UNKNOWN
+                null null undefined NaN
+                """;
     }
 }
