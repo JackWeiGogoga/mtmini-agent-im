@@ -117,6 +117,32 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
     }
 
     @Test
+    void parsesSentimentTemplateXlsxIntoColumnChunks() throws Exception {
+        MtReplyKnowledgeDocument document = document("XLSX", "template.xlsx");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/template.xlsx"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder().content(sentimentTemplateXlsxBytes()).fileName("template.xlsx").build());
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        ArgumentCaptor<List<MtReplyKnowledgeChunk>> chunksCaptor = ArgumentCaptor.forClass(List.class);
+        verify(knowledgeVectorStore).upsertChunks(chunksCaptor.capture());
+        List<MtReplyKnowledgeChunk> chunks = chunksCaptor.getValue();
+        assertEquals(9, chunks.size());
+        assertEquals("GOOD", chunks.get(0).getSentiment());
+        assertEquals("NEUTRAL", chunks.get(1).getSentiment());
+        assertEquals("BAD", chunks.get(2).getSentiment());
+        assertEquals("GOOD", chunks.get(3).getSentiment());
+        assertEquals("NEUTRAL", chunks.get(4).getSentiment());
+        assertEquals("BAD", chunks.get(5).getSentiment());
+        org.junit.jupiter.api.Assertions.assertTrue(chunks.get(0).getChunkText().startsWith("好评回复（四星五星）："));
+    }
+
+    @Test
     void updatesChunkSentimentEnabledAndDeleteByCurrentShop() {
         CommentReplyKnowledgeChunkUpdateParam param = new CommentReplyKnowledgeChunkUpdateParam();
         param.setSentiment("BAD");
@@ -196,6 +222,25 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
             var row = sheet.createRow(1);
             row.createCell(0).setCellValue("差评 投诉不好");
             row.createCell(1).setCellValue("抱歉改进");
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    private byte[] sentimentTemplateXlsxBytes() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("评价回复-新颖");
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("好评回复（四星五星）");
+            header.createCell(1).setCellValue("中评回复三星");
+            header.createCell(2).setCellValue("差评回复一星二星");
+            for (int i = 1; i <= 3; i++) {
+                var row = sheet.createRow(i);
+                row.createCell(0).setCellValue("好评文案" + i);
+                row.createCell(1).setCellValue("中评文案" + i);
+                row.createCell(2).setCellValue("差评文案" + i);
+            }
             workbook.write(output);
             return output.toByteArray();
         }

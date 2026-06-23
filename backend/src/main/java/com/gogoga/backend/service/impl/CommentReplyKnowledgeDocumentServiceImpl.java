@@ -25,6 +25,7 @@ import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -171,7 +172,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         mtReplyKnowledgeDocumentMapper.updateParseStatus(document.getId(), CommentReplyDocumentParseStatusEnum.PARSING.name(), null, 0, now);
         try {
             byte[] content = cosStorageService.loadObject(document.getObjectKey()).getContent();
-            List<String> rawChunks = extractChunks(document.getFileType(), content);
+            List<ParsedDocumentChunk> rawChunks = extractChunks(document.getFileType(), content);
             List<MtReplyKnowledgeChunk> chunks = buildChunks(document, rawChunks);
             knowledgeVectorStore.deleteBySource(CommentReplyKnowledgeSourceTypeEnum.DOCUMENT.name(), document.getId());
             knowledgeVectorStore.upsertChunks(chunks);
@@ -249,13 +250,16 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         return document;
     }
 
-    private List<String> extractChunks(String fileType, byte[] content) throws Exception {
+    private List<ParsedDocumentChunk> extractChunks(String fileType, byte[] content) throws Exception {
         String text = switch (StringUtils.defaultString(fileType)) {
             case "TXT" -> new String(content, StandardCharsets.UTF_8);
             case "DOCX" -> extractDocxText(content);
-            case "XLSX" -> extractXlsxText(content);
+            case "XLSX" -> null;
             default -> throw new BusinessException("不支持的知识文档格式");
         };
+        if (StringUtils.equals(fileType, "XLSX")) {
+            return extractXlsxChunks(content);
+        }
         return splitText(cleanText(text));
     }
 
@@ -276,7 +280,57 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         }
     }
 
-    private String extractXlsxText(byte[] content) throws Exception {
+    private List<ParsedDocumentChunk> extractXlsxChunks(byte[] content) throws Exception {
+        List<ParsedDocumentChunk> sentimentChunks = extractSentimentTemplateXlsxChunks(content);
+        if (!sentimentChunks.isEmpty()) {
+            return sentimentChunks;
+        }
+        return splitText(cleanText(extractGenericXlsxText(content)));
+    }
+
+    private List<ParsedDocumentChunk> extractSentimentTemplateXlsxChunks(byte[] content) throws Exception {
+        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        int maxChunks = Math.max(1, knowledge.getMaxChunksPerDocument());
+        DataFormatter formatter = new DataFormatter();
+        List<ParsedDocumentChunk> chunks = new ArrayList<>();
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+            for (Sheet sheet : workbook) {
+                List<String> headers = null;
+                CommentReplySentimentEnum[] sentimentByColumn = null;
+                for (Row row : sheet) {
+                    List<String> cells = readRowCells(row, formatter);
+                    if (cells.isEmpty()) {
+                        continue;
+                    }
+                    if (headers == null) {
+                        headers = cells;
+                        sentimentByColumn = resolveSentimentColumns(headers);
+                        if (!hasAnySentimentColumn(sentimentByColumn)) {
+                            break;
+                        }
+                        continue;
+                    }
+                    for (int i = 0; i < cells.size() && i < sentimentByColumn.length; i++) {
+                        CommentReplySentimentEnum sentiment = sentimentByColumn[i];
+                        String value = StringUtils.trimToEmpty(cells.get(i));
+                        if (sentiment == null || StringUtils.isBlank(value)) {
+                            continue;
+                        }
+                        String header = i < headers.size() ? headers.get(i) : sentiment.name();
+                        String text = StringUtils.defaultIfBlank(header, sentiment.name()) + "：" + value;
+                        chunks.add(new ParsedDocumentChunk(cleanText(text), sentiment));
+                        if (chunks.size() >= maxChunks) {
+                            return chunks;
+                        }
+                    }
+                }
+            }
+        }
+        return chunks;
+    }
+
+    private String extractGenericXlsxText(byte[] content) throws Exception {
+        DataFormatter formatter = new DataFormatter();
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
             List<String> lines = new ArrayList<>();
             for (Sheet sheet : workbook) {
@@ -284,10 +338,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
                 List<String> headers = null;
                 boolean structured = false;
                 for (Row row : sheet) {
-                    List<String> cells = new ArrayList<>();
-                    for (Cell cell : row) {
-                        addIfNotBlank(cells, cell.toString());
-                    }
+                    List<String> cells = readRowCells(row, formatter);
                     if (cells.isEmpty()) {
                         continue;
                     }
@@ -306,6 +357,52 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             }
             return String.join("\n", lines);
         }
+    }
+
+    private List<String> readRowCells(Row row, DataFormatter formatter) {
+        List<String> cells = new ArrayList<>();
+        if (row == null) {
+            return cells;
+        }
+        short lastCellNum = row.getLastCellNum();
+        if (lastCellNum < 0) {
+            return cells;
+        }
+        for (int i = 0; i < lastCellNum; i++) {
+            Cell cell = row.getCell(i);
+            cells.add(cell == null ? "" : StringUtils.trimToEmpty(formatter.formatCellValue(cell)));
+        }
+        while (!cells.isEmpty() && StringUtils.isBlank(cells.get(cells.size() - 1))) {
+            cells.remove(cells.size() - 1);
+        }
+        return cells;
+    }
+
+    private CommentReplySentimentEnum[] resolveSentimentColumns(List<String> headers) {
+        CommentReplySentimentEnum[] result = new CommentReplySentimentEnum[headers.size()];
+        for (int i = 0; i < headers.size(); i++) {
+            String header = StringUtils.defaultString(headers.get(i));
+            if (StringUtils.containsAny(header, "好评", "四星", "五星", "4星", "5星")) {
+                result[i] = CommentReplySentimentEnum.GOOD;
+            } else if (StringUtils.containsAny(header, "中评", "三星", "3星")) {
+                result[i] = CommentReplySentimentEnum.NEUTRAL;
+            } else if (StringUtils.containsAny(header, "差评", "一星", "二星", "1星", "2星")) {
+                result[i] = CommentReplySentimentEnum.BAD;
+            }
+        }
+        return result;
+    }
+
+    private boolean hasAnySentimentColumn(CommentReplySentimentEnum[] sentimentByColumn) {
+        if (sentimentByColumn == null) {
+            return false;
+        }
+        for (CommentReplySentimentEnum sentiment : sentimentByColumn) {
+            if (sentiment != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasKnowledgeHeaders(List<String> headers) {
@@ -336,32 +433,35 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
                 .trim();
     }
 
-    private List<String> splitText(String text) {
+    private List<ParsedDocumentChunk> splitText(String text) {
         if (StringUtils.isBlank(text)) {
             throw new BusinessException("知识文档没有可解析文本");
         }
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
-        List<String> result = new ArrayList<>();
+        List<ParsedDocumentChunk> result = new ArrayList<>();
         int start = 0;
         while (start < text.length() && result.size() < knowledge.getMaxChunksPerDocument()) {
             int end = Math.min(start + TARGET_CHUNK_CHARS, text.length());
-            result.add(text.substring(start, end).trim());
+            result.add(new ParsedDocumentChunk(text.substring(start, end).trim(), null));
             if (end >= text.length()) {
                 break;
             }
             start = Math.max(end - CHUNK_OVERLAP_CHARS, start + 1);
         }
-        return result.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        return result.stream()
+                .filter(chunk -> StringUtils.isNotBlank(chunk.getText()))
+                .collect(Collectors.toList());
     }
 
-    private List<MtReplyKnowledgeChunk> buildChunks(MtReplyKnowledgeDocument document, List<String> rawChunks) {
+    private List<MtReplyKnowledgeChunk> buildChunks(MtReplyKnowledgeDocument document, List<ParsedDocumentChunk> rawChunks) {
         if (rawChunks == null || rawChunks.isEmpty()) {
             throw new BusinessException("知识文档没有可用片段");
         }
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
         LocalDateTime now = LocalDateTime.now();
         List<MtReplyKnowledgeChunk> chunks = new ArrayList<>();
-        for (String text : rawChunks) {
+        for (ParsedDocumentChunk rawChunk : rawChunks) {
+            String text = rawChunk.getText();
             float[] embedding = commentReplyEmbeddingService.embed(text);
             MtReplyKnowledgeChunk chunk = new MtReplyKnowledgeChunk();
             chunk.setShopId(document.getShopId());
@@ -369,7 +469,10 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             chunk.setSourceId(document.getId());
             chunk.setDocumentId(document.getId());
             chunk.setItemId(null);
-            chunk.setSentiment(inferSentiment(text).name());
+            CommentReplySentimentEnum sentiment = rawChunk.getSentiment() == null
+                    ? inferSentiment(text)
+                    : rawChunk.getSentiment();
+            chunk.setSentiment(sentiment.name());
             chunk.setChunkText(text);
             chunk.setEmbeddingProvider(knowledge.getEmbeddingProvider());
             chunk.setEmbeddingModel(knowledge.getEmbeddingModel());
@@ -383,6 +486,13 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             chunks.add(chunk);
         }
         return chunks;
+    }
+
+    @lombok.Value
+    private static class ParsedDocumentChunk {
+
+        String text;
+        CommentReplySentimentEnum sentiment;
     }
 
     private CommentReplySentimentEnum inferSentiment(String text) {
