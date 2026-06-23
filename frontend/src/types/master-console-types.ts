@@ -67,3 +67,18 @@ export interface ShopOperationSettingsUpdateParam {
   autoReplyEnabled: boolean;
   negativeCommentAppealEnabled: boolean;
 }
+
+export interface CommentReplyLogRecord {
+  id: number;
+  commentId?: number;
+  commentTime?: string;
+  replyTime?: string;
+  sentiment?: "GOOD" | "NEUTRAL" | "BAD" | string;
+  score?: number;
+  customerMessage?: string;
+  addComment?: string;
+  imageUrls?: string[];
+  aiReplyText?: string;
+  analysisText?: string;
+  autoReplyStatus?: string;
+}

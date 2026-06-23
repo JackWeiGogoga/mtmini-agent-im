@@ -8,6 +8,7 @@ import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.service.AdminMasterConsoleService;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.MtH5CommentReplyLogVO;
 import com.gogoga.backend.vo.ResultVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
@@ -95,5 +96,20 @@ public class AdminMasterConsoleController {
             @PathVariable Long shopId,
             @Valid @RequestBody ShopOperationSettingsUpdateParam param) {
         return ResultVO.success(adminMasterConsoleService.updateOperationSettings(shopId, param));
+    }
+
+    @GetMapping("/comment-reply-logs")
+    @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
+    public ResultVO<PageInfo<MtH5CommentReplyLogVO>> listCommentReplyLogs(
+            @RequestParam Long shopId,
+            @RequestParam(required = false) String bindingDomain,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ResultVO.success(adminMasterConsoleService.listCommentReplyLogs(
+                shopId,
+                bindingDomain,
+                pageNum,
+                pageSize
+        ));
     }
 }

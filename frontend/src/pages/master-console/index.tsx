@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  Drawer,
   Form,
+  Image,
   Input,
   Select,
   Segmented,
@@ -15,7 +17,13 @@ import {
 import { createStyles } from "antd-style";
 import type { ColumnsType } from "antd/es/table";
 import type { SortOrder } from "antd/es/table/interface";
-import { DatabaseOutlined, DownloadOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
+import {
+  DatabaseOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
+  ShopOutlined,
+  UnorderedListOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
@@ -24,11 +32,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useResponsive } from "@/hooks";
 import {
   exportMasterConsoleShops,
+  getMasterConsoleCommentReplyLogs,
   getMasterConsoleShops,
   getMasterConsoleVisibleUsers,
   updateMasterConsoleShopOperationSettings,
 } from "@/services/master-console-api";
 import type {
+  CommentReplyLogRecord,
   DashboardStatsRange,
   MasterConsoleQueryParam,
   MasterConsoleShopRow,
@@ -92,6 +102,31 @@ const useMasterConsoleStyles = createStyles(() => ({
       alignItems: "center",
     },
   },
+  logDrawerHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    marginBottom: 16,
+  },
+  logShopMeta: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  logText: {
+    marginBottom: 0,
+    whiteSpace: "pre-wrap",
+  },
+  logImageStrip: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  logScore: {
+    color: "#c18a16",
+    whiteSpace: "nowrap",
+  },
 }));
 
 function formatDateTime(value?: string) {
@@ -151,6 +186,47 @@ function buildUserLabel(user?: VisibleUserOption) {
   return user.displayName || user.nickname || user.username || user.userId;
 }
 
+function normalizeSentiment(record: CommentReplyLogRecord) {
+  const sentiment = String(record.sentiment || "").toUpperCase();
+  if (sentiment === "GOOD" || sentiment === "BAD" || sentiment === "NEUTRAL") {
+    return sentiment;
+  }
+  const score = Number(record.score);
+  if (score >= 0 && score <= 2) {
+    return "BAD";
+  }
+  if (score >= 4 && score <= 5) {
+    return "GOOD";
+  }
+  return "NEUTRAL";
+}
+
+function renderSentimentTag(record: CommentReplyLogRecord) {
+  const sentiment = normalizeSentiment(record);
+  if (sentiment === "BAD") {
+    return <Tag color="red">差评</Tag>;
+  }
+  if (sentiment === "GOOD") {
+    return <Tag color="green">好评</Tag>;
+  }
+  return <Tag color="default">中评</Tag>;
+}
+
+function renderReplyStatus(status?: string) {
+  const normalizedStatus = String(status || "").toUpperCase();
+  const statusMap: Record<string, { color: string; text: string }> = {
+    SUCCESS: { color: "green", text: "已回复" },
+    PENDING: { color: "processing", text: "待处理" },
+    FAILED: { color: "red", text: "失败" },
+    SKIPPED: { color: "default", text: "已跳过" },
+  };
+  const config = statusMap[normalizedStatus] || {
+    color: "default",
+    text: status || "未知",
+  };
+  return <Tag color={config.color}>{config.text}</Tag>;
+}
+
 const MasterConsole: React.FC = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm<MasterConsoleQueryParam>();
@@ -169,6 +245,13 @@ const MasterConsole: React.FC = () => {
   const [visibleUsers, setVisibleUsers] = useState<VisibleUserOption[]>([]);
   const [userLoading, setUserLoading] = useState(false);
   const [operationSettingShopIds, setOperationSettingShopIds] = useState<number[]>([]);
+  const [logDrawerOpen, setLogDrawerOpen] = useState(false);
+  const [logShop, setLogShop] = useState<MasterConsoleShopRow | null>(null);
+  const [logRecords, setLogRecords] = useState<CommentReplyLogRecord[]>([]);
+  const [logTotal, setLogTotal] = useState(0);
+  const [logPageNum, setLogPageNum] = useState(1);
+  const [logPageSize, setLogPageSize] = useState(20);
+  const [logLoading, setLogLoading] = useState(false);
   const userSearchTimer = useRef<number | null>(null);
 
   const activeRange = useMemo(
@@ -322,6 +405,173 @@ const MasterConsole: React.FC = () => {
       }
     },
     [],
+  );
+
+  const loadCommentReplyLogs = useCallback(
+    async (
+      record: MasterConsoleShopRow,
+      nextPageNum = logPageNum,
+      nextPageSize = logPageSize,
+    ) => {
+      setLogLoading(true);
+      try {
+        const page = await getMasterConsoleCommentReplyLogs(
+          record.shopId,
+          record.bindingDomain,
+          nextPageNum,
+          nextPageSize,
+        );
+        setLogRecords(page.list || []);
+        setLogTotal(page.total || 0);
+        setLogPageNum(page.pageNum || nextPageNum);
+        setLogPageSize(page.pageSize || nextPageSize);
+      } catch (error) {
+        console.error("Failed to load comment reply logs:", error);
+        message.error("加载回复日志失败");
+      } finally {
+        setLogLoading(false);
+      }
+    },
+    [logPageNum, logPageSize],
+  );
+
+  const openLogDrawer = useCallback(
+    async (record: MasterConsoleShopRow) => {
+      setLogShop(record);
+      setLogDrawerOpen(true);
+      setLogPageNum(1);
+      setLogPageSize(20);
+      setLogRecords([]);
+      setLogTotal(0);
+      await loadCommentReplyLogs(record, 1, 20);
+    },
+    [loadCommentReplyLogs],
+  );
+
+  const closeLogDrawer = useCallback(() => {
+    setLogDrawerOpen(false);
+    setLogShop(null);
+    setLogRecords([]);
+    setLogTotal(0);
+    setLogPageNum(1);
+    setLogPageSize(20);
+  }, []);
+
+  const logColumns = useMemo<ColumnsType<CommentReplyLogRecord>>(
+    () => [
+      {
+        title: "时间",
+        key: "time",
+        width: 150,
+        render: (_, record) => (
+          <Space direction="vertical" size={2}>
+            <Text>{formatDateTime(record.replyTime || record.commentTime)}</Text>
+            <Text type="secondary">评价：{formatDateTime(record.commentTime)}</Text>
+          </Space>
+        ),
+      },
+      {
+        title: "评分",
+        key: "score",
+        width: 120,
+        render: (_, record) => {
+          const score = Number(record.score);
+          const scoreText =
+            Number.isFinite(score) && score >= 0 && score <= 5
+              ? `${"★".repeat(score)}${"☆".repeat(5 - score)}`
+              : "--星";
+          return (
+            <Space direction="vertical" size={4}>
+              {renderSentimentTag(record)}
+              <Text className={masterConsoleStyles.logScore}>{scoreText}</Text>
+            </Space>
+          );
+        },
+      },
+      {
+        title: "顾客消息",
+        key: "customerMessage",
+        width: 280,
+        render: (_, record) => (
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            <Typography.Paragraph
+              className={masterConsoleStyles.logText}
+              ellipsis={{ rows: 3, expandable: true }}
+            >
+              {record.customerMessage || "暂无顾客消息"}
+            </Typography.Paragraph>
+            {record.addComment ? (
+              <Typography.Paragraph
+                className={masterConsoleStyles.logText}
+                type="secondary"
+                ellipsis={{ rows: 2, expandable: true }}
+              >
+                追评：{record.addComment}
+              </Typography.Paragraph>
+            ) : null}
+          </Space>
+        ),
+      },
+      {
+        title: "图片",
+        dataIndex: "imageUrls",
+        key: "imageUrls",
+        width: 180,
+        render: (imageUrls?: string[]) =>
+          imageUrls?.length ? (
+            <Image.PreviewGroup>
+              <div className={masterConsoleStyles.logImageStrip}>
+                {imageUrls.slice(0, 6).map((url, index) => (
+                  <Image
+                    key={`${url}-${index}`}
+                    src={url}
+                    width={48}
+                    height={48}
+                    style={{ objectFit: "cover", borderRadius: 6 }}
+                  />
+                ))}
+              </div>
+            </Image.PreviewGroup>
+          ) : (
+            <Text type="secondary">无图片</Text>
+          ),
+      },
+      {
+        title: "AI 回复",
+        key: "aiReplyText",
+        width: 280,
+        render: (_, record) => (
+          <Space direction="vertical" size={6} style={{ width: "100%" }}>
+            {renderReplyStatus(record.autoReplyStatus)}
+            <Typography.Paragraph
+              className={masterConsoleStyles.logText}
+              ellipsis={{ rows: 3, expandable: true }}
+            >
+              {record.aiReplyText || "暂无 AI 回复"}
+            </Typography.Paragraph>
+          </Space>
+        ),
+      },
+      {
+        title: "AI 分析",
+        dataIndex: "analysisText",
+        key: "analysisText",
+        width: 220,
+        render: (value?: string) => (
+          <Typography.Paragraph
+            className={masterConsoleStyles.logText}
+            ellipsis={{ rows: 3, expandable: true }}
+          >
+            {value || "AI 分析结果"}
+          </Typography.Paragraph>
+        ),
+      },
+    ],
+    [
+      masterConsoleStyles.logImageStrip,
+      masterConsoleStyles.logScore,
+      masterConsoleStyles.logText,
+    ],
   );
 
   const columns = useMemo<ColumnsType<MasterConsoleShopRow>>(
@@ -498,16 +748,25 @@ const MasterConsole: React.FC = () => {
       {
         title: "操作",
         key: "actions",
-        width: 120,
+        width: 210,
         fixed: isCompact ? undefined : "right",
         render: (_, record) => (
-          <Button
-            type="link"
-            icon={<DatabaseOutlined />}
-            onClick={() => navigate(`/merchant-knowledge?shopId=${record.shopId}`)}
-          >
-            知识库
-          </Button>
+          <Space size={4}>
+            <Button
+              type="link"
+              icon={<UnorderedListOutlined />}
+              onClick={() => void openLogDrawer(record)}
+            >
+              回复日志
+            </Button>
+            <Button
+              type="link"
+              icon={<DatabaseOutlined />}
+              onClick={() => navigate(`/merchant-knowledge?shopId=${record.shopId}`)}
+            >
+              知识库
+            </Button>
+          </Space>
         ),
       },
     ],
@@ -516,6 +775,7 @@ const MasterConsole: React.FC = () => {
       handleOperationSettingsChange,
       isCompact,
       navigate,
+      openLogDrawer,
       operationSettingShopIds,
       query.sortField,
       query.sortOrder,
@@ -611,7 +871,7 @@ const MasterConsole: React.FC = () => {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1810 }}
+        scroll={{ x: 1900 }}
         pagination={{
           current: query.pageNum,
           pageSize: query.pageSize,
@@ -630,6 +890,56 @@ const MasterConsole: React.FC = () => {
           });
         }}
       />
+
+      <Drawer
+        title={logShop ? `${logShop.shopName || logShop.poiId || "门店"} 回复日志` : "回复日志"}
+        open={logDrawerOpen}
+        width={isCompact ? "100%" : 1040}
+        onClose={closeLogDrawer}
+        destroyOnHidden
+      >
+        <div className={masterConsoleStyles.logDrawerHeader}>
+          <div className={masterConsoleStyles.logShopMeta}>
+            <Text strong>{logShop?.shopName || "-"}</Text>
+            <Text type="secondary">门店ID：{logShop?.poiId || "-"}</Text>
+          </div>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={logLoading}
+            onClick={() => {
+              if (logShop) {
+                void loadCommentReplyLogs(logShop);
+              }
+            }}
+          >
+            刷新
+          </Button>
+        </div>
+
+        <Table<CommentReplyLogRecord>
+          rowKey={(record) => `${record.id || record.commentId}`}
+          loading={logLoading}
+          columns={logColumns}
+          dataSource={logRecords}
+          size={isCompact ? "small" : "middle"}
+          scroll={{ x: 1230 }}
+          pagination={{
+            current: logPageNum,
+            pageSize: logPageSize,
+            total: logTotal,
+            showSizeChanger: true,
+            showQuickJumper: !isCompact,
+            showTotal: (value) => `共 ${value} 条`,
+            onChange: (page, size) => {
+              if (!logShop) {
+                return;
+              }
+              void loadCommentReplyLogs(logShop, page, size);
+            },
+          }}
+          locale={{ emptyText: "暂无回复日志" }}
+        />
+      </Drawer>
     </PageContainer>
   );
 };

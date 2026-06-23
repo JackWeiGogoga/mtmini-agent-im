@@ -8,6 +8,7 @@ import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.MtH5CommentReplyLogVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.UserShopBindingVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
@@ -36,6 +37,7 @@ public class AdminMasterConsoleService {
     private final MtPowerAccountService mtPowerAccountService;
     private final ShopDashboardMetricsService shopDashboardMetricsService;
     private final ShopOperationSettingsService shopOperationSettingsService;
+    private final MtH5CommentReplyLogService mtH5CommentReplyLogService;
 
     public PageInfo<AdminMasterConsoleRowVO> listRows(String keyword,
                                                       String targetUserId,
@@ -106,6 +108,17 @@ public class AdminMasterConsoleService {
                 shopId,
                 param,
                 ShopOperationSettingsService.CHANGE_SOURCE_ADMIN
+        );
+    }
+
+    public PageInfo<MtH5CommentReplyLogVO> listCommentReplyLogs(Long shopId,
+                                                                String bindingDomain,
+                                                                Integer pageNum,
+                                                                Integer pageSize) {
+        return mtH5CommentReplyLogService.listLogs(
+                userShopBindingService.requireCurrentUserVisibleShop(shopId, bindingDomain),
+                pageNum,
+                pageSize
         );
     }
 
