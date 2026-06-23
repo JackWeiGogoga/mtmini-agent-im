@@ -4,6 +4,7 @@ import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
+import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentPreviewVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -13,6 +14,10 @@ public interface CommentReplyKnowledgeDocumentService {
     List<CommentReplyKnowledgeDocumentVO> listCurrentShopDocuments();
 
     List<CommentReplyKnowledgeDocumentVO> listShopDocuments(Long shopId);
+
+    CommentReplyKnowledgeDocumentPreviewVO previewCurrentShopDocument(MultipartFile file);
+
+    CommentReplyKnowledgeDocumentPreviewVO previewShopDocument(Long shopId, MultipartFile file);
 
     CommentReplyKnowledgeDocumentVO uploadCurrentShopDocument(MultipartFile file);
 

@@ -22,6 +22,7 @@ import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
+import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentPreviewVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -55,6 +56,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     private static final String STORAGE_PROVIDER_COS = "TENCENT_COS";
     private static final int TARGET_CHUNK_CHARS = 800;
     private static final int CHUNK_OVERLAP_CHARS = 120;
+    private static final int PREVIEW_CHUNK_LIMIT = 20;
 
     private final MtH5ShopService mtH5ShopService;
     private final MtReplyKnowledgeDocumentMapper mtReplyKnowledgeDocumentMapper;
@@ -77,6 +79,28 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         return mtReplyKnowledgeDocumentMapper.selectByShopId(shopId).stream()
                 .map(this::toDocumentVO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public CommentReplyKnowledgeDocumentPreviewVO previewCurrentShopDocument(MultipartFile file) {
+        MtShop shop = mtH5ShopService.getCurrentShop();
+        return previewShopDocument(shop.getId(), file);
+    }
+
+    @Override
+    public CommentReplyKnowledgeDocumentPreviewVO previewShopDocument(Long shopId, MultipartFile file) {
+        requireShopId(shopId);
+        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        validateUpload(file, shopId, knowledge);
+        String fileType = resolveFileType(file);
+        try {
+            List<ParsedDocumentChunk> rawChunks = extractChunks(fileType, file.getBytes());
+            return buildPreview(file, fileType, rawChunks);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("知识文档解析预览失败：" + StringUtils.defaultIfBlank(e.getMessage(), "UNKNOWN_ERROR"));
+        }
     }
 
     @Override
@@ -786,6 +810,32 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             chunks.add(chunk);
         }
         return chunks;
+    }
+
+    private CommentReplyKnowledgeDocumentPreviewVO buildPreview(MultipartFile file, String fileType, List<ParsedDocumentChunk> rawChunks) {
+        if (rawChunks == null || rawChunks.isEmpty()) {
+            throw new BusinessException("知识文档没有可用片段");
+        }
+        CommentReplyKnowledgeDocumentPreviewVO preview = new CommentReplyKnowledgeDocumentPreviewVO();
+        preview.setFileName(StringUtils.defaultIfBlank(file.getOriginalFilename(), "knowledge." + StringUtils.lowerCase(fileType, Locale.ROOT)));
+        preview.setFileType(fileType);
+        preview.setFileSize(file.getSize());
+        preview.setChunkCount(rawChunks.size());
+        List<CommentReplyKnowledgeDocumentPreviewVO.ChunkPreview> chunks = new ArrayList<>();
+        int previewSize = Math.min(rawChunks.size(), PREVIEW_CHUNK_LIMIT);
+        for (int i = 0; i < previewSize; i++) {
+            ParsedDocumentChunk rawChunk = rawChunks.get(i);
+            CommentReplySentimentEnum sentiment = rawChunk.getSentiment() == null
+                    ? inferSentiment(rawChunk.getText())
+                    : rawChunk.getSentiment();
+            CommentReplyKnowledgeDocumentPreviewVO.ChunkPreview chunk = new CommentReplyKnowledgeDocumentPreviewVO.ChunkPreview();
+            chunk.setIndex(i + 1);
+            chunk.setSentiment(sentiment.name());
+            chunk.setChunkText(rawChunk.getText());
+            chunks.add(chunk);
+        }
+        preview.setChunks(chunks);
+        return preview;
     }
 
     @lombok.Value

@@ -41,6 +41,7 @@ import {
   listMerchantReplyDocumentChunks,
   listMerchantReplyDocuments,
   listMerchantReplyQa,
+  previewMerchantReplyDocument,
   updateMerchantReplyChunkEnabled,
   updateMerchantReplyChunkSentiment,
   updateMerchantReplyQa,
@@ -49,6 +50,7 @@ import {
 import type {
   CommentReplyKnowledgeChunk,
   CommentReplyKnowledgeDocument,
+  CommentReplyKnowledgeDocumentPreview,
   CommentReplyKnowledgeItem,
   CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
@@ -121,6 +123,10 @@ export default function MerchantKnowledgeManage() {
   const [qaItems, setQaItems] = useState<CommentReplyKnowledgeItem[]>([]);
   const [documents, setDocuments] = useState<CommentReplyKnowledgeDocument[]>([]);
   const [qaModalOpen, setQaModalOpen] = useState(false);
+  const [uploadPreviewOpen, setUploadPreviewOpen] = useState(false);
+  const [previewingUpload, setPreviewingUpload] = useState(false);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<CommentReplyKnowledgeDocumentPreview | null>(null);
   const [editingQa, setEditingQa] = useState<CommentReplyKnowledgeItem | null>(null);
   const [savingQa, setSavingQa] = useState(false);
   const [chunkDrawerOpen, setChunkDrawerOpen] = useState(false);
@@ -141,6 +147,15 @@ export default function MerchantKnowledgeManage() {
     const chunkCount = documents.reduce((sum, item) => sum + (item.chunkCount || 0), 0);
     return { enabledQaCount, successDocumentCount, failedDocumentCount, chunkCount };
   }, [documents, qaItems]);
+
+  const uploadPreviewSummary = useMemo(() => {
+    const total = uploadPreview?.chunkCount || 0;
+    const shown = uploadPreview?.chunks?.length || 0;
+    if (total > shown && shown > 0) {
+      return `共 ${total} 个片段，仅展示前 ${shown} 个`;
+    }
+    return `共 ${total} 个片段`;
+  }, [uploadPreview]);
 
   const fetchShops = useCallback(
     async (keyword?: string) => {
@@ -257,10 +272,32 @@ export default function MerchantKnowledgeManage() {
       message.error("仅支持 txt、docx、xlsx 文件");
       return false;
     }
+    setPendingUploadFile(file);
+    setUploadPreview(null);
+    setUploadPreviewOpen(true);
+    setPreviewingUpload(true);
+    try {
+      setUploadPreview(await previewMerchantReplyDocument(selectedShopId, file));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "解析预览失败");
+    } finally {
+      setPreviewingUpload(false);
+    }
+    return false;
+  };
+
+  const confirmPreviewUpload = async () => {
+    if (!selectedShopId || !pendingUploadFile || !uploadPreview?.chunks?.length) {
+      message.warning("请先完成解析预览");
+      return;
+    }
     setUploading(true);
     try {
-      const uploaded = await uploadMerchantReplyDocument(selectedShopId, file);
+      const uploaded = await uploadMerchantReplyDocument(selectedShopId, pendingUploadFile);
       message.success("上传成功，正在解析");
+      setUploadPreviewOpen(false);
+      setPendingUploadFile(null);
+      setUploadPreview(null);
       await loadKnowledge();
       void pollDocumentParse(uploaded.id);
     } catch (error) {
@@ -268,7 +305,6 @@ export default function MerchantKnowledgeManage() {
     } finally {
       setUploading(false);
     }
-    return false;
   };
 
   const pollDocumentParse = async (documentId: number) => {
@@ -666,6 +702,57 @@ export default function MerchantKnowledgeManage() {
             <Switch />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="解析预览"
+        open={uploadPreviewOpen}
+        onCancel={() => {
+          if (!uploading) {
+            setUploadPreviewOpen(false);
+            setPendingUploadFile(null);
+            setUploadPreview(null);
+          }
+        }}
+        onOk={() => void confirmPreviewUpload()}
+        okText="确认上传"
+        okButtonProps={{ disabled: previewingUpload || !uploadPreview?.chunks?.length }}
+        confirmLoading={uploading}
+        width={760}
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <Descriptions size="small" column={3} bordered>
+            <Descriptions.Item label="文件名">{uploadPreview?.fileName || pendingUploadFile?.name || "-"}</Descriptions.Item>
+            <Descriptions.Item label="格式">{uploadPreview?.fileType || "-"}</Descriptions.Item>
+            <Descriptions.Item label="大小">{formatFileSize(uploadPreview?.fileSize || pendingUploadFile?.size)}</Descriptions.Item>
+            <Descriptions.Item label="片段数">{uploadPreviewSummary}</Descriptions.Item>
+          </Descriptions>
+          <Table
+            rowKey="index"
+            loading={previewingUpload}
+            columns={[
+              {
+                title: "片段",
+                dataIndex: "index",
+                width: 80,
+              },
+              {
+                title: "类型",
+                dataIndex: "sentiment",
+                width: 100,
+                render: (value: string) => <Tag>{sentimentText[value] || value}</Tag>,
+              },
+              {
+                title: "内容",
+                dataIndex: "chunkText",
+                render: (value: string) => <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>,
+              },
+            ]}
+            dataSource={uploadPreview?.chunks || []}
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+          />
+        </Space>
       </Modal>
 
       <Drawer

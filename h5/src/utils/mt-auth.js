@@ -108,10 +108,18 @@ export function deleteCommentReplyChunk(chunkId) {
 }
 
 export function uploadCommentReplyDocument(filePath, name = 'file') {
+  return uploadCommentReplyKnowledgeFile('/api/h5/comment-reply-knowledge/documents/upload', filePath, name, '上传失败')
+}
+
+export function previewCommentReplyDocument(filePath, name = 'file') {
+  return uploadCommentReplyKnowledgeFile('/api/h5/comment-reply-knowledge/documents/preview', filePath, name, '解析预览失败')
+}
+
+function uploadCommentReplyKnowledgeFile(url, filePath, name, defaultErrorMessage) {
   const token = getToken()
   return new Promise((resolve, reject) => {
     uni.uploadFile({
-      url: '/api/h5/comment-reply-knowledge/documents/upload',
+      url,
       filePath,
       name,
       header: token ? { Authorization: `Bearer ${token}` } : {},
@@ -126,12 +134,12 @@ export function uploadCommentReplyDocument(filePath, name = 'file') {
           }
         }
         if (response.statusCode !== 200 || body?.code !== 200) {
-          reject(new Error(body?.msg || '上传失败'))
+          reject(new Error(body?.msg || defaultErrorMessage))
           return
         }
         resolve(body.data)
       },
-      fail: (error) => reject(new Error(error?.errMsg || '上传失败')),
+      fail: (error) => reject(new Error(error?.errMsg || defaultErrorMessage)),
     })
   })
 }

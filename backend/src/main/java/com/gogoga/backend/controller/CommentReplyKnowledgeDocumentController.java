@@ -7,6 +7,7 @@ import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
+import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentPreviewVO;
 import com.gogoga.backend.vo.ResultVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,11 @@ public class CommentReplyKnowledgeDocumentController {
     @PostMapping("/upload")
     public ResultVO<CommentReplyKnowledgeDocumentVO> uploadDocument(@RequestParam("file") MultipartFile file) {
         return ResultVO.success(commentReplyKnowledgeDocumentService.uploadCurrentShopDocument(file));
+    }
+
+    @PostMapping("/preview")
+    public ResultVO<CommentReplyKnowledgeDocumentPreviewVO> previewDocument(@RequestParam("file") MultipartFile file) {
+        return ResultVO.success(commentReplyKnowledgeDocumentService.previewCurrentShopDocument(file));
     }
 
     @DeleteMapping("/{id}")

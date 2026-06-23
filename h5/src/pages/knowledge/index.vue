@@ -92,6 +92,55 @@
       </view>
     </view>
 
+    <view v-if="uploadPreviewVisible" class="modal-mask doc-detail-mask" @tap="closeUploadPreview">
+      <view class="upload-preview-modal" @tap.stop>
+        <view class="doc-detail-head">
+          <view class="doc-detail-title-wrap">
+            <text class="doc-detail-title">解析预览</text>
+            <text class="doc-detail-subtitle">确认片段无误后再上传学习</text>
+          </view>
+          <text class="doc-detail-close" @tap="closeUploadPreview">×</text>
+        </view>
+
+        <view v-if="pendingUploadFile" class="preview-summary">
+          <view class="preview-summary-row">
+            <text class="preview-label">文件名</text>
+            <text class="preview-value">{{ pendingUploadFile.name }}</text>
+          </view>
+          <view class="preview-summary-row">
+            <text class="preview-label">格式</text>
+            <text class="preview-value">{{ pendingUploadFile.type }}</text>
+          </view>
+          <view class="preview-summary-row">
+            <text class="preview-label">大小</text>
+            <text class="preview-value">{{ formatFileSize(pendingUploadFile.size) }}</text>
+          </view>
+        </view>
+
+        <view class="preview-content">
+          <view class="chunk-toolbar">
+            <text class="preview-title">{{ uploadPreviewSummaryText }}</text>
+            <text v-if="previewingUpload" class="status-text">解析中...</text>
+          </view>
+          <scroll-view v-if="uploadPreviewChunks.length > 0" class="preview-chunk-list" scroll-y>
+            <view v-for="chunk in uploadPreviewChunks" :key="chunk.index" class="preview-chunk-card">
+              <view class="chunk-head">
+                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
+                <text class="chunk-enabled">片段 {{ chunk.index }}</text>
+              </view>
+              <text class="chunk-text">{{ chunk.chunkText }}</text>
+            </view>
+          </scroll-view>
+          <view v-else class="preview-box muted">{{ pendingPreviewHint }}</view>
+        </view>
+
+        <view class="doc-detail-actions">
+          <button class="close-doc-btn" :loading="uploading" :disabled="previewingUpload || uploadPreviewChunks.length === 0" @tap="confirmUploadDocument">确认上传</button>
+          <button class="delete-doc-btn" @tap="closeUploadPreview">取消</button>
+        </view>
+      </view>
+    </view>
+
     <view v-if="uploadLogsVisible" class="modal-mask doc-detail-mask" @tap="closeUploadLogs">
       <view class="upload-log-modal" @tap.stop>
         <view class="doc-detail-head">
@@ -197,6 +246,7 @@ import {
   getCommentReplyDocumentChunks,
   getCommentReplyDocuments,
   getCommentReplyQaItems,
+  previewCommentReplyDocument,
   updateCommentReplyChunkEnabled,
   updateCommentReplyChunkSentiment,
   updateCommentReplyQaItem,
@@ -214,11 +264,16 @@ const documents = ref([])
 const uploading = ref(false)
 const savingQa = ref(false)
 const qaFormVisible = ref(false)
+const uploadPreviewVisible = ref(false)
 const uploadLogsVisible = ref(false)
 const docDetailVisible = ref(false)
 const selectedDocument = ref(null)
 const documentChunks = ref([])
 const loadingChunks = ref(false)
+const previewingUpload = ref(false)
+const pendingUploadFile = ref(null)
+const uploadPreviewResult = ref(null)
+const pendingPreviewHint = ref('')
 const editingQaId = ref(null)
 const expandedQaId = ref(null)
 const sentimentIndex = ref(0)
@@ -244,6 +299,15 @@ const knowledgeRows = computed(() => {
 
 const failedDocumentCount = computed(() => {
   return documents.value.filter((doc) => doc.parseStatus === 'FAILED').length
+})
+
+const uploadPreviewSummaryText = computed(() => {
+  const total = uploadPreviewResult.value?.chunkCount || 0
+  const shown = uploadPreviewChunks.value.length
+  if (total > shown && shown > 0) {
+    return `将生成 ${total} 个知识片段，仅展示前 ${shown} 个`
+  }
+  return `将生成 ${total} 个知识片段`
 })
 
 onMounted(() => {
@@ -272,20 +336,92 @@ function chooseDocument() {
       if (!file?.path) {
         return
       }
-      uploading.value = true
-      try {
-        const uploaded = await uploadCommentReplyDocument(file.path)
-        uni.showToast({ title: '上传成功，解析中', icon: 'none' })
-        await refresh()
-        await pollDocumentParse(uploaded?.id)
-      } catch (error) {
-        uni.showToast({ title: error.message || '上传失败', icon: 'none' })
-      } finally {
-        uploading.value = false
-      }
+      await openUploadPreview(file)
     },
   })
 }
+
+async function openUploadPreview(file) {
+  pendingUploadFile.value = normalizeUploadFile(file)
+  uploadPreviewResult.value = null
+  pendingPreviewHint.value = '正在解析文档，请稍候...'
+  uploadPreviewVisible.value = true
+  previewingUpload.value = true
+  try {
+    uploadPreviewResult.value = await previewCommentReplyDocument(file.path)
+    pendingPreviewHint.value = uploadPreviewChunks.value.length > 0
+      ? ''
+      : '没有解析出可用知识片段，建议取消上传并调整文档内容。'
+  } catch (error) {
+    pendingPreviewHint.value = error.message || '解析预览失败，请调整文档后重试。'
+  } finally {
+    previewingUpload.value = false
+  }
+}
+
+function closeUploadPreview() {
+  if (uploading.value) {
+    return
+  }
+  resetUploadPreview()
+}
+
+async function confirmUploadDocument() {
+  if (!pendingUploadFile.value?.path) {
+    uni.showToast({ title: '请先选择文档', icon: 'none' })
+    return
+  }
+  if (uploadPreviewChunks.value.length === 0) {
+    uni.showToast({ title: '请先完成解析预览', icon: 'none' })
+    return
+  }
+  uploading.value = true
+  try {
+    const uploaded = await uploadCommentReplyDocument(pendingUploadFile.value.path)
+    resetUploadPreview()
+    uni.showToast({ title: '上传成功，解析中', icon: 'none' })
+    await refresh()
+    await pollDocumentParse(uploaded?.id)
+  } catch (error) {
+    uni.showToast({ title: error.message || '上传失败', icon: 'none' })
+  } finally {
+    uploading.value = false
+  }
+}
+
+function normalizeUploadFile(file) {
+  const name = file.name || file.path?.split('/').pop() || 'knowledge'
+  return {
+    name,
+    path: file.path,
+    size: file.size || 0,
+    type: resolveUploadFileType(name),
+  }
+}
+
+function resetUploadPreview() {
+  uploadPreviewVisible.value = false
+  pendingUploadFile.value = null
+  uploadPreviewResult.value = null
+  pendingPreviewHint.value = ''
+  previewingUpload.value = false
+}
+
+function resolveUploadFileType(name) {
+  const lower = String(name || '').toLowerCase()
+  if (lower.endsWith('.txt')) {
+    return 'TXT'
+  }
+  if (lower.endsWith('.docx')) {
+    return 'WORD'
+  }
+  if (lower.endsWith('.xlsx')) {
+    return 'EXCEL'
+  }
+  return '文档'
+}
+
+const uploadPreviewChunks = computed(() => uploadPreviewResult.value?.chunks || [])
 
 function confirmRemoveDocument(doc) {
   if (!doc?.id) {
@@ -589,6 +725,17 @@ function documentStatusTextClass(value) {
 function shortFileName(value) {
   const name = value || '文档'
   return name.length > 9 ? `${name.slice(0, 6)}...` : name
+}
+
+function formatFileSize(value) {
+  const size = Number(value || 0)
+  if (size <= 0) {
+    return '-'
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)}KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(1)}MB`
 }
 </script>
 
@@ -1082,6 +1229,16 @@ function shortFileName(value) {
   box-sizing: border-box;
 }
 
+.upload-preview-modal {
+  width: 100%;
+  max-width: 351px;
+  max-height: 78vh;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
 .doc-detail-head,
 .doc-summary,
 .summary-item,
@@ -1282,6 +1439,80 @@ function shortFileName(value) {
   color: #111111;
   background: linear-gradient(180deg, #f5cd59 0%, #e6b72e 100%);
   font-weight: 700;
+}
+
+.preview-summary {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f6f7fb;
+}
+
+.preview-summary-row {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.preview-label {
+  width: 48px;
+  flex-shrink: 0;
+  color: #888888;
+  font-size: 12px;
+}
+
+.preview-value {
+  flex: 1;
+  min-width: 0;
+  color: #111111;
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.preview-content {
+  margin-top: 14px;
+}
+
+.preview-title {
+  display: block;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.preview-box {
+  max-height: 210px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #eeeeee;
+  border-radius: 10px;
+  background: #fbfbfb;
+  color: #111111;
+  font-size: 12px;
+  line-height: 18px;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+}
+
+.preview-box.muted {
+  color: #888888;
+  text-align: center;
+}
+
+.preview-chunk-list {
+  max-height: 260px;
+  margin-top: 8px;
+}
+
+.preview-chunk-card {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.preview-chunk-card:last-child {
+  border-bottom: 0;
 }
 
 .upload-log-list {

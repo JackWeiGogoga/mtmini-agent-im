@@ -40,6 +40,20 @@ export interface CommentReplyKnowledgeChunk {
   updateTime?: string;
 }
 
+export interface CommentReplyKnowledgeDocumentPreviewChunk {
+  index: number;
+  sentiment: CommentReplySentiment;
+  chunkText: string;
+}
+
+export interface CommentReplyKnowledgeDocumentPreview {
+  fileName: string;
+  fileType: string;
+  fileSize?: number;
+  chunkCount: number;
+  chunks: CommentReplyKnowledgeDocumentPreviewChunk[];
+}
+
 export interface AdminCommentReplyOfficialKnowledgeParam {
   title: string;
   sentiment: Exclude<CommentReplySentiment, "UNKNOWN">;

@@ -9,6 +9,7 @@ import com.gogoga.backend.service.CommentReplyKnowledgeService;
 import com.gogoga.backend.service.UserShopBindingService;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
+import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentPreviewVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeItemVO;
 import com.gogoga.backend.vo.ResultVO;
 import jakarta.validation.Valid;
@@ -97,6 +98,16 @@ public class AdminMerchantKnowledgeController {
     ) {
         requireVisibleShop(shopId);
         return ResultVO.success(commentReplyKnowledgeDocumentService.uploadShopDocument(shopId, file));
+    }
+
+    @PostMapping("/documents/preview")
+    @RequiresPermission("comment:merchant-knowledge:add")
+    public ResultVO<CommentReplyKnowledgeDocumentPreviewVO> previewDocument(
+            @RequestParam Long shopId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        requireVisibleShop(shopId);
+        return ResultVO.success(commentReplyKnowledgeDocumentService.previewShopDocument(shopId, file));
     }
 
     @DeleteMapping("/documents/{id}")

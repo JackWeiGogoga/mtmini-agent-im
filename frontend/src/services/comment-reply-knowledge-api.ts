@@ -3,6 +3,7 @@ import type {
   AdminCommentReplyOfficialKnowledgeParam,
   CommentReplyKnowledgeChunk,
   CommentReplyKnowledgeDocument,
+  CommentReplyKnowledgeDocumentPreview,
   CommentReplyKnowledgeItem,
   CommentReplyOfficialTemplateImportResult,
   CommentReplyQaKnowledgeParam,
@@ -122,6 +123,20 @@ export async function uploadMerchantReplyDocument(
   formData.append("file", file);
   const response = await request.post<unknown, { data: CommentReplyKnowledgeDocument }>(
     `${MERCHANT_BASE_URL}/documents/upload`,
+    formData,
+    { params: { shopId }, headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return response.data;
+}
+
+export async function previewMerchantReplyDocument(
+  shopId: number,
+  file: File,
+): Promise<CommentReplyKnowledgeDocumentPreview> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await request.post<unknown, { data: CommentReplyKnowledgeDocumentPreview }>(
+    `${MERCHANT_BASE_URL}/documents/preview`,
     formData,
     { params: { shopId }, headers: { "Content-Type": "multipart/form-data" } },
   );
