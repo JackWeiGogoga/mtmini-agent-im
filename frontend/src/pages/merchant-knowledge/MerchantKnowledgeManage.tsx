@@ -42,6 +42,7 @@ import {
   listMerchantReplyDocuments,
   listMerchantReplyQa,
   previewMerchantReplyDocument,
+  testMerchantReply,
   updateMerchantReplyChunkEnabled,
   updateMerchantReplyChunkSentiment,
   updateMerchantReplyQa,
@@ -54,6 +55,8 @@ import type {
   CommentReplyKnowledgeItem,
   CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
+  CommentReplyTestParam,
+  CommentReplyTestResult,
   UserShopBinding,
 } from "@/types";
 
@@ -89,7 +92,27 @@ const parseStatusColor: Record<string, string> = {
   FAILED: "red",
 };
 
+const knowledgeSourceTypeText: Record<string, string> = {
+  QA: "手工问答",
+  DOCUMENT: "上传文档",
+  OFFICIAL: "官方文案",
+};
+
 const SHOP_SEARCH_DEBOUNCE_MS = 300;
+
+interface KnowledgeHitRow {
+  key: string;
+  chunkId?: number;
+  sourceType?: string;
+  sourceId?: number;
+  itemId?: number;
+  documentId?: number;
+  sentiment?: CommentReplySentiment | string;
+  chunkText?: string;
+  tokenCount?: number;
+  score?: number;
+  cosineScore?: number;
+}
 
 function formatDateTime(value?: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
@@ -109,9 +132,125 @@ function buildShopLabel(shop: UserShopBinding) {
   return `${shop.shopName || shop.poiId || shop.shopId}（${shop.poiId || shop.shopId}）`;
 }
 
+function formatHitScore(value?: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(4) : "-";
+}
+
+function parseKnowledgeHits(value?: string): KnowledgeHitRow[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item, index) => {
+      const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        key: String(row.chunkId || index),
+        chunkId: typeof row.chunkId === "number" ? row.chunkId : undefined,
+        sourceType: typeof row.sourceType === "string" ? row.sourceType : undefined,
+        sourceId: typeof row.sourceId === "number" ? row.sourceId : undefined,
+        itemId: typeof row.itemId === "number" ? row.itemId : undefined,
+        documentId: typeof row.documentId === "number" ? row.documentId : undefined,
+        sentiment: typeof row.sentiment === "string" ? row.sentiment : undefined,
+        chunkText: typeof row.chunkText === "string" ? row.chunkText : undefined,
+        tokenCount: typeof row.tokenCount === "number" ? row.tokenCount : undefined,
+        score: typeof row.score === "number" ? row.score : undefined,
+        cosineScore: typeof row.cosineScore === "number" ? row.cosineScore : undefined,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function KnowledgeHitList({ knowledgeHitJson }: { knowledgeHitJson?: string }) {
+  const rows = useMemo(() => parseKnowledgeHits(knowledgeHitJson), [knowledgeHitJson]);
+
+  if (!knowledgeHitJson) {
+    return null;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <details>
+        <summary>查看命中知识</summary>
+        <pre style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>{knowledgeHitJson}</pre>
+      </details>
+    );
+  }
+
+  const columns: ColumnsType<KnowledgeHitRow> = [
+    {
+      title: "排序",
+      width: 72,
+      render: (_value, _record, index) => index + 1,
+    },
+    {
+      title: "类型",
+      dataIndex: "sourceType",
+      width: 110,
+      render: (value?: string) => value ? <Tag>{knowledgeSourceTypeText[value] || value}</Tag> : "-",
+    },
+    {
+      title: "情绪",
+      dataIndex: "sentiment",
+      width: 90,
+      render: (value?: string) => value ? <Tag>{sentimentText[value] || value}</Tag> : "-",
+    },
+    {
+      title: "综合分",
+      dataIndex: "score",
+      width: 100,
+      render: (value?: number) => formatHitScore(value),
+    },
+    {
+      title: "余弦分",
+      dataIndex: "cosineScore",
+      width: 100,
+      render: (value?: number) => formatHitScore(value),
+    },
+    {
+      title: "来源",
+      width: 180,
+      render: (_value, record) => {
+        const id = record.itemId || record.documentId || record.sourceId;
+        if (!record.sourceType || !id) {
+          return "-";
+        }
+        return record.sourceType === "QA" ? `问答 #${id}` : `文档 #${id}`;
+      },
+    },
+    {
+      title: "命中片段",
+      dataIndex: "chunkText",
+      render: (value?: string) => value ? (
+        <div style={{ whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}>{value}</div>
+      ) : "-",
+    },
+  ];
+
+  return (
+    <details open>
+      <summary style={{ cursor: "pointer" }}>查看命中知识（{rows.length} 条）</summary>
+      <Table
+        style={{ marginTop: 8 }}
+        size="small"
+        rowKey="key"
+        columns={columns}
+        dataSource={rows}
+        pagination={false}
+      />
+    </details>
+  );
+}
+
 export default function MerchantKnowledgeManage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [qaForm] = Form.useForm<CommentReplyQaKnowledgeParam>();
+  const [replyTestForm] = Form.useForm<CommentReplyTestParam>();
   const [shops, setShops] = useState<UserShopBinding[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<number | undefined>(() => {
     const rawShopId = Number(searchParams.get("shopId"));
@@ -129,6 +268,8 @@ export default function MerchantKnowledgeManage() {
   const [uploadPreview, setUploadPreview] = useState<CommentReplyKnowledgeDocumentPreview | null>(null);
   const [editingQa, setEditingQa] = useState<CommentReplyKnowledgeItem | null>(null);
   const [savingQa, setSavingQa] = useState(false);
+  const [testingReply, setTestingReply] = useState(false);
+  const [replyTestResult, setReplyTestResult] = useState<CommentReplyTestResult | null>(null);
   const [chunkDrawerOpen, setChunkDrawerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<CommentReplyKnowledgeDocument | null>(null);
   const [chunks, setChunks] = useState<CommentReplyKnowledgeChunk[]>([]);
@@ -304,6 +445,23 @@ export default function MerchantKnowledgeManage() {
       message.error(error instanceof Error ? error.message : "上传失败");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const submitReplyTest = async () => {
+    if (!selectedShopId) {
+      message.warning("请先选择商户");
+      return;
+    }
+    const values = await replyTestForm.validateFields();
+    setTestingReply(true);
+    setReplyTestResult(null);
+    try {
+      setReplyTestResult(await testMerchantReply(selectedShopId, values));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "测试回复失败");
+    } finally {
+      setTestingReply(false);
     }
   };
 
@@ -666,6 +824,65 @@ export default function MerchantKnowledgeManage() {
                         dataSource={documents}
                         pagination={{ pageSize: 10, showSizeChanger: true }}
                       />
+                    </Space>
+                  ),
+                },
+                {
+                  key: "reply-test",
+                  label: "测试回复效果",
+                  children: (
+                    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                      <Form
+                        form={replyTestForm}
+                        layout="vertical"
+                        initialValues={{ foodCommentScore: 5 }}
+                        style={{ maxWidth: 720 }}
+                      >
+                        <Form.Item
+                          name="foodCommentScore"
+                          label="评价星级"
+                          rules={[{ required: true, message: "请选择评价星级" }]}
+                        >
+                          <Select
+                            options={[
+                              { label: "5星（好评）", value: 5 },
+                              { label: "4星（好评）", value: 4 },
+                              { label: "3星（中评）", value: 3 },
+                              { label: "2星（差评）", value: 2 },
+                              { label: "1星（差评）", value: 1 },
+                              { label: "0星（差评）", value: 0 },
+                            ]}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          name="commentContent"
+                          label="评价内容"
+                          rules={[{ required: true, message: "请输入评价内容" }]}
+                        >
+                          <Input.TextArea rows={5} maxLength={1000} showCount placeholder="输入一条顾客评价，测试系统会生成怎样的商家回复" />
+                        </Form.Item>
+                        <Button type="primary" loading={testingReply} onClick={() => void submitReplyTest()}>
+                          生成测试回复
+                        </Button>
+                      </Form>
+
+                      {replyTestResult ? (
+                        <Card title="测试结果" size="small">
+                          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                            <Space wrap>
+                              <Tag color={replyTestResult.shouldReply ? "green" : "default"}>
+                                {replyTestResult.shouldReply ? "会回复" : "不回复"}
+                              </Tag>
+                              {replyTestResult.sentiment ? <Tag>{sentimentText[replyTestResult.sentiment] || replyTestResult.sentiment}</Tag> : null}
+                              {replyTestResult.replySource ? <Tag color="blue">{replyTestResult.replySource}</Tag> : null}
+                              {replyTestResult.model ? <Tag>{replyTestResult.model}</Tag> : null}
+                              {replyTestResult.skipReason ? <Tag color="orange">{replyTestResult.skipReason}</Tag> : null}
+                            </Space>
+                            <Input.TextArea value={replyTestResult.replyContent || ""} rows={4} readOnly />
+                            <KnowledgeHitList knowledgeHitJson={replyTestResult.knowledgeHitJson} />
+                          </Space>
+                        </Card>
+                      ) : null}
                     </Space>
                   ),
                 },

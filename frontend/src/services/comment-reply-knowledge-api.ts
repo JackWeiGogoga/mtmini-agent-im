@@ -8,6 +8,8 @@ import type {
   CommentReplyOfficialTemplateImportResult,
   CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
+  CommentReplyTestParam,
+  CommentReplyTestResult,
   PageInfo,
 } from "@/types";
 
@@ -188,4 +190,16 @@ export async function deleteMerchantReplyChunk(shopId: number, chunkId: number):
   await request.delete(`${MERCHANT_BASE_URL}/documents/chunks/${chunkId}`, {
     params: { shopId },
   });
+}
+
+export async function testMerchantReply(
+  shopId: number,
+  payload: CommentReplyTestParam,
+): Promise<CommentReplyTestResult> {
+  const response = await request.post<unknown, { data: CommentReplyTestResult }>(
+    `${MERCHANT_BASE_URL}/reply-test`,
+    payload,
+    { params: { shopId } },
+  );
+  return response.data;
 }

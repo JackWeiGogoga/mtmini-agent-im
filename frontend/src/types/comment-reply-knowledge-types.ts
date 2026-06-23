@@ -69,6 +69,23 @@ export interface CommentReplyQaKnowledgeParam {
   enabled: boolean;
 }
 
+export interface CommentReplyTestParam {
+  foodCommentScore: number;
+  commentContent: string;
+}
+
+export interface CommentReplyTestResult {
+  shouldReply: boolean;
+  skipReason?: string;
+  replyContent?: string;
+  replySource?: string;
+  sentiment?: CommentReplySentiment;
+  generationId?: number;
+  knowledgeHitJson?: string;
+  model?: string;
+  powerAmount?: number;
+}
+
 export interface CommentReplyOfficialTemplateImportResult {
   totalCount: number;
   createdCount: number;

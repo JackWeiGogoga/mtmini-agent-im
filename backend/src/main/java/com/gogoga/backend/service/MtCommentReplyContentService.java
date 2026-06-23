@@ -7,4 +7,6 @@ import com.gogoga.backend.entity.mt.MtShop;
 public interface MtCommentReplyContentService {
 
     CommentReplyContentResultDTO generateReply(MtShop shop, MtComment comment);
+
+    CommentReplyContentResultDTO previewReply(MtShop shop, MtComment comment);
 }

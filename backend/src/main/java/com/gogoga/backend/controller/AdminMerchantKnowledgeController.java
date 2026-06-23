@@ -2,10 +2,15 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
+import com.gogoga.backend.dto.CommentReplyContentResultDTO;
+import com.gogoga.backend.entity.mt.MtComment;
+import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
+import com.gogoga.backend.param.CommentReplyTestParam;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
+import com.gogoga.backend.service.MtCommentReplyContentService;
 import com.gogoga.backend.service.UserShopBindingService;
 import com.gogoga.backend.vo.CommentReplyKnowledgeChunkVO;
 import com.gogoga.backend.vo.CommentReplyKnowledgeDocumentVO;
@@ -40,6 +45,7 @@ public class AdminMerchantKnowledgeController {
     private final UserShopBindingService userShopBindingService;
     private final CommentReplyKnowledgeService commentReplyKnowledgeService;
     private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
+    private final MtCommentReplyContentService mtCommentReplyContentService;
 
     @GetMapping("/items")
     public ResultVO<List<CommentReplyKnowledgeItemVO>> listQa(@RequestParam Long shopId) {
@@ -157,7 +163,24 @@ public class AdminMerchantKnowledgeController {
         return ResultVO.success();
     }
 
-    private void requireVisibleShop(Long shopId) {
-        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+    @PostMapping("/reply-test")
+    public ResultVO<CommentReplyContentResultDTO> testReply(
+            @RequestParam Long shopId,
+            @Valid @RequestBody CommentReplyTestParam param
+    ) {
+        MtShop shop = requireVisibleShop(shopId);
+        MtComment comment = new MtComment();
+        comment.setId(null);
+        comment.setShopId(shop.getId());
+        comment.setPoiId(shop.getPoiId());
+        comment.setEpoiId(shop.getEpoiId());
+        comment.setCommentId(System.currentTimeMillis());
+        comment.setFoodCommentScore(param.getFoodCommentScore());
+        comment.setCommentContent(param.getCommentContent());
+        return ResultVO.success(mtCommentReplyContentService.previewReply(shop, comment));
+    }
+
+    private MtShop requireVisibleShop(Long shopId) {
+        return userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
     }
 }

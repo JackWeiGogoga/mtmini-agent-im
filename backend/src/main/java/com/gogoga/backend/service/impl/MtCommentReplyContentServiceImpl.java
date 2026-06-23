@@ -54,6 +54,15 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
 
     @Override
     public CommentReplyContentResultDTO generateReply(MtShop shop, MtComment comment) {
+        return generateReplyInternal(shop, comment, true);
+    }
+
+    @Override
+    public CommentReplyContentResultDTO previewReply(MtShop shop, MtComment comment) {
+        return generateReplyInternal(shop, comment, false);
+    }
+
+    private CommentReplyContentResultDTO generateReplyInternal(MtShop shop, MtComment comment, boolean persistGeneration) {
         if (shop == null || comment == null || comment.getCommentId() == null) {
             throw new BusinessException(400, "评价回复上下文不能为空");
         }
@@ -70,12 +79,12 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
 
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
         if (!knowledge.isEnabled() || !knowledgeVectorStore.hasShopKnowledge(shop.getId())) {
-            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.OFFICIAL_RANDOM, null, null);
+            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.OFFICIAL_RANDOM, null, null, persistGeneration);
         }
 
         MtPowerAccount account = mtPowerAccountService.getAccount(shop.getId());
         if (account == null || account.getBalance() == null || account.getBalance() <= knowledge.getRagBalanceThreshold()) {
-            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "POWER_BALANCE_NOT_ENOUGH", null);
+            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "POWER_BALANCE_NOT_ENOUGH", null, persistGeneration);
         }
 
         try {
@@ -83,16 +92,18 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             float[] queryEmbedding = commentReplyEmbeddingService.embed(queryText);
             List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shop.getId(), sentiment, queryEmbedding);
             if (hits.isEmpty()) {
-                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_NO_HIT", null);
+                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_NO_HIT", null, persistGeneration);
             }
             String knowledgeHitJson = toHitJson(hits);
             String reply = callChatModel(sentiment, comment, hits);
             if (StringUtils.isBlank(reply)) {
-                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_EMPTY_REPLY", null);
+                return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_EMPTY_REPLY", null, persistGeneration);
             }
             int powerAmount = Math.max(knowledge.getFallbackRagPowerAmount(), 1);
-            consumePower(shop.getId(), comment.getCommentId(), powerAmount);
-            MtCommentReplyGeneration generation = insertGeneration(
+            if (persistGeneration) {
+                consumePower(shop.getId(), comment.getCommentId(), powerAmount);
+            }
+            MtCommentReplyGeneration generation = buildGeneration(
                     shop,
                     comment,
                     CommentReplySourceEnum.SHOP_RAG,
@@ -102,12 +113,15 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                     knowledgeHitJson,
                     null,
                     null,
-                    powerAmount
+                    persistGeneration ? powerAmount : null
             );
+            if (persistGeneration) {
+                mtCommentReplyGenerationMapper.insert(generation);
+            }
             return toResult(generation, true, null);
         } catch (Exception e) {
             log.error("RAG 评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
-            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_ERROR", e.getMessage());
+            return buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_ERROR", e.getMessage(), persistGeneration);
         }
     }
 
@@ -116,12 +130,13 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                                                              CommentReplySentimentEnum sentiment,
                                                              CommentReplySourceEnum source,
                                                              String fallbackReason,
-                                                             String errorMessage) {
+                                                             String errorMessage,
+                                                             boolean persistGeneration) {
         MtReplyKnowledgeItem template = officialTemplateService.selectRandomEnabledTemplate(sentiment);
         String reply = template == null || StringUtils.isBlank(template.getAnswer())
                 ? StringUtils.defaultIfBlank(mtProperties.getComment().getDefaultReply(), "很好")
                 : StringUtils.trim(template.getAnswer());
-        MtCommentReplyGeneration generation = insertGeneration(
+        MtCommentReplyGeneration generation = buildGeneration(
                 shop,
                 comment,
                 source,
@@ -133,6 +148,9 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 errorMessage,
                 null
         );
+        if (persistGeneration) {
+            mtCommentReplyGenerationMapper.insert(generation);
+        }
         return toResult(generation, true, null);
     }
 
@@ -191,7 +209,11 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             row.put("chunkId", hit.getChunk().getId());
             row.put("sourceType", hit.getChunk().getSourceType());
             row.put("sourceId", hit.getChunk().getSourceId());
+            row.put("itemId", hit.getChunk().getItemId());
+            row.put("documentId", hit.getChunk().getDocumentId());
             row.put("sentiment", hit.getChunk().getSentiment());
+            row.put("chunkText", StringUtils.left(StringUtils.defaultString(hit.getChunk().getChunkText()), 1000));
+            row.put("tokenCount", hit.getChunk().getTokenCount());
             row.put("score", hit.getScore());
             row.put("cosineScore", hit.getCosineScore());
             return row;
@@ -210,7 +232,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         mtPowerConsumeService.consume(request);
     }
 
-    private MtCommentReplyGeneration insertGeneration(MtShop shop,
+    private MtCommentReplyGeneration buildGeneration(MtShop shop,
                                                       MtComment comment,
                                                       CommentReplySourceEnum source,
                                                       CommentReplySentimentEnum sentiment,
@@ -241,7 +263,6 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         generation.setErrorMessage(StringUtils.left(errorMessage, 1000));
         generation.setCreateTime(now);
         generation.setUpdateTime(now);
-        mtCommentReplyGenerationMapper.insert(generation);
         return generation;
     }
 
