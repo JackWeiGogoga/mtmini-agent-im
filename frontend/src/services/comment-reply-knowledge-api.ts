@@ -1,13 +1,17 @@
 import request from "@/utils/request";
 import type {
   AdminCommentReplyOfficialKnowledgeParam,
+  CommentReplyKnowledgeChunk,
+  CommentReplyKnowledgeDocument,
   CommentReplyKnowledgeItem,
   CommentReplyOfficialTemplateImportResult,
+  CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
   PageInfo,
 } from "@/types";
 
 const BASE_URL = "/system/comment-reply-knowledge/official";
+const MERCHANT_BASE_URL = "/system/comment-reply-knowledge/merchant";
 
 export async function listOfficialReplyKnowledge(
   sentiment?: CommentReplySentiment,
@@ -55,4 +59,118 @@ export async function importOfficialReplyKnowledge(file: File): Promise<CommentR
     { headers: { "Content-Type": "multipart/form-data" } },
   );
   return response.data;
+}
+
+export async function listMerchantReplyQa(
+  shopId: number,
+): Promise<CommentReplyKnowledgeItem[]> {
+  const response = await request.get<unknown, { data: CommentReplyKnowledgeItem[] }>(
+    `${MERCHANT_BASE_URL}/items`,
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function createMerchantReplyQa(
+  shopId: number,
+  payload: CommentReplyQaKnowledgeParam,
+): Promise<CommentReplyKnowledgeItem> {
+  const response = await request.post<unknown, { data: CommentReplyKnowledgeItem }>(
+    `${MERCHANT_BASE_URL}/items`,
+    payload,
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function updateMerchantReplyQa(
+  shopId: number,
+  id: number,
+  payload: CommentReplyQaKnowledgeParam,
+): Promise<CommentReplyKnowledgeItem> {
+  const response = await request.put<unknown, { data: CommentReplyKnowledgeItem }>(
+    `${MERCHANT_BASE_URL}/items/${id}`,
+    payload,
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function deleteMerchantReplyQa(shopId: number, id: number): Promise<void> {
+  await request.delete(`${MERCHANT_BASE_URL}/items/${id}`, { params: { shopId } });
+}
+
+export async function clearMerchantReplyKnowledge(shopId: number): Promise<void> {
+  await request.delete(`${MERCHANT_BASE_URL}/items/all`, { params: { shopId } });
+}
+
+export async function listMerchantReplyDocuments(
+  shopId: number,
+): Promise<CommentReplyKnowledgeDocument[]> {
+  const response = await request.get<unknown, { data: CommentReplyKnowledgeDocument[] }>(
+    `${MERCHANT_BASE_URL}/documents`,
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function uploadMerchantReplyDocument(
+  shopId: number,
+  file: File,
+): Promise<CommentReplyKnowledgeDocument> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await request.post<unknown, { data: CommentReplyKnowledgeDocument }>(
+    `${MERCHANT_BASE_URL}/documents/upload`,
+    formData,
+    { params: { shopId }, headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return response.data;
+}
+
+export async function deleteMerchantReplyDocument(shopId: number, id: number): Promise<void> {
+  await request.delete(`${MERCHANT_BASE_URL}/documents/${id}`, { params: { shopId } });
+}
+
+export async function listMerchantReplyDocumentChunks(
+  shopId: number,
+  documentId: number,
+): Promise<CommentReplyKnowledgeChunk[]> {
+  const response = await request.get<unknown, { data: CommentReplyKnowledgeChunk[] }>(
+    `${MERCHANT_BASE_URL}/documents/${documentId}/chunks`,
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function updateMerchantReplyChunkSentiment(
+  shopId: number,
+  chunkId: number,
+  sentiment: CommentReplySentiment,
+): Promise<CommentReplyKnowledgeChunk> {
+  const response = await request.put<unknown, { data: CommentReplyKnowledgeChunk }>(
+    `${MERCHANT_BASE_URL}/documents/chunks/${chunkId}/sentiment`,
+    { sentiment },
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function updateMerchantReplyChunkEnabled(
+  shopId: number,
+  chunkId: number,
+  enabled: boolean,
+): Promise<CommentReplyKnowledgeChunk> {
+  const response = await request.put<unknown, { data: CommentReplyKnowledgeChunk }>(
+    `${MERCHANT_BASE_URL}/documents/chunks/${chunkId}/enabled`,
+    undefined,
+    { params: { shopId, enabled } },
+  );
+  return response.data;
+}
+
+export async function deleteMerchantReplyChunk(shopId: number, chunkId: number): Promise<void> {
+  await request.delete(`${MERCHANT_BASE_URL}/documents/chunks/${chunkId}`, {
+    params: { shopId },
+  });
 }

@@ -28,6 +28,9 @@ const UserBehaviorAnalytics = lazy(
 const CommentReplyKnowledgeManage = lazy(
   () => import("@/pages/comment-reply-knowledge"),
 );
+const MerchantKnowledgeManage = lazy(
+  () => import("@/pages/merchant-knowledge"),
+);
 const SalesConfig = lazy(() => import("@/pages/sales-config"));
 const SalesCommissionManage = lazy(
   () => import("@/pages/sales-commission-manage"),
@@ -206,6 +209,16 @@ const router = createBrowserRouter(
             <AuthLayout permission="comment:reply-knowledge:list">
               <LazyWrapper>
                 <CommentReplyKnowledgeManage />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
+        {
+          path: "/merchant-knowledge",
+          element: (
+            <AuthLayout permission="comment:merchant-knowledge:list">
+              <LazyWrapper>
+                <MerchantKnowledgeManage />
               </LazyWrapper>
             </AuthLayout>
           ),

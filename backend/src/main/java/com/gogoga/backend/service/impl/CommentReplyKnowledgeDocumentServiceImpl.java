@@ -68,7 +68,13 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     @Override
     public List<CommentReplyKnowledgeDocumentVO> listCurrentShopDocuments() {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        return mtReplyKnowledgeDocumentMapper.selectByShopId(shop.getId()).stream()
+        return listShopDocuments(shop.getId());
+    }
+
+    @Override
+    public List<CommentReplyKnowledgeDocumentVO> listShopDocuments(Long shopId) {
+        requireShopId(shopId);
+        return mtReplyKnowledgeDocumentMapper.selectByShopId(shopId).stream()
                 .map(this::toDocumentVO)
                 .collect(Collectors.toList());
     }
@@ -77,17 +83,24 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     @Transactional(rollbackFor = Exception.class)
     public CommentReplyKnowledgeDocumentVO uploadCurrentShopDocument(MultipartFile file) {
         MtShop shop = mtH5ShopService.getCurrentShop();
+        return uploadShopDocument(shop.getId(), file);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentReplyKnowledgeDocumentVO uploadShopDocument(Long shopId, MultipartFile file) {
+        requireShopId(shopId);
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
-        validateUpload(file, shop.getId(), knowledge);
+        validateUpload(file, shopId, knowledge);
         String fileType = resolveFileType(file);
         CosStorageService.StoredObject storedObject = cosStorageService.uploadObject(
                 knowledge.getDocumentKeyPrefix(),
-                String.valueOf(shop.getId()),
+                String.valueOf(shopId),
                 file
         );
         LocalDateTime now = LocalDateTime.now();
         MtReplyKnowledgeDocument document = new MtReplyKnowledgeDocument();
-        document.setShopId(shop.getId());
+        document.setShopId(shopId);
         document.setFileName(StringUtils.defaultIfBlank(file.getOriginalFilename(), "knowledge." + fileType.toLowerCase(Locale.ROOT)));
         document.setFileType(fileType);
         document.setFileSize(file.getSize());
@@ -109,8 +122,15 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     @Transactional(rollbackFor = Exception.class)
     public void deleteCurrentShopDocument(Long id) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        MtReplyKnowledgeDocument document = requireCurrentShopDocument(id, shop.getId());
-        mtReplyKnowledgeDocumentMapper.softDeleteByIdAndShopId(document.getId(), shop.getId(), LocalDateTime.now());
+        deleteShopDocument(shop.getId(), id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteShopDocument(Long shopId, Long id) {
+        requireShopId(shopId);
+        MtReplyKnowledgeDocument document = requireCurrentShopDocument(id, shopId);
+        mtReplyKnowledgeDocumentMapper.softDeleteByIdAndShopId(document.getId(), shopId, LocalDateTime.now());
         knowledgeVectorStore.deleteBySource(CommentReplyKnowledgeSourceTypeEnum.DOCUMENT.name(), document.getId());
         cosStorageService.deleteObject(document.getObjectKey());
     }
@@ -118,8 +138,14 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     @Override
     public List<CommentReplyKnowledgeChunkVO> listCurrentShopDocumentChunks(Long documentId) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        requireCurrentShopDocument(documentId, shop.getId());
-        return mtReplyKnowledgeChunkMapper.selectByDocumentIdAndShopId(documentId, shop.getId()).stream()
+        return listShopDocumentChunks(shop.getId(), documentId);
+    }
+
+    @Override
+    public List<CommentReplyKnowledgeChunkVO> listShopDocumentChunks(Long shopId, Long documentId) {
+        requireShopId(shopId);
+        requireCurrentShopDocument(documentId, shopId);
+        return mtReplyKnowledgeChunkMapper.selectByDocumentIdAndShopId(documentId, shopId).stream()
                 .map(this::toChunkVO)
                 .collect(Collectors.toList());
     }
@@ -128,30 +154,51 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     @Transactional(rollbackFor = Exception.class)
     public CommentReplyKnowledgeChunkVO updateCurrentShopChunkSentiment(Long chunkId, CommentReplyKnowledgeChunkUpdateParam param) {
         MtShop shop = mtH5ShopService.getCurrentShop();
+        return updateShopChunkSentiment(shop.getId(), chunkId, param);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentReplyKnowledgeChunkVO updateShopChunkSentiment(Long shopId, Long chunkId, CommentReplyKnowledgeChunkUpdateParam param) {
+        requireShopId(shopId);
         CommentReplySentimentEnum sentiment = requireSentiment(param.getSentiment());
-        int rows = mtReplyKnowledgeChunkMapper.updateSentimentByIdAndShopId(chunkId, shop.getId(), sentiment.name(), LocalDateTime.now());
+        int rows = mtReplyKnowledgeChunkMapper.updateSentimentByIdAndShopId(chunkId, shopId, sentiment.name(), LocalDateTime.now());
         if (rows <= 0) {
             throw new BusinessException(404, "知识片段不存在");
         }
-        return toChunkVO(mtReplyKnowledgeChunkMapper.selectByIdAndShopId(chunkId, shop.getId()));
+        return toChunkVO(mtReplyKnowledgeChunkMapper.selectByIdAndShopId(chunkId, shopId));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CommentReplyKnowledgeChunkVO updateCurrentShopChunkEnabled(Long chunkId, Boolean enabled) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        int rows = mtReplyKnowledgeChunkMapper.updateEnabledByIdAndShopId(chunkId, shop.getId(), Boolean.TRUE.equals(enabled), LocalDateTime.now());
+        return updateShopChunkEnabled(shop.getId(), chunkId, enabled);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentReplyKnowledgeChunkVO updateShopChunkEnabled(Long shopId, Long chunkId, Boolean enabled) {
+        requireShopId(shopId);
+        int rows = mtReplyKnowledgeChunkMapper.updateEnabledByIdAndShopId(chunkId, shopId, Boolean.TRUE.equals(enabled), LocalDateTime.now());
         if (rows <= 0) {
             throw new BusinessException(404, "知识片段不存在");
         }
-        return toChunkVO(mtReplyKnowledgeChunkMapper.selectByIdAndShopId(chunkId, shop.getId()));
+        return toChunkVO(mtReplyKnowledgeChunkMapper.selectByIdAndShopId(chunkId, shopId));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteCurrentShopChunk(Long chunkId) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        int rows = mtReplyKnowledgeChunkMapper.softDeleteByIdAndShopId(chunkId, shop.getId(), LocalDateTime.now());
+        deleteShopChunk(shop.getId(), chunkId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteShopChunk(Long shopId, Long chunkId) {
+        requireShopId(shopId);
+        int rows = mtReplyKnowledgeChunkMapper.softDeleteByIdAndShopId(chunkId, shopId, LocalDateTime.now());
         if (rows <= 0) {
             throw new BusinessException(404, "知识片段不存在");
         }
@@ -248,6 +295,12 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             throw new BusinessException(404, "知识文档不存在");
         }
         return document;
+    }
+
+    private void requireShopId(Long shopId) {
+        if (shopId == null) {
+            throw new BusinessException("门店ID不能为空");
+        }
     }
 
     private List<ParsedDocumentChunk> extractChunks(String fileType, byte[] content) throws Exception {
@@ -392,7 +445,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
                 result[i] = CommentReplySentimentEnum.GOOD;
             } else if (StringUtils.containsAny(header, "中评", "三星", "3星")) {
                 result[i] = CommentReplySentimentEnum.NEUTRAL;
-            } else if (StringUtils.containsAny(header, "差评", "一星", "二星", "1星", "2星")) {
+            } else if (StringUtils.containsAny(header, "差评", "零星", "一星", "二星", "0星", "1星", "2星")) {
                 result[i] = CommentReplySentimentEnum.BAD;
             }
         }
@@ -554,7 +607,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
             String key = structuredLine.getKey();
             String fieldValue = structuredLine.getValue();
             if (StringUtils.containsAny(key, "评论类型", "类型", "评分", "星级", "评价", "情绪", "sentiment", "score", "rating")
-                    || StringUtils.containsAny(fieldValue, "好评", "中评", "差评", "四星", "五星", "三星", "一星", "二星", "4星", "5星", "3星", "1星", "2星", "GOOD", "NEUTRAL", "BAD")) {
+                    || StringUtils.containsAny(fieldValue, "好评", "中评", "差评", "四星", "五星", "三星", "零星", "一星", "二星", "4星", "5星", "3星", "0星", "1星", "2星", "GOOD", "NEUTRAL", "BAD")) {
                 CommentReplySentimentEnum sentiment = inferSentiment(fieldValue);
                 if (sentiment != CommentReplySentimentEnum.UNKNOWN) {
                     return sentiment;
@@ -751,7 +804,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
 
     private CommentReplySentimentEnum inferSentiment(String text) {
         String value = StringUtils.defaultString(text);
-        if (StringUtils.containsAny(value, "差评", "一星", "1星", "二星", "2星", "不好", "抱歉", "投诉",
+        if (StringUtils.containsAny(value, "差评", "零星", "0星", "零分", "0分", "一星", "1星", "二星", "2星", "不好", "抱歉", "投诉",
                 "少送", "漏送", "撒漏", "洒漏", "不满意", "道歉", "退款", "赔付")) {
             return CommentReplySentimentEnum.BAD;
         }

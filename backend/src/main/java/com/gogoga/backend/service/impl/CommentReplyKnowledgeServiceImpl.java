@@ -43,7 +43,13 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     @Override
     public List<CommentReplyKnowledgeItemVO> listCurrentShopQa() {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        return mtReplyKnowledgeItemMapper.selectByShopId(shop.getId(), CommentReplyKnowledgeSourceTypeEnum.QA.name())
+        return listShopQa(shop.getId());
+    }
+
+    @Override
+    public List<CommentReplyKnowledgeItemVO> listShopQa(Long shopId) {
+        requireShopId(shopId);
+        return mtReplyKnowledgeItemMapper.selectByShopId(shopId, CommentReplyKnowledgeSourceTypeEnum.QA.name())
                 .stream()
                 .map(this::toVO)
                 .collect(Collectors.toList());
@@ -53,7 +59,14 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     @Transactional(rollbackFor = Exception.class)
     public CommentReplyKnowledgeItemVO createCurrentShopQa(CommentReplyQaKnowledgeParam param) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        int count = mtReplyKnowledgeItemMapper.countEnabledQaByShopId(shop.getId());
+        return createShopQa(shop.getId(), param);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentReplyKnowledgeItemVO createShopQa(Long shopId, CommentReplyQaKnowledgeParam param) {
+        requireShopId(shopId);
+        int count = mtReplyKnowledgeItemMapper.countEnabledQaByShopId(shopId);
         int maxCount = mtProperties.getComment().getKnowledge().getMaxQaItemsPerShop();
         if (count >= maxCount) {
             throw new BusinessException("每个商户最多上传 " + maxCount + " 条问答知识");
@@ -61,7 +74,7 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
         CommentReplySentimentEnum sentiment = requireSentiment(param.getSentiment());
         LocalDateTime now = LocalDateTime.now();
         MtReplyKnowledgeItem item = new MtReplyKnowledgeItem();
-        item.setShopId(shop.getId());
+        item.setShopId(shopId);
         item.setScope(CommentReplyKnowledgeScopeEnum.SHOP.name());
         item.setSourceType(CommentReplyKnowledgeSourceTypeEnum.QA.name());
         item.setSentiment(sentiment.name());
@@ -81,7 +94,14 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     @Transactional(rollbackFor = Exception.class)
     public CommentReplyKnowledgeItemVO updateCurrentShopQa(Long id, CommentReplyQaKnowledgeParam param) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        MtReplyKnowledgeItem item = requireCurrentShopQa(id, shop.getId());
+        return updateShopQa(shop.getId(), id, param);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CommentReplyKnowledgeItemVO updateShopQa(Long shopId, Long id, CommentReplyQaKnowledgeParam param) {
+        requireShopId(shopId);
+        MtReplyKnowledgeItem item = requireCurrentShopQa(id, shopId);
         CommentReplySentimentEnum sentiment = requireSentiment(param.getSentiment());
         item.setSentiment(sentiment.name());
         item.setTitle(StringUtils.trim(param.getTitle()));
@@ -98,8 +118,15 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     @Transactional(rollbackFor = Exception.class)
     public void deleteCurrentShopQa(Long id) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        MtReplyKnowledgeItem item = requireCurrentShopQa(id, shop.getId());
-        mtReplyKnowledgeItemMapper.softDeleteByIdAndShopId(item.getId(), shop.getId());
+        deleteShopQa(shop.getId(), id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteShopQa(Long shopId, Long id) {
+        requireShopId(shopId);
+        MtReplyKnowledgeItem item = requireCurrentShopQa(id, shopId);
+        mtReplyKnowledgeItemMapper.softDeleteByIdAndShopId(item.getId(), shopId);
         knowledgeVectorStore.deleteBySource(CommentReplyKnowledgeSourceTypeEnum.QA.name(), item.getId());
     }
 
@@ -107,10 +134,17 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     @Transactional(rollbackFor = Exception.class)
     public void clearCurrentShopKnowledge() {
         MtShop shop = mtH5ShopService.getCurrentShop();
+        clearShopKnowledge(shop.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void clearShopKnowledge(Long shopId) {
+        requireShopId(shopId);
         LocalDateTime now = LocalDateTime.now();
-        mtReplyKnowledgeItemMapper.softDeleteByShopId(shop.getId());
-        mtReplyKnowledgeDocumentMapper.softDeleteByShopId(shop.getId(), now);
-        mtReplyKnowledgeChunkMapper.softDeleteByShopId(shop.getId(), now);
+        mtReplyKnowledgeItemMapper.softDeleteByShopId(shopId);
+        mtReplyKnowledgeDocumentMapper.softDeleteByShopId(shopId, now);
+        mtReplyKnowledgeChunkMapper.softDeleteByShopId(shopId, now);
     }
 
     private void rebuildQaChunk(MtReplyKnowledgeItem item) {
@@ -164,6 +198,12 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
             throw new BusinessException(404, "问答知识不存在");
         }
         return item;
+    }
+
+    private void requireShopId(Long shopId) {
+        if (shopId == null) {
+            throw new BusinessException("门店ID不能为空");
+        }
     }
 
     private CommentReplySentimentEnum requireSentiment(String value) {

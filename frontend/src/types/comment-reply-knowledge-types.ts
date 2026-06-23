@@ -14,9 +14,43 @@ export interface CommentReplyKnowledgeItem {
   updateTime?: string;
 }
 
+export interface CommentReplyKnowledgeDocument {
+  id: number;
+  shopId: number;
+  fileName: string;
+  fileType: string;
+  fileSize?: number;
+  parseStatus: "PENDING" | "PARSING" | "SUCCESS" | "FAILED" | string;
+  parseError?: string;
+  chunkCount?: number;
+  enabled: boolean;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface CommentReplyKnowledgeChunk {
+  id: number;
+  shopId: number;
+  documentId: number;
+  sourceType: string;
+  sentiment: CommentReplySentiment;
+  chunkText: string;
+  enabled: boolean;
+  createTime?: string;
+  updateTime?: string;
+}
+
 export interface AdminCommentReplyOfficialKnowledgeParam {
   title: string;
   sentiment: Exclude<CommentReplySentiment, "UNKNOWN">;
+  answer: string;
+  enabled: boolean;
+}
+
+export interface CommentReplyQaKnowledgeParam {
+  title: string;
+  sentiment: Exclude<CommentReplySentiment, "UNKNOWN">;
+  question: string;
   answer: string;
   enabled: boolean;
 }

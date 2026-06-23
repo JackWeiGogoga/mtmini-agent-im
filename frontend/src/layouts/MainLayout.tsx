@@ -168,6 +168,8 @@ const defaultRouteTitles: Record<string, string> = {
   "/power-management": "算力管理",
   "/power-recharge-orders": "充值订单",
   "/analytics/user-behavior": "行为统计",
+  "/merchant-knowledge": "知识库管理",
+  "/comment-reply-knowledge": "回复文案",
   "/system": "系统管理",
   "/system/user": "用户管理",
   "/system/role": "角色管理",

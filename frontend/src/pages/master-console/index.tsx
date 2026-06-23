@@ -14,7 +14,8 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SortOrder } from "antd/es/table/interface";
-import { DownloadOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
+import { DatabaseOutlined, DownloadOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
 import { message } from "@/components/AppMessageContext";
@@ -127,6 +128,7 @@ function buildUserLabel(user?: VisibleUserOption) {
 }
 
 const MasterConsole: React.FC = () => {
+  const navigate = useNavigate();
   const [form] = Form.useForm<MasterConsoleQueryParam>();
   const { styles } = usePageStyles();
   const { isCompact } = useResponsive();
@@ -437,11 +439,27 @@ const MasterConsole: React.FC = () => {
         width: 160,
         render: (value?: string) => formatDateTime(value),
       },
+      {
+        title: "操作",
+        key: "actions",
+        width: 120,
+        fixed: isCompact ? undefined : "right",
+        render: (_, record) => (
+          <Button
+            type="link"
+            icon={<DatabaseOutlined />}
+            onClick={() => navigate(`/merchant-knowledge?shopId=${record.shopId}`)}
+          >
+            知识库
+          </Button>
+        ),
+      },
     ],
     [
       activeRange.compareLabel,
       handleOperationSettingsChange,
       isCompact,
+      navigate,
       operationSettingShopIds,
       query.sortField,
       query.sortOrder,
@@ -531,7 +549,7 @@ const MasterConsole: React.FC = () => {
         columns={columns}
         dataSource={data}
         loading={loading}
-        scroll={{ x: 1690 }}
+        scroll={{ x: 1810 }}
         pagination={{
           current: query.pageNum,
           pageSize: query.pageSize,
