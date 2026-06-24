@@ -202,21 +202,21 @@ export default {
       });
     },
     resolveTimeText(item) {
-      return item?.replyTime || item?.commentTime || "";
+      return item?.commentTime || item?.replyTime || "";
     },
     formatDateText(timeText) {
       const text = String(timeText || "");
       if (text.length >= 10) {
-        return text.slice(0, 10).replace(/-/g, ".");
+        return text.slice(0, 10);
       }
       return "--";
     },
     formatTimeText(timeText) {
       const text = String(timeText || "");
-      if (text.length >= 16) {
-        return text.slice(11, 16);
+      if (text.length >= 10) {
+        return text.slice(0, 10);
       }
-      return "--:--";
+      return "--";
     },
     normalizedSentiment(item) {
       const sentiment = String(item?.sentiment || "").toUpperCase();
@@ -420,16 +420,17 @@ page {
 }
 
 .log-meta {
-  width: 92rpx;
+  width: 142rpx;
   flex-shrink: 0;
 }
 
 .log-time {
   display: block;
   padding-top: 2rpx;
-  font-size: 28rpx;
+  font-size: 22rpx;
   font-weight: 700;
   color: #32353d;
+  white-space: nowrap;
 }
 
 .log-status {

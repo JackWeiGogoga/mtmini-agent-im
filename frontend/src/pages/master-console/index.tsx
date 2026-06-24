@@ -137,6 +137,14 @@ function formatDateTime(value?: string) {
   return parsed.isValid() ? parsed.format("YYYY-MM-DD HH:mm") : value;
 }
 
+function formatLogDate(value?: string) {
+  if (!value) {
+    return "-";
+  }
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format("YYYY-MM-DD") : value.slice(0, 10);
+}
+
 function formatCount(value?: number | null) {
   return value ?? 0;
 }
@@ -460,13 +468,15 @@ const MasterConsole: React.FC = () => {
   const logColumns = useMemo<ColumnsType<CommentReplyLogRecord>>(
     () => [
       {
-        title: "时间",
+        title: "评论时间",
         key: "time",
         width: 150,
         render: (_, record) => (
           <Space direction="vertical" size={2}>
-            <Text>{formatDateTime(record.replyTime || record.commentTime)}</Text>
-            <Text type="secondary">评价：{formatDateTime(record.commentTime)}</Text>
+            <Text>{formatLogDate(record.commentTime)}</Text>
+            {record.addComment ? (
+              <Text type="secondary">追评：{formatLogDate(record.addCommentTime)}</Text>
+            ) : null}
           </Space>
         ),
       },
@@ -535,6 +545,13 @@ const MasterConsole: React.FC = () => {
           ) : (
             <Text type="secondary">无图片</Text>
           ),
+      },
+      {
+        title: "回复时间",
+        dataIndex: "replyTime",
+        key: "replyTime",
+        width: 150,
+        render: (value?: string) => formatLogDate(value),
       },
       {
         title: "AI 回复",
@@ -922,7 +939,7 @@ const MasterConsole: React.FC = () => {
           columns={logColumns}
           dataSource={logRecords}
           size={isCompact ? "small" : "middle"}
-          scroll={{ x: 1230 }}
+          scroll={{ x: 1380 }}
           pagination={{
             current: logPageNum,
             pageSize: logPageSize,

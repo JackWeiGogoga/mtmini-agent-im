@@ -77,6 +77,7 @@ export interface CommentReplyLogRecord {
   score?: number;
   customerMessage?: string;
   addComment?: string;
+  addCommentTime?: string;
   imageUrls?: string[];
   aiReplyText?: string;
   analysisText?: string;

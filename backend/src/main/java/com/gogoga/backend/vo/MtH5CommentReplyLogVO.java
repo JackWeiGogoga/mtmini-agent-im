@@ -19,6 +19,7 @@ public class MtH5CommentReplyLogVO {
     private Integer score;
     private String customerMessage;
     private String addComment;
+    private String addCommentTime;
     private List<String> imageUrls;
     private String aiReplyText;
     private String analysisText;

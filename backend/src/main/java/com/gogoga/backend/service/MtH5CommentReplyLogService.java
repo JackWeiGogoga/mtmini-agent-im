@@ -64,6 +64,7 @@ public class MtH5CommentReplyLogService {
         vo.setScore(comment.getFoodCommentScore());
         vo.setCustomerMessage(StringUtils.trimToNull(comment.getCommentContent()));
         vo.setAddComment(StringUtils.trimToNull(comment.getAddComment()));
+        vo.setAddCommentTime(StringUtils.trimToNull(comment.getAddCommentTime()));
         vo.setImageUrls(CommentImageUrlUtil.parseImageUrls(comment.getCommentPictures(), MAX_IMAGE_COUNT));
         vo.setAiReplyText(comment.getAutoReplyContent());
         vo.setAnalysisText(DEFAULT_ANALYSIS_TEXT);
