@@ -195,6 +195,10 @@ public class AdminMerchantKnowledgeController {
         comment.setCommentId(System.currentTimeMillis());
         comment.setProductScore(param.getProductScore());
         comment.setPackingScore(param.getPackingScore());
+        comment.setOrderCommentScore(param.getOrderCommentScore());
+        comment.setDeliveryCommentScore(param.getDeliveryCommentScore());
+        comment.setCommentLables(param.getCommentLabels());
+        comment.setOverDeliveryTimeDesc(param.getOverDeliveryTimeDesc());
         comment.setCommentContent(param.getCommentContent());
         comment.setAddComment(param.getAddComment());
         List<String> imageUrls = CommentImageUrlUtil.parseImageUrls(

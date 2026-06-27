@@ -64,6 +64,10 @@ class AdminMerchantKnowledgeControllerTest {
         CommentReplyTestParam param = new CommentReplyTestParam();
         param.setProductScore(5);
         param.setPackingScore(4);
+        param.setOrderCommentScore(3);
+        param.setDeliveryCommentScore(2);
+        param.setCommentLabels("风雨无阻,快速准时");
+        param.setOverDeliveryTimeDesc("超时 12 分钟");
         param.setCommentContent("很好吃");
         param.setAddComment("第二次买，配送也很快");
         param.setCommentPictures(List.of("https://example.com/a.jpg", "invalid", "https://example.com/b.jpg"));
@@ -74,6 +78,10 @@ class AdminMerchantKnowledgeControllerTest {
         verify(mtCommentReplyContentService).previewReply(eq(shop), commentCaptor.capture());
         assertEquals(5, commentCaptor.getValue().getProductScore());
         assertEquals(4, commentCaptor.getValue().getPackingScore());
+        assertEquals(3, commentCaptor.getValue().getOrderCommentScore());
+        assertEquals(2, commentCaptor.getValue().getDeliveryCommentScore());
+        assertEquals("风雨无阻,快速准时", commentCaptor.getValue().getCommentLables());
+        assertEquals("超时 12 分钟", commentCaptor.getValue().getOverDeliveryTimeDesc());
         assertEquals("第二次买，配送也很快", commentCaptor.getValue().getAddComment());
         assertEquals("https://example.com/a.jpg,https://example.com/b.jpg", commentCaptor.getValue().getCommentPictures());
         assertEquals("图片显示包装完整。", commentCaptor.getValue().getImageSummaryText());

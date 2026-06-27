@@ -72,6 +72,10 @@ export interface CommentReplyQaKnowledgeParam {
 export interface CommentReplyTestParam {
   productScore: number;
   packingScore: number;
+  orderCommentScore: number;
+  deliveryCommentScore: number;
+  commentLabels?: string;
+  overDeliveryTimeDesc?: string;
   commentContent: string;
   addComment?: string;
   commentPictures?: string[];

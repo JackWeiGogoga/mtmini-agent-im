@@ -94,6 +94,23 @@ const parseStatusColor: Record<string, string> = {
   FAILED: "red",
 };
 
+const scoreOptions = [
+  { label: "5星（好评）", value: 5 },
+  { label: "4星（好评）", value: 4 },
+  { label: "3星（中评）", value: 3 },
+  { label: "2星（差评）", value: 2 },
+  { label: "1星（差评）", value: 1 },
+  { label: "0星（差评）", value: 0 },
+];
+
+const commentLabelOptions = [
+  { label: "风雨无阻", value: "风雨无阻" },
+  { label: "货品完好", value: "货品完好" },
+  { label: "穿戴工服", value: "穿戴工服" },
+  { label: "礼貌热情", value: "礼貌热情" },
+  { label: "快速准时", value: "快速准时" },
+];
+
 const knowledgeSourceTypeText: Record<string, string> = {
   QA: "手工问答",
   DOCUMENT: "上传文档",
@@ -117,7 +134,9 @@ interface KnowledgeHitRow {
   cosineScore?: number;
 }
 
-interface ReplyTestFormValues extends CommentReplyTestParam {
+interface ReplyTestFormValues
+  extends Omit<CommentReplyTestParam, "commentLabels"> {
+  commentLabels?: string[];
   commentPicturesText?: string;
 }
 
@@ -573,6 +592,13 @@ export default function MerchantKnowledgeManage() {
         await testMerchantReply(selectedShopId, {
           productScore: values.productScore,
           packingScore: values.packingScore,
+          orderCommentScore: values.orderCommentScore,
+          deliveryCommentScore: values.deliveryCommentScore,
+          commentLabels: values.commentLabels?.length
+            ? values.commentLabels.join(",")
+            : undefined,
+          overDeliveryTimeDesc:
+            values.overDeliveryTimeDesc?.trim() || undefined,
           commentContent: values.commentContent,
           addComment: values.addComment?.trim() || undefined,
           commentPictures: usePictures
@@ -1073,42 +1099,74 @@ export default function MerchantKnowledgeManage() {
                         <Form
                           form={replyTestForm}
                           layout="vertical"
-                          initialValues={{ productScore: 5, packingScore: 5 }}
+                          initialValues={{
+                            productScore: 5,
+                            packingScore: 5,
+                            orderCommentScore: 5,
+                            deliveryCommentScore: 5,
+                          }}
                         >
-                          <Form.Item
-                            name="productScore"
-                            label="商品评分"
-                            rules={[
-                              { required: true, message: "请选择商品评分" },
-                            ]}
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              columnGap: 12,
+                            }}
                           >
-                            <Select
-                              options={[
-                                { label: "5星（好评）", value: 5 },
-                                { label: "4星（好评）", value: 4 },
-                                { label: "3星（中评）", value: 3 },
-                                { label: "2星（差评）", value: 2 },
-                                { label: "1星（差评）", value: 1 },
-                                { label: "0星（差评）", value: 0 },
+                            <Form.Item
+                              name="productScore"
+                              label="商品评分"
+                              rules={[
+                                { required: true, message: "请选择商品评分" },
                               ]}
+                              style={{ marginBottom: 12 }}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="packingScore"
+                              label="包装评分"
+                              rules={[
+                                { required: true, message: "请选择包装评分" },
+                              ]}
+                              style={{ marginBottom: 12 }}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="orderCommentScore"
+                              label="口味评分"
+                              rules={[
+                                { required: true, message: "请选择口味评分" },
+                              ]}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="deliveryCommentScore"
+                              label="配送评分"
+                              rules={[
+                                { required: true, message: "请选择配送评分" },
+                              ]}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                          </div>
+                          <Form.Item name="commentLabels" label="评价标签">
+                            <Select
+                              mode="multiple"
+                              allowClear
+                              options={commentLabelOptions}
+                              placeholder="选填，可多选"
                             />
                           </Form.Item>
                           <Form.Item
-                            name="packingScore"
-                            label="包装评分"
-                            rules={[
-                              { required: true, message: "请选择包装评分" },
-                            ]}
+                            name="overDeliveryTimeDesc"
+                            label="配送超时时间描述"
                           >
-                            <Select
-                              options={[
-                                { label: "5星（好评）", value: 5 },
-                                { label: "4星（好评）", value: 4 },
-                                { label: "3星（中评）", value: 3 },
-                                { label: "2星（差评）", value: 2 },
-                                { label: "1星（差评）", value: 1 },
-                                { label: "0星（差评）", value: 0 },
-                              ]}
+                            <Input
+                              maxLength={255}
+                              placeholder="选填，例如：超时 12 分钟"
                             />
                           </Form.Item>
                           <Form.Item

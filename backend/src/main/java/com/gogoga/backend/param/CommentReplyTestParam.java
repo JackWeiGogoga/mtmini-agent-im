@@ -24,6 +24,20 @@ public class CommentReplyTestParam {
     @Max(value = 5, message = "包装评分不能大于5")
     private Integer packingScore;
 
+    @NotNull(message = "口味评分不能为空")
+    @Min(value = 0, message = "口味评分不能小于0")
+    @Max(value = 5, message = "口味评分不能大于5")
+    private Integer orderCommentScore;
+
+    @NotNull(message = "配送评分不能为空")
+    @Min(value = 0, message = "配送评分不能小于0")
+    @Max(value = 5, message = "配送评分不能大于5")
+    private Integer deliveryCommentScore;
+
+    private String commentLabels;
+
+    private String overDeliveryTimeDesc;
+
     @NotBlank(message = "评价内容不能为空")
     private String commentContent;
 
