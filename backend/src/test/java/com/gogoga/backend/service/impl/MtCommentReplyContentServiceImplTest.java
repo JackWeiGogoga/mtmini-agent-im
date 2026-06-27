@@ -5,6 +5,7 @@ import com.gogoga.backend.dto.CommentImageSummaryResultDTO;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.dto.KnowledgeSearchHitDTO;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
+import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtCommentReplyGeneration;
 import com.gogoga.backend.entity.mt.MtPowerAccount;
@@ -19,6 +20,7 @@ import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtPowerAccountService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
+import com.gogoga.backend.service.SystemPromptService;
 import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionMessage;
@@ -61,6 +63,8 @@ class MtCommentReplyContentServiceImplTest {
     private MtPowerConsumeService mtPowerConsumeService;
     @Mock
     private MtCommentReplyGenerationMapper mtCommentReplyGenerationMapper;
+    @Mock
+    private SystemPromptService systemPromptService;
 
     private MtProperties mtProperties;
     private MtCommentReplyContentServiceImpl service;
@@ -79,7 +83,8 @@ class MtCommentReplyContentServiceImplTest {
                 openAiCompatibleChatService,
                 mtPowerAccountService,
                 mtPowerConsumeService,
-                mtCommentReplyGenerationMapper
+                mtCommentReplyGenerationMapper,
+                systemPromptService
         );
         lenient().doAnswer(invocation -> {
             MtCommentReplyGeneration generation = invocation.getArgument(0);
@@ -87,16 +92,34 @@ class MtCommentReplyContentServiceImplTest {
             return 1;
         }).when(mtCommentReplyGenerationMapper).insert(any(MtCommentReplyGeneration.class));
         lenient().when(commentImageVisionService.resolveForReply(any(), any(), eq(true))).thenReturn(emptyImageSummary());
+        lenient().when(systemPromptService.resolve(any(), any())).thenAnswer(invocation -> {
+            ResolvedSystemPromptDTO result = new ResolvedSystemPromptDTO();
+            result.setPromptKey(invocation.getArgument(0));
+            result.setContent(invocation.getArgument(1));
+            result.setVersion(1);
+            result.setSource("TEST");
+            return result;
+        });
+        lenient().when(systemPromptService.render(any(), any(), any())).thenAnswer(invocation -> {
+            ResolvedSystemPromptDTO result = new ResolvedSystemPromptDTO();
+            result.setPromptKey(invocation.getArgument(0));
+            result.setContent(invocation.getArgument(2));
+            result.setVersion(1);
+            result.setSource("TEST");
+            return result;
+        });
     }
 
     @Test
-    void invalidFoodCommentScoreSkipsReplyWithoutGeneration() {
+    void invalidProductPackingScoreSkipsReplyWithoutGeneration() {
         MtComment comment = comment(6);
+        comment.setProductScore(6);
+        comment.setPackingScore(null);
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment);
 
         assertFalse(result.isShouldReply());
-        assertEquals("FOOD_COMMENT_SCORE_INVALID", result.getSkipReason());
+        assertEquals("PRODUCT_PACKING_SCORE_INVALID", result.getSkipReason());
         verify(mtCommentReplyGenerationMapper, never()).insert(any());
     }
 
@@ -189,6 +212,8 @@ class MtCommentReplyContentServiceImplTest {
         comment.setId(9L);
         comment.setCommentId(542543250001L);
         comment.setFoodCommentScore(score);
+        comment.setProductScore(score);
+        comment.setPackingScore(score);
         comment.setCommentContent("味道不错");
         return comment;
     }

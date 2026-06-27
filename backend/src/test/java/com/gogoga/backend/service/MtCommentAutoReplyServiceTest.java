@@ -55,6 +55,8 @@ class MtCommentAutoReplyServiceTest {
     private ShopOperationSettingsService shopOperationSettingsService;
     @Mock
     private MtCommentReplyContentService mtCommentReplyContentService;
+    @Mock
+    private CommentLogAnalysisService commentLogAnalysisService;
 
     private final MtProperties mtProperties = new MtProperties();
 
@@ -76,7 +78,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -134,7 +137,7 @@ class MtCommentAutoReplyServiceTest {
         assertEquals(542543250001L, payloadCaptor.getValue().getCommentId());
         verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
         verify(mtCommentMapper, never()).markAutoReplySuccessWithGeneration(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         );
     }
 
@@ -148,7 +151,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -188,7 +192,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -218,7 +223,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -260,7 +266,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);
@@ -288,6 +295,7 @@ class MtCommentAutoReplyServiceTest {
         replyResult.setReplySource("OFFICIAL_RANDOM");
         replyResult.setSentiment("GOOD");
         replyResult.setGenerationId(1L);
+        replyResult.setReplyDurationMs(123);
         when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
 
         MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
@@ -312,6 +320,7 @@ class MtCommentAutoReplyServiceTest {
                 any(),
                 any(),
                 any(),
+                eq(123),
                 any(LocalDateTime.class)
         );
     }
@@ -326,7 +335,8 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                commentLogAnalysisService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);
@@ -346,7 +356,7 @@ class MtCommentAutoReplyServiceTest {
 
         CommentReplyContentResultDTO replyResult = new CommentReplyContentResultDTO();
         replyResult.setShouldReply(false);
-        replyResult.setSkipReason("FOOD_COMMENT_SCORE_INVALID");
+        replyResult.setSkipReason("PRODUCT_PACKING_SCORE_INVALID");
         when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
 
         MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
@@ -356,6 +366,6 @@ class MtCommentAutoReplyServiceTest {
         service.executeCommentAutoReplyTask(payload);
 
         verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
-        verify(mtCommentMapper).markAutoReplySkipped(eq(9L), eq("FOOD_COMMENT_SCORE_INVALID"), any(LocalDateTime.class));
+        verify(mtCommentMapper).markAutoReplySkipped(eq(9L), eq("PRODUCT_PACKING_SCORE_INVALID"), any(LocalDateTime.class));
     }
 }

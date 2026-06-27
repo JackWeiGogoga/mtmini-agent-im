@@ -41,6 +41,7 @@ const SalesRedemptionCodeManage = lazy(
 const UserManage = lazy(() => import("@/pages/user-manage"));
 const RoleManage = lazy(() => import("@/pages/role-manage"));
 const MenuManage = lazy(() => import("@/pages/menu-manage"));
+const SystemPromptManage = lazy(() => import("@/pages/system-prompt"));
 const Forbidden = lazy(() => import("@/pages/error/Forbidden"));
 
 /**
@@ -280,6 +281,16 @@ const router = createBrowserRouter(
             <AuthLayout permission="system:menu:list">
               <LazyWrapper>
                 <MenuManage />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
+        {
+          path: "/system/prompts",
+          element: (
+            <AuthLayout permission="system:prompt:list">
+              <LazyWrapper>
+                <SystemPromptManage />
               </LazyWrapper>
             </AuthLayout>
           ),

@@ -19,6 +19,7 @@
         <result column="prompt_tokens" property="promptTokens"/>
         <result column="completion_tokens" property="completionTokens"/>
         <result column="power_amount" property="powerAmount"/>
+        <result column="duration_ms" property="durationMs"/>
         <result column="fallback_reason" property="fallbackReason"/>
         <result column="error_stage" property="errorStage"/>
         <result column="error_message" property="errorMessage"/>
@@ -29,7 +30,7 @@
     <sql id="BaseColumnList">
         id, shop_id, mt_comment_id, comment_id, reply_source, sentiment, reply_content,
         official_item_id, knowledge_hit_json, llm_provider, llm_model, embedding_provider,
-        embedding_model, prompt_tokens, completion_tokens, power_amount, fallback_reason,
+        embedding_model, prompt_tokens, completion_tokens, power_amount, duration_ms, fallback_reason,
         error_stage, error_message, create_time, update_time
     </sql>
 
@@ -44,12 +45,12 @@
         INSERT INTO mt_comment_reply_generation (
             shop_id, mt_comment_id, comment_id, reply_source, sentiment, reply_content,
             official_item_id, knowledge_hit_json, llm_provider, llm_model, embedding_provider,
-            embedding_model, prompt_tokens, completion_tokens, power_amount, fallback_reason,
+            embedding_model, prompt_tokens, completion_tokens, power_amount, duration_ms, fallback_reason,
             error_stage, error_message, create_time, update_time
         ) VALUES (
             #{shopId}, #{mtCommentId}, #{commentId}, #{replySource}, #{sentiment}, #{replyContent},
             #{officialItemId}, #{knowledgeHitJson}, #{llmProvider}, #{llmModel}, #{embeddingProvider},
-            #{embeddingModel}, #{promptTokens}, #{completionTokens}, #{powerAmount}, #{fallbackReason},
+            #{embeddingModel}, #{promptTokens}, #{completionTokens}, #{powerAmount}, #{durationMs}, #{fallbackReason},
             #{errorStage}, #{errorMessage}, #{createTime}, #{updateTime}
         )
     </insert>

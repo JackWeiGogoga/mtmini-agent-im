@@ -25,4 +25,14 @@ public class CommentReplyContentResultDTO {
     private Integer imageCompletionTokens;
     private Integer imageTotalTokens;
     private Integer imagePowerAmount;
+    private Integer replyDurationMs;
+    private String analysisText;
+    private String analysisModel;
+    private Integer analysisPromptTokens;
+    private Integer analysisCompletionTokens;
+    private Integer analysisTotalTokens;
+    private Integer analysisPowerAmount;
+    private Integer analysisDurationMs;
+    private String analysisErrorMessage;
+    private Integer totalDurationMs;
 }

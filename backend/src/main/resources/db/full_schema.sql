@@ -38,6 +38,30 @@ CREATE TABLE `ai_menu` (
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `system_prompt_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `prompt_key` varchar(100) NOT NULL COMMENT '提示词唯一键',
+  `prompt_name` varchar(100) NOT NULL COMMENT '提示词名称',
+  `prompt_type` varchar(32) NOT NULL COMMENT '提示词类型 SYSTEM/USER/VISION/ANALYSIS',
+  `content` longtext NOT NULL COMMENT '提示词内容',
+  `default_resource_path` varchar(255) DEFAULT NULL COMMENT '默认资源路径',
+  `variables_json` longtext COMMENT '变量说明JSON',
+  `model_hint` varchar(128) DEFAULT NULL COMMENT '建议模型或用途说明',
+  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
+  `version` int NOT NULL DEFAULT '1' COMMENT '版本号',
+  `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+  `create_by` varchar(64) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(64) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_system_prompt_config_key` (`prompt_key`),
+  KEY `idx_system_prompt_config_enabled` (`enabled`,`prompt_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统提示词配置表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ai_role` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `role_id` varchar(50) NOT NULL COMMENT '角色ID',
@@ -430,12 +454,25 @@ CREATE TABLE IF NOT EXISTS `mt_comment` (
   `auto_reply_knowledge_hit_json` longtext COMMENT '自动回复命中知识JSON',
   `auto_reply_model` varchar(128) DEFAULT NULL COMMENT '自动回复模型',
   `auto_reply_power_amount` int DEFAULT NULL COMMENT '自动回复消耗算力',
+  `auto_reply_duration_ms` int DEFAULT NULL COMMENT '自动回复处理耗时毫秒',
+  `analysis_status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT 'AI分析状态 PENDING/SUCCESS/FAILED',
+  `analysis_text` varchar(1000) DEFAULT NULL COMMENT 'AI分析日志文案',
+  `analysis_model` varchar(128) DEFAULT NULL COMMENT 'AI分析模型',
+  `analysis_prompt_key` varchar(100) DEFAULT NULL COMMENT 'AI分析提示词Key',
+  `analysis_prompt_version` int DEFAULT NULL COMMENT 'AI分析提示词版本',
+  `analysis_prompt_tokens` int DEFAULT NULL COMMENT 'AI分析输入token数',
+  `analysis_completion_tokens` int DEFAULT NULL COMMENT 'AI分析输出token数',
+  `analysis_power_amount` int DEFAULT NULL COMMENT 'AI分析消耗算力',
+  `analysis_duration_ms` int DEFAULT NULL COMMENT 'AI分析处理耗时毫秒',
+  `analysis_error` varchar(1000) DEFAULT NULL COMMENT 'AI分析错误',
+  `analysis_at` datetime DEFAULT NULL COMMENT 'AI分析生成时间',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_mt_comment_comment_id` (`comment_id`),
   KEY `idx_mt_comment_shop_reply_status` (`shop_id`, `reply_status`, `auto_reply_status`),
-  KEY `idx_mt_comment_shop_comment_time` (`shop_id`, `comment_time`)
+  KEY `idx_mt_comment_shop_comment_time` (`shop_id`, `comment_time`),
+  KEY `idx_mt_comment_shop_analysis_status` (`shop_id`,`analysis_status`,`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团门店评价表';
 
 CREATE TABLE IF NOT EXISTS `mt_reply_knowledge_item` (
@@ -519,6 +556,7 @@ CREATE TABLE IF NOT EXISTS `mt_comment_reply_generation` (
   `prompt_tokens` int DEFAULT NULL COMMENT '输入token数',
   `completion_tokens` int DEFAULT NULL COMMENT '输出token数',
   `power_amount` int DEFAULT NULL COMMENT '消耗算力',
+  `duration_ms` int DEFAULT NULL COMMENT '回复生成耗时毫秒',
   `fallback_reason` varchar(255) DEFAULT NULL COMMENT '兜底原因',
   `error_stage` varchar(64) DEFAULT NULL COMMENT '失败阶段',
   `error_message` varchar(1000) DEFAULT NULL COMMENT '失败原因',

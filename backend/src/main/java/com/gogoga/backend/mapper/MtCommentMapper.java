@@ -49,6 +49,7 @@ public interface MtCommentMapper {
             @Param("knowledgeHitJson") String knowledgeHitJson,
             @Param("replyModel") String replyModel,
             @Param("powerAmount") Integer powerAmount,
+            @Param("durationMs") Integer durationMs,
             @Param("updateTime") LocalDateTime updateTime
     );
 
@@ -59,6 +60,26 @@ public interface MtCommentMapper {
     );
 
     int markAutoReplySkipped(
+            @Param("id") Long id,
+            @Param("error") String error,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int markAnalysisSuccess(
+            @Param("id") Long id,
+            @Param("analysisText") String analysisText,
+            @Param("analysisModel") String analysisModel,
+            @Param("promptKey") String promptKey,
+            @Param("promptVersion") Integer promptVersion,
+            @Param("promptTokens") Integer promptTokens,
+            @Param("completionTokens") Integer completionTokens,
+            @Param("powerAmount") Integer powerAmount,
+            @Param("durationMs") Integer durationMs,
+            @Param("analysisAt") LocalDateTime analysisAt,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int markAnalysisFailed(
             @Param("id") Long id,
             @Param("error") String error,
             @Param("updateTime") LocalDateTime updateTime

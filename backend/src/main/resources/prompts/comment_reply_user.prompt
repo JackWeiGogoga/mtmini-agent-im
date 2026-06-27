@@ -1,0 +1,7 @@
+顾客评价：
+{{commentText}}
+
+可用商户知识：
+{{knowledgeContexts}}
+
+请生成一条商家回复。

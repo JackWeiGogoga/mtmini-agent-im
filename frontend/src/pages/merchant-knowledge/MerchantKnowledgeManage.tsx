@@ -137,6 +137,16 @@ function formatFileSize(value?: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function formatDurationMs(value?: number) {
+  if (value === undefined || value === null) {
+    return "-";
+  }
+  if (value < 1000) {
+    return `${value}ms`;
+  }
+  return `${(value / 1000).toFixed(2)}s`;
+}
+
 function buildShopLabel(shop: UserShopBinding) {
   return `${shop.shopName || shop.poiId || shop.shopId}（${shop.poiId || shop.shopId}）`;
 }
@@ -336,6 +346,9 @@ export default function MerchantKnowledgeManage() {
   const [testingReply, setTestingReply] = useState(false);
   const [uploadingReplyTestImages, setUploadingReplyTestImages] =
     useState(false);
+  const [replyTestImageObjectKeys, setReplyTestImageObjectKeys] = useState<
+    string[]
+  >([]);
   const [replyImageInputMode, setReplyImageInputMode] =
     useState<ReplyImageInputMode>("url");
   const [replyTestResult, setReplyTestResult] =
@@ -558,17 +571,25 @@ export default function MerchantKnowledgeManage() {
         replyImageInputMode === "url" || replyImageInputMode === "upload";
       setReplyTestResult(
         await testMerchantReply(selectedShopId, {
-          foodCommentScore: values.foodCommentScore,
+          productScore: values.productScore,
+          packingScore: values.packingScore,
           commentContent: values.commentContent,
+          addComment: values.addComment?.trim() || undefined,
           commentPictures: usePictures
             ? parseReplyImageUrls(values.commentPicturesText)
             : [],
+          temporaryImageObjectKeys:
+            replyImageInputMode === "upload" ? replyTestImageObjectKeys : [],
           imageSummaryText: useSummary ? values.imageSummaryText : undefined,
         }),
       );
     } catch (error) {
       message.error(error instanceof Error ? error.message : "测试回复失败");
     } finally {
+      if (replyImageInputMode === "upload") {
+        setReplyTestImageObjectKeys([]);
+        replyTestForm.setFieldValue("commentPicturesText", "");
+      }
       setTestingReply(false);
     }
   };
@@ -592,6 +613,14 @@ export default function MerchantKnowledgeManage() {
         ...parseReplyImageUrls(current),
         ...uploaded.map((item) => item.url).filter(Boolean),
       ];
+      setReplyTestImageObjectKeys((currentKeys) =>
+        Array.from(
+          new Set([
+            ...currentKeys,
+            ...uploaded.map((item) => item.objectKey).filter(Boolean),
+          ]),
+        ),
+      );
       replyTestForm.setFieldValue(
         "commentPicturesText",
         Array.from(new Set(urls)).join("\n"),
@@ -1044,13 +1073,31 @@ export default function MerchantKnowledgeManage() {
                         <Form
                           form={replyTestForm}
                           layout="vertical"
-                          initialValues={{ foodCommentScore: 5 }}
+                          initialValues={{ productScore: 5, packingScore: 5 }}
                         >
                           <Form.Item
-                            name="foodCommentScore"
-                            label="评价星级"
+                            name="productScore"
+                            label="商品评分"
                             rules={[
-                              { required: true, message: "请选择评价星级" },
+                              { required: true, message: "请选择商品评分" },
+                            ]}
+                          >
+                            <Select
+                              options={[
+                                { label: "5星（好评）", value: 5 },
+                                { label: "4星（好评）", value: 4 },
+                                { label: "3星（中评）", value: 3 },
+                                { label: "2星（差评）", value: 2 },
+                                { label: "1星（差评）", value: 1 },
+                                { label: "0星（差评）", value: 0 },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name="packingScore"
+                            label="包装评分"
+                            rules={[
+                              { required: true, message: "请选择包装评分" },
                             ]}
                           >
                             <Select
@@ -1076,6 +1123,14 @@ export default function MerchantKnowledgeManage() {
                               maxLength={1000}
                               showCount
                               placeholder="输入一条顾客评价，测试系统会生成怎样的商家回复"
+                            />
+                          </Form.Item>
+                          <Form.Item name="addComment" label="追加评论">
+                            <Input.TextArea
+                              rows={3}
+                              maxLength={1000}
+                              showCount
+                              placeholder="选填。用于模拟顾客追评内容"
                             />
                           </Form.Item>
                           <Form.Item label="图片上下文">
@@ -1217,12 +1272,34 @@ export default function MerchantKnowledgeManage() {
                                   图片：{replyTestResult.imageSummaryStatus}
                                 </Tag>
                               ) : null}
+                              {replyTestResult.analysisModel ? (
+                                <Tag color="cyan">
+                                  分析：{replyTestResult.analysisModel}
+                                </Tag>
+                              ) : null}
                               {replyTestResult.skipReason ? (
                                 <Tag color="orange">
                                   {replyTestResult.skipReason}
                                 </Tag>
                               ) : null}
                             </Space>
+                            <Descriptions size="small" column={3} bordered>
+                              <Descriptions.Item label="回复耗时">
+                                {formatDurationMs(
+                                  replyTestResult.replyDurationMs,
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="分析耗时">
+                                {formatDurationMs(
+                                  replyTestResult.analysisDurationMs,
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="总耗时">
+                                {formatDurationMs(
+                                  replyTestResult.totalDurationMs,
+                                )}
+                              </Descriptions.Item>
+                            </Descriptions>
                             {replyTestResult.imageSummaryStatus ? (
                               <Descriptions size="small" column={4} bordered>
                                 <Descriptions.Item label="图片状态">
@@ -1246,6 +1323,42 @@ export default function MerchantKnowledgeManage() {
                                     span={4}
                                   >
                                     {replyTestResult.imageSummaryErrorMessage}
+                                  </Descriptions.Item>
+                                ) : null}
+                              </Descriptions>
+                            ) : null}
+                            {replyTestResult.analysisText ||
+                            replyTestResult.analysisErrorMessage ? (
+                              <Descriptions
+                                title="AI 分析日志"
+                                size="small"
+                                column={4}
+                                bordered
+                              >
+                                <Descriptions.Item label="模型" span={3}>
+                                  {replyTestResult.analysisModel || "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="输入Token">
+                                  {replyTestResult.analysisPromptTokens ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="输出Token">
+                                  {replyTestResult.analysisCompletionTokens ??
+                                    "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="预估算力" span={2}>
+                                  {replyTestResult.analysisPowerAmount ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="分析耗时" span={2}>
+                                  {formatDurationMs(
+                                    replyTestResult.analysisDurationMs,
+                                  )}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="分析内容" span={4}>
+                                  {replyTestResult.analysisText || "-"}
+                                </Descriptions.Item>
+                                {replyTestResult.analysisErrorMessage ? (
+                                  <Descriptions.Item label="分析错误" span={4}>
+                                    {replyTestResult.analysisErrorMessage}
                                   </Descriptions.Item>
                                 ) : null}
                               </Descriptions>

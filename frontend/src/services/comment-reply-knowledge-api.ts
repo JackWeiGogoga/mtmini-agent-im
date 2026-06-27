@@ -200,7 +200,7 @@ export async function testMerchantReply(
   const response = await request.post<unknown, { data: CommentReplyTestResult }>(
     `${MERCHANT_BASE_URL}/reply-test`,
     payload,
-    { params: { shopId } },
+    { params: { shopId }, timeout: 90000 },
   );
   return response.data;
 }

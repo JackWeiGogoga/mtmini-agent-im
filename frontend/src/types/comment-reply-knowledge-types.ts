@@ -70,9 +70,12 @@ export interface CommentReplyQaKnowledgeParam {
 }
 
 export interface CommentReplyTestParam {
-  foodCommentScore: number;
+  productScore: number;
+  packingScore: number;
   commentContent: string;
+  addComment?: string;
   commentPictures?: string[];
+  temporaryImageObjectKeys?: string[];
   imageSummaryText?: string;
 }
 
@@ -94,6 +97,16 @@ export interface CommentReplyTestResult {
   imageCompletionTokens?: number;
   imageTotalTokens?: number;
   imagePowerAmount?: number;
+  replyDurationMs?: number;
+  analysisText?: string;
+  analysisModel?: string;
+  analysisPromptTokens?: number;
+  analysisCompletionTokens?: number;
+  analysisTotalTokens?: number;
+  analysisPowerAmount?: number;
+  analysisDurationMs?: number;
+  analysisErrorMessage?: string;
+  totalDurationMs?: number;
 }
 
 export interface CommentReplyImageUploadResult {

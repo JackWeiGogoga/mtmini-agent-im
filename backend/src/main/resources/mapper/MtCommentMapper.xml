@@ -46,6 +46,18 @@
         <result column="auto_reply_knowledge_hit_json" property="autoReplyKnowledgeHitJson"/>
         <result column="auto_reply_model" property="autoReplyModel"/>
         <result column="auto_reply_power_amount" property="autoReplyPowerAmount"/>
+        <result column="auto_reply_duration_ms" property="autoReplyDurationMs"/>
+        <result column="analysis_status" property="analysisStatus"/>
+        <result column="analysis_text" property="analysisText"/>
+        <result column="analysis_model" property="analysisModel"/>
+        <result column="analysis_prompt_key" property="analysisPromptKey"/>
+        <result column="analysis_prompt_version" property="analysisPromptVersion"/>
+        <result column="analysis_prompt_tokens" property="analysisPromptTokens"/>
+        <result column="analysis_completion_tokens" property="analysisCompletionTokens"/>
+        <result column="analysis_power_amount" property="analysisPowerAmount"/>
+        <result column="analysis_duration_ms" property="analysisDurationMs"/>
+        <result column="analysis_error" property="analysisError"/>
+        <result column="analysis_at" property="analysisAt"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -59,7 +71,10 @@
         biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
         auto_reply_content, auto_reply_at, auto_reply_error, auto_reply_source,
         auto_reply_sentiment, auto_reply_generation_id, auto_reply_knowledge_hit_json,
-        auto_reply_model, auto_reply_power_amount, create_time, update_time
+        auto_reply_model, auto_reply_power_amount, auto_reply_duration_ms, analysis_status, analysis_text,
+        analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
+        analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
+        create_time, update_time
     </sql>
 
     <select id="selectByCommentId" resultMap="BaseResultMap">
@@ -95,14 +110,24 @@
     <select id="selectStatsByShopIdAndCreateTimeBetween"
             resultType="com.gogoga.backend.entity.mt.MtCommentStatsAggregate">
         SELECT
-            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 4 AND 5 THEN 1 ELSE 0 END), 0) AS goodCommentCount,
-            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 2 AND 3 THEN 1 ELSE 0 END), 0) AS neutralCommentCount,
-            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 0 AND 1 THEN 1 ELSE 0 END), 0) AS badCommentCount,
-            COALESCE(SUM(CASE WHEN food_comment_score BETWEEN 0 AND 1 AND reply_status = 1 THEN 1 ELSE 0 END), 0) AS repliedBadCommentCount
-        FROM mt_comment
-        WHERE shop_id = #{shopId}
-          AND create_time &gt;= #{from}
-          AND create_time &lt; #{to}
+            COALESCE(SUM(CASE WHEN effective_score BETWEEN 4 AND 5 THEN 1 ELSE 0 END), 0) AS goodCommentCount,
+            COALESCE(SUM(CASE WHEN effective_score = 3 THEN 1 ELSE 0 END), 0) AS neutralCommentCount,
+            COALESCE(SUM(CASE WHEN effective_score BETWEEN 0 AND 2 THEN 1 ELSE 0 END), 0) AS badCommentCount,
+            COALESCE(SUM(CASE WHEN effective_score BETWEEN 0 AND 2 AND reply_status = 1 THEN 1 ELSE 0 END), 0) AS repliedBadCommentCount
+        FROM (
+            SELECT
+                reply_status,
+                CASE
+                    WHEN product_score BETWEEN 0 AND 5 AND packing_score BETWEEN 0 AND 5 THEN LEAST(product_score, packing_score)
+                    WHEN product_score BETWEEN 0 AND 5 THEN product_score
+                    WHEN packing_score BETWEEN 0 AND 5 THEN packing_score
+                    ELSE NULL
+                END AS effective_score
+            FROM mt_comment
+            WHERE shop_id = #{shopId}
+              AND create_time &gt;= #{from}
+              AND create_time &lt; #{to}
+        ) comment_scores
     </select>
 
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtComment" useGeneratedKeys="true" keyProperty="id">
@@ -115,7 +140,10 @@
             biz_code, query_start_time, query_end_time, raw_payload_json, auto_reply_status,
             auto_reply_content, auto_reply_at, auto_reply_error, auto_reply_source,
             auto_reply_sentiment, auto_reply_generation_id, auto_reply_knowledge_hit_json,
-            auto_reply_model, auto_reply_power_amount, create_time, update_time
+            auto_reply_model, auto_reply_power_amount, auto_reply_duration_ms, analysis_status, analysis_text,
+            analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
+            analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
+            create_time, update_time
         ) VALUES (
             #{shopId}, #{epoiId}, #{poiId}, #{commentId}, #{result}, #{commentContent}, #{orderCommentScore},
             #{foodCommentScore}, #{deliveryCommentScore}, #{addComment}, #{addCommentTime}, #{packingScore},
@@ -125,7 +153,10 @@
             #{bizCode}, #{queryStartTime}, #{queryEndTime}, #{rawPayloadJson}, #{autoReplyStatus},
             #{autoReplyContent}, #{autoReplyAt}, #{autoReplyError}, #{autoReplySource},
             #{autoReplySentiment}, #{autoReplyGenerationId}, #{autoReplyKnowledgeHitJson},
-            #{autoReplyModel}, #{autoReplyPowerAmount}, #{createTime}, #{updateTime}
+            #{autoReplyModel}, #{autoReplyPowerAmount}, #{autoReplyDurationMs}, #{analysisStatus}, #{analysisText},
+            #{analysisModel}, #{analysisPromptKey}, #{analysisPromptVersion}, #{analysisPromptTokens},
+            #{analysisCompletionTokens}, #{analysisPowerAmount}, #{analysisDurationMs}, #{analysisError}, #{analysisAt},
+            #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -187,6 +218,7 @@
             auto_reply_knowledge_hit_json = #{knowledgeHitJson},
             auto_reply_model = #{replyModel},
             auto_reply_power_amount = #{powerAmount},
+            auto_reply_duration_ms = #{durationMs},
             update_time = #{updateTime}
         WHERE id = #{id}
     </update>
@@ -205,6 +237,33 @@
             auto_reply_error = #{error},
             update_time = #{updateTime}
         WHERE id = #{id}
+    </update>
+
+    <update id="markAnalysisSuccess">
+        UPDATE mt_comment
+        SET analysis_status = 'SUCCESS',
+            analysis_text = #{analysisText},
+            analysis_model = #{analysisModel},
+            analysis_prompt_key = #{promptKey},
+            analysis_prompt_version = #{promptVersion},
+            analysis_prompt_tokens = #{promptTokens},
+            analysis_completion_tokens = #{completionTokens},
+            analysis_power_amount = #{powerAmount},
+            analysis_duration_ms = #{durationMs},
+            analysis_error = NULL,
+            analysis_at = #{analysisAt},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND analysis_status != 'SUCCESS'
+    </update>
+
+    <update id="markAnalysisFailed">
+        UPDATE mt_comment
+        SET analysis_status = 'FAILED',
+            analysis_error = #{error},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND analysis_status != 'SUCCESS'
     </update>
 
 </mapper>

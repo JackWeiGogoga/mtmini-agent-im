@@ -225,6 +225,7 @@ mt:
       vision-timeout-seconds: ${MT_COMMENT_KNOWLEDGE_VISION_TIMEOUT_SECONDS:30}
       vision-fallback-power-amount: ${MT_COMMENT_KNOWLEDGE_VISION_FALLBACK_POWER_AMOUNT:1000}
       vision-image-key-prefix: ${MT_COMMENT_KNOWLEDGE_VISION_IMAGE_KEY_PREFIX:comment-knowledge/vision-images}
+      vision-temp-image-key-prefix: ${MT_COMMENT_KNOWLEDGE_VISION_TEMP_IMAGE_KEY_PREFIX:comment-knowledge/vision-temp-images}
       fallback-rag-power-amount: ${MT_COMMENT_KNOWLEDGE_FALLBACK_RAG_POWER_AMOUNT:1000}
 
 youzan:

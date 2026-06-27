@@ -436,8 +436,18 @@ public class MtProperties {
         private String visionImageKeyPrefix = "comment-knowledge/vision-images";
 
         /**
+         * 测试回复临时图片 COS key 前缀。
+         */
+        private String visionTempImageKeyPrefix = "comment-knowledge/vision-temp-images";
+
+        /**
          * RAG 回复估算算力消耗，后续可按真实 token 计费替换。
          */
         private int fallbackRagPowerAmount = 1000;
+
+        /**
+         * 评论日志分析 usage 缺失时的兜底算力消耗。
+         */
+        private int analysisFallbackPowerAmount = 1000;
     }
 }

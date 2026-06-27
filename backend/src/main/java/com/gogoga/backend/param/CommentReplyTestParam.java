@@ -14,15 +14,24 @@ import java.util.List;
 @Data
 public class CommentReplyTestParam {
 
-    @NotNull(message = "星级不能为空")
-    @Min(value = 0, message = "星级不能小于0")
-    @Max(value = 5, message = "星级不能大于5")
-    private Integer foodCommentScore;
+    @NotNull(message = "商品评分不能为空")
+    @Min(value = 0, message = "商品评分不能小于0")
+    @Max(value = 5, message = "商品评分不能大于5")
+    private Integer productScore;
+
+    @NotNull(message = "包装评分不能为空")
+    @Min(value = 0, message = "包装评分不能小于0")
+    @Max(value = 5, message = "包装评分不能大于5")
+    private Integer packingScore;
 
     @NotBlank(message = "评价内容不能为空")
     private String commentContent;
 
+    private String addComment;
+
     private List<String> commentPictures;
+
+    private List<String> temporaryImageObjectKeys;
 
     private String imageSummaryText;
 }

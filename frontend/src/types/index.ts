@@ -41,6 +41,9 @@ export * from "./user-behavior-analytics-types";
 // 评论回复知识库类型
 export * from "./comment-reply-knowledge-types";
 
+// 系统提示词类型
+export * from "./system-prompt-types";
+
 // 菜单管理类型
 export type {
   Menu,

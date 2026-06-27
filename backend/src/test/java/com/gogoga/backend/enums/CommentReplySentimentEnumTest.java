@@ -7,19 +7,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CommentReplySentimentEnumTest {
 
     @Test
-    void fromFoodCommentScoreMapsConfiguredRanges() {
-        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromFoodCommentScore(0));
-        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromFoodCommentScore(1));
-        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromFoodCommentScore(2));
-        assertEquals(CommentReplySentimentEnum.NEUTRAL, CommentReplySentimentEnum.fromFoodCommentScore(3));
-        assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromFoodCommentScore(4));
-        assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromFoodCommentScore(5));
+    void fromProductAndPackingScoreUsesLowerScore() {
+        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromProductAndPackingScore(5, 2));
+        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromProductAndPackingScore(1, 5));
+        assertEquals(CommentReplySentimentEnum.NEUTRAL, CommentReplySentimentEnum.fromProductAndPackingScore(3, 5));
+        assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromProductAndPackingScore(5, 4));
     }
 
     @Test
-    void fromFoodCommentScoreReturnsUnknownForInvalidScores() {
-        assertEquals(CommentReplySentimentEnum.UNKNOWN, CommentReplySentimentEnum.fromFoodCommentScore(null));
-        assertEquals(CommentReplySentimentEnum.UNKNOWN, CommentReplySentimentEnum.fromFoodCommentScore(-1));
-        assertEquals(CommentReplySentimentEnum.UNKNOWN, CommentReplySentimentEnum.fromFoodCommentScore(6));
+    void fromProductAndPackingScoreReturnsUnknownWhenBothInvalid() {
+        assertEquals(CommentReplySentimentEnum.UNKNOWN, CommentReplySentimentEnum.fromProductAndPackingScore(null, null));
+        assertEquals(CommentReplySentimentEnum.UNKNOWN, CommentReplySentimentEnum.fromProductAndPackingScore(-1, 6));
+    }
+
+    @Test
+    void fromProductAndPackingScoreUsesSingleValidScoreWhenOtherMissing() {
+        assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromProductAndPackingScore(5, null));
+        assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromProductAndPackingScore(null, 2));
     }
 }

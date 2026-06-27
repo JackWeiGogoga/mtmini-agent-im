@@ -174,6 +174,7 @@ const defaultRouteTitles: Record<string, string> = {
   "/system/user": "用户管理",
   "/system/role": "角色管理",
   "/system/menu": "菜单管理",
+  "/system/prompts": "系统提示词",
 };
 
 const portalTitleMap: Record<BackendPortal, string> = {

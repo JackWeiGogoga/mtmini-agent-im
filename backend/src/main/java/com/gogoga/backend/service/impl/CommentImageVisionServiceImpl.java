@@ -3,6 +3,7 @@ package com.gogoga.backend.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.config.PowerProperties;
+import com.gogoga.backend.constant.SystemPromptKeyConstant;
 import com.gogoga.backend.dto.CommentImageSummaryResultDTO;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
 import com.gogoga.backend.entity.mt.MtComment;
@@ -13,6 +14,7 @@ import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtCommentImageSummaryMapper;
 import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.MtPowerConsumeService;
+import com.gogoga.backend.service.SystemPromptService;
 import com.gogoga.backend.util.CommentImageUrlUtil;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
     private final PowerProperties powerProperties;
     private final MtCommentImageSummaryMapper mtCommentImageSummaryMapper;
     private final MtPowerConsumeService mtPowerConsumeService;
+    private final SystemPromptService systemPromptService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -147,13 +150,18 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
     }
 
     private String buildVisionPrompt(int imageCount) {
-        return "你是外卖评价图片质检助手。请识别这 " + imageCount + " 张顾客上传的外卖评价图片，只描述图片中清晰可见的事实。"
+        String fallback = "你是外卖评价图片质检助手。请识别这 " + imageCount + " 张顾客上传的外卖评价图片，只描述图片中清晰可见的事实。"
                 + "重点判断是否存在餐品异常、包装破损、汤汁撒漏、异物、票据或文字信息。"
                 + "不要推测图片之外的原因，不要生成商家回复。"
                 + "只输出 JSON 对象，字段固定为："
                 + "{\"hasFoodIssue\":boolean,\"hasPackageIssue\":boolean,\"hasForeignObject\":boolean,"
                 + "\"hasLeakage\":boolean,\"hasReceiptOrText\":boolean,\"summary\":\"中文摘要，80字以内\","
                 + "\"confidence\":\"HIGH|MEDIUM|LOW\"}";
+        return systemPromptService.render(
+                SystemPromptKeyConstant.COMMENT_IMAGE_VISION,
+                Map.of("imageCount", imageCount),
+                fallback
+        ).getContent();
     }
 
     private VisionModelResponse parseVisionResponse(String response) {

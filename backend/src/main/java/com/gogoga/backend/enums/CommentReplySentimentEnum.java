@@ -19,7 +19,23 @@ public enum CommentReplySentimentEnum {
         this.desc = desc;
     }
 
-    public static CommentReplySentimentEnum fromFoodCommentScore(Integer score) {
+    public static CommentReplySentimentEnum fromProductAndPackingScore(Integer productScore, Integer packingScore) {
+        return fromScore(resolveProductPackingScore(productScore, packingScore));
+    }
+
+    public static Integer resolveProductPackingScore(Integer productScore, Integer packingScore) {
+        Integer validProductScore = isValidScore(productScore) ? productScore : null;
+        Integer validPackingScore = isValidScore(packingScore) ? packingScore : null;
+        if (validProductScore == null) {
+            return validPackingScore;
+        }
+        if (validPackingScore == null) {
+            return validProductScore;
+        }
+        return Math.min(validProductScore, validPackingScore);
+    }
+
+    private static CommentReplySentimentEnum fromScore(Integer score) {
         if (score == null) {
             return UNKNOWN;
         }
@@ -33,5 +49,9 @@ public enum CommentReplySentimentEnum {
             return GOOD;
         }
         return UNKNOWN;
+    }
+
+    private static boolean isValidScore(Integer score) {
+        return score != null && score >= 0 && score <= 5;
     }
 }

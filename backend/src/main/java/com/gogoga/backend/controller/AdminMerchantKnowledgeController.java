@@ -2,6 +2,7 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
+import com.gogoga.backend.dto.CommentLogAnalysisPreviewDTO;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtComment;
@@ -12,6 +13,7 @@ import com.gogoga.backend.param.CommentReplyTestParam;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
+import com.gogoga.backend.service.CommentLogAnalysisService;
 import com.gogoga.backend.service.CosStorageService;
 import com.gogoga.backend.service.MtCommentReplyContentService;
 import com.gogoga.backend.service.UserShopBindingService;
@@ -24,6 +26,8 @@ import com.gogoga.backend.vo.CommentReplyKnowledgeItemVO;
 import com.gogoga.backend.vo.ResultVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,6 +51,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 @RequiresLogin
 @RequiresPermission("comment:merchant-knowledge:list")
+@Slf4j
 public class AdminMerchantKnowledgeController {
 
     private static final long REPLY_TEST_IMAGE_URL_EXPIRE_SECONDS = 1800L;
@@ -55,6 +60,7 @@ public class AdminMerchantKnowledgeController {
     private final CommentReplyKnowledgeService commentReplyKnowledgeService;
     private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
+    private final CommentLogAnalysisService commentLogAnalysisService;
     private final CosStorageService cosStorageService;
     private final MtProperties mtProperties;
 
@@ -179,6 +185,7 @@ public class AdminMerchantKnowledgeController {
             @RequestParam Long shopId,
             @Valid @RequestBody CommentReplyTestParam param
     ) {
+        long startNanos = System.nanoTime();
         MtShop shop = requireVisibleShop(shopId);
         MtComment comment = new MtComment();
         comment.setId(null);
@@ -186,15 +193,73 @@ public class AdminMerchantKnowledgeController {
         comment.setPoiId(shop.getPoiId());
         comment.setEpoiId(shop.getEpoiId());
         comment.setCommentId(System.currentTimeMillis());
-        comment.setFoodCommentScore(param.getFoodCommentScore());
+        comment.setProductScore(param.getProductScore());
+        comment.setPackingScore(param.getPackingScore());
         comment.setCommentContent(param.getCommentContent());
+        comment.setAddComment(param.getAddComment());
         List<String> imageUrls = CommentImageUrlUtil.parseImageUrls(
                 param.getCommentPictures(),
                 mtProperties.getComment().getKnowledge().getVisionMaxImageCount()
         );
         comment.setCommentPictures(String.join(",", imageUrls));
         comment.setImageSummaryText(param.getImageSummaryText());
-        return ResultVO.success(mtCommentReplyContentService.previewReply(shop, comment));
+        try {
+            CommentReplyContentResultDTO result = mtCommentReplyContentService.previewReply(shop, comment);
+            if (result != null && result.getImageSummaryText() != null) {
+                comment.setImageSummaryText(result.getImageSummaryText());
+            }
+            attachAnalysisPreview(result, comment);
+            if (result != null) {
+                result.setTotalDurationMs(durationMs(startNanos));
+            }
+            log.info("测试回复生成完成，shopId={}, commentId={}, replyDurationMs={}, analysisDurationMs={}, totalDurationMs={}",
+                    shopId,
+                    comment.getCommentId(),
+                    result == null ? null : result.getReplyDurationMs(),
+                    result == null ? null : result.getAnalysisDurationMs(),
+                    result == null ? null : result.getTotalDurationMs());
+            return ResultVO.success(result);
+        } finally {
+            cleanupTemporaryImages(shopId, param.getTemporaryImageObjectKeys());
+        }
+    }
+
+    private void attachAnalysisPreview(CommentReplyContentResultDTO result, MtComment comment) {
+        if (result == null) {
+            return;
+        }
+        CommentLogAnalysisPreviewDTO preview = commentLogAnalysisService.preview(comment);
+        if (preview == null) {
+            return;
+        }
+        result.setAnalysisText(preview.getAnalysisText());
+        result.setAnalysisModel(preview.getModel());
+        result.setAnalysisPromptTokens(preview.getPromptTokens());
+        result.setAnalysisCompletionTokens(preview.getCompletionTokens());
+        result.setAnalysisTotalTokens(preview.getTotalTokens());
+        result.setAnalysisPowerAmount(preview.getEstimatedPowerAmount());
+        result.setAnalysisDurationMs(preview.getDurationMs());
+        result.setAnalysisErrorMessage(preview.getErrorMessage());
+    }
+
+    private void cleanupTemporaryImages(Long shopId, List<String> objectKeys) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
+            return;
+        }
+        String prefix = StringUtils.stripEnd(mtProperties.getComment().getKnowledge().getVisionTempImageKeyPrefix(), "/")
+                + "/" + shopId + "/";
+        objectKeys.stream()
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .filter(objectKey -> StringUtils.startsWith(objectKey, prefix))
+                .forEach(objectKey -> {
+                    try {
+                        cosStorageService.deleteObject(objectKey);
+                        log.info("已清理测试回复临时图片，shopId={}, objectKey={}", shopId, objectKey);
+                    } catch (Exception e) {
+                        log.warn("清理测试回复临时图片失败，shopId={}, objectKey={}", shopId, objectKey, e);
+                    }
+                });
     }
 
     @PostMapping("/reply-test/images/upload")
@@ -215,7 +280,7 @@ public class AdminMerchantKnowledgeController {
         for (MultipartFile file : files) {
             validateImageFile(file);
             CosStorageService.StoredObject storedObject = cosStorageService.uploadObject(
-                    mtProperties.getComment().getKnowledge().getVisionImageKeyPrefix(),
+                    mtProperties.getComment().getKnowledge().getVisionTempImageKeyPrefix(),
                     String.valueOf(shopId),
                     file
             );
@@ -247,5 +312,10 @@ public class AdminMerchantKnowledgeController {
         if (file.getSize() > 10L * 1024L * 1024L) {
             throw new BusinessException("单张图片最大 10MB");
         }
+    }
+
+    private int durationMs(long startNanos) {
+        long millis = (System.nanoTime() - startNanos) / 1_000_000L;
+        return millis > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(millis, 0L);
     }
 }

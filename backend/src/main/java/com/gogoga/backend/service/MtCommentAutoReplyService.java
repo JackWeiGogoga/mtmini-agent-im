@@ -50,6 +50,7 @@ public class MtCommentAutoReplyService {
     private final MtAsyncTaskService mtAsyncTaskService;
     private final ShopOperationSettingsService shopOperationSettingsService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
+    private final CommentLogAnalysisService commentLogAnalysisService;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -249,8 +250,20 @@ public class MtCommentAutoReplyService {
                     replyResult.getKnowledgeHitJson(),
                     replyResult.getModel(),
                     replyResult.getPowerAmount(),
+                    replyResult.getReplyDurationMs(),
                     now
             );
+            comment.setAutoReplyContent(reply);
+            comment.setAutoReplyAt(now);
+            comment.setAutoReplyStatus("SUCCESS");
+            comment.setAutoReplySource(replyResult.getReplySource());
+            comment.setAutoReplySentiment(replyResult.getSentiment());
+            comment.setAutoReplyGenerationId(replyResult.getGenerationId());
+            comment.setAutoReplyKnowledgeHitJson(replyResult.getKnowledgeHitJson());
+            comment.setAutoReplyModel(replyResult.getModel());
+            comment.setAutoReplyPowerAmount(replyResult.getPowerAmount());
+            comment.setAutoReplyDurationMs(replyResult.getReplyDurationMs());
+            commentLogAnalysisService.generateAfterAutoReply(shop, comment);
         } catch (MtSdkException e) {
             mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
             log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
@@ -297,6 +310,7 @@ public class MtCommentAutoReplyService {
         comment.setQueryEndTime(endTime);
         comment.setRawPayloadJson(JsonUtil.toJson(response));
         comment.setAutoReplyStatus("PENDING");
+        comment.setAnalysisStatus("PENDING");
         comment.setCreateTime(now);
         comment.setUpdateTime(now);
         return comment;

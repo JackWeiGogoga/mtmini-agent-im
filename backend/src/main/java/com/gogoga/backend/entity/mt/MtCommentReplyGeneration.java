@@ -26,6 +26,7 @@ public class MtCommentReplyGeneration {
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer powerAmount;
+    private Integer durationMs;
     private String fallbackReason;
     private String errorStage;
     private String errorMessage;

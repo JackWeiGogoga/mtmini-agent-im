@@ -61,13 +61,13 @@ public class MtH5CommentReplyLogService {
         vo.setCommentTime(comment.getCommentTime());
         vo.setReplyTime(comment.getAutoReplyAt());
         vo.setSentiment(resolveSentiment(comment));
-        vo.setScore(comment.getFoodCommentScore());
+        vo.setScore(CommentReplySentimentEnum.resolveProductPackingScore(comment.getProductScore(), comment.getPackingScore()));
         vo.setCustomerMessage(StringUtils.trimToNull(comment.getCommentContent()));
         vo.setAddComment(StringUtils.trimToNull(comment.getAddComment()));
         vo.setAddCommentTime(StringUtils.trimToNull(comment.getAddCommentTime()));
         vo.setImageUrls(CommentImageUrlUtil.parseImageUrls(comment.getCommentPictures(), MAX_IMAGE_COUNT));
         vo.setAiReplyText(comment.getAutoReplyContent());
-        vo.setAnalysisText(DEFAULT_ANALYSIS_TEXT);
+        vo.setAnalysisText(StringUtils.defaultIfBlank(comment.getAnalysisText(), DEFAULT_ANALYSIS_TEXT));
         vo.setAutoReplyStatus(comment.getAutoReplyStatus());
         return vo;
     }
@@ -86,7 +86,10 @@ public class MtH5CommentReplyLogService {
                 // 历史脏数据按评分兜底。
             }
         }
-        CommentReplySentimentEnum fromScore = CommentReplySentimentEnum.fromFoodCommentScore(comment.getFoodCommentScore());
+        CommentReplySentimentEnum fromScore = CommentReplySentimentEnum.fromProductAndPackingScore(
+                comment.getProductScore(),
+                comment.getPackingScore()
+        );
         if (fromScore == CommentReplySentimentEnum.GOOD || fromScore == CommentReplySentimentEnum.BAD) {
             return fromScore.name();
         }

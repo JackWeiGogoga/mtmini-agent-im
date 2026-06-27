@@ -8,6 +8,7 @@ import com.gogoga.backend.entity.mt.MtCommentImageSummary;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.mapper.MtCommentImageSummaryMapper;
 import com.gogoga.backend.service.MtPowerConsumeService;
+import com.gogoga.backend.service.SystemPromptService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,8 @@ class CommentImageVisionServiceImplTest {
     private MtCommentImageSummaryMapper mtCommentImageSummaryMapper;
     @Mock
     private MtPowerConsumeService mtPowerConsumeService;
+    @Mock
+    private SystemPromptService systemPromptService;
 
     private MtProperties mtProperties;
     private CommentImageVisionServiceImpl service;
@@ -41,7 +44,8 @@ class CommentImageVisionServiceImplTest {
                 mtProperties,
                 new PowerProperties(),
                 mtCommentImageSummaryMapper,
-                mtPowerConsumeService
+                mtPowerConsumeService,
+                systemPromptService
         );
     }
 
