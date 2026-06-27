@@ -5,12 +5,14 @@ import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.CommentReplySentimentEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
@@ -263,7 +265,9 @@ public class MtCommentAutoReplyService {
             comment.setAutoReplyModel(replyResult.getModel());
             comment.setAutoReplyPowerAmount(replyResult.getPowerAmount());
             comment.setAutoReplyDurationMs(replyResult.getReplyDurationMs());
+            comment.setImageSummaryText(replyResult.getImageSummaryText());
             commentLogAnalysisService.generateAfterAutoReply(shop, comment);
+            enqueueCommentComplaintTaskIfNeeded(shop, comment);
         } catch (MtSdkException e) {
             mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
             log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
@@ -311,6 +315,7 @@ public class MtCommentAutoReplyService {
         comment.setRawPayloadJson(JsonUtil.toJson(response));
         comment.setAutoReplyStatus("PENDING");
         comment.setAnalysisStatus("PENDING");
+        comment.setComplaintStatus("PENDING");
         comment.setCreateTime(now);
         comment.setUpdateTime(now);
         return comment;
@@ -318,5 +323,36 @@ public class MtCommentAutoReplyService {
 
     private String buildCommentReplyTaskBizKey(Long commentId) {
         return "comment:" + commentId;
+    }
+
+    private void enqueueCommentComplaintTaskIfNeeded(MtShop shop, MtComment comment) {
+        if (shop == null || shop.getId() == null || comment == null || comment.getCommentId() == null) {
+            return;
+        }
+        if (!shopOperationSettingsService.isNegativeCommentAppealEnabled(shop.getId())) {
+            return;
+        }
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+                comment.getProductScore(),
+                comment.getPackingScore()
+        );
+        if (sentiment != CommentReplySentimentEnum.BAD) {
+            return;
+        }
+        MtCommentAutoComplaintTaskPayload payload = new MtCommentAutoComplaintTaskPayload();
+        payload.setShopId(shop.getId());
+        payload.setCommentId(comment.getCommentId());
+        mtAsyncTaskService.enqueueTask(
+                MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
+                buildCommentComplaintTaskBizKey(comment.getCommentId()),
+                String.valueOf(shop.getId()),
+                payload,
+                LocalDateTime.now(),
+                mtProperties.getAsyncTask().getCommentAutoComplaint().getMaxRetryCount()
+        );
+    }
+
+    private String buildCommentComplaintTaskBizKey(Long commentId) {
+        return "comment-complaint:" + commentId;
     }
 }

@@ -198,6 +198,7 @@ mt:
     page-size: ${MT_COMMENT_PAGE_SIZE:20}
     query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:false}
     reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:false}
+    complaint-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:false}
     dry-run-reschedule-seconds: ${MT_COMMENT_DRY_RUN_RESCHEDULE_SECONDS:3600}
     default-reply: ${MT_COMMENT_DEFAULT_REPLY:很好}
     sensitive-word:

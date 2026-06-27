@@ -58,6 +58,11 @@
         <result column="analysis_duration_ms" property="analysisDurationMs"/>
         <result column="analysis_error" property="analysisError"/>
         <result column="analysis_at" property="analysisAt"/>
+        <result column="complaint_status" property="complaintStatus"/>
+        <result column="complaint_report_type_code" property="complaintReportTypeCode"/>
+        <result column="complaint_report_content" property="complaintReportContent"/>
+        <result column="complaint_at" property="complaintAt"/>
+        <result column="complaint_error" property="complaintError"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -74,6 +79,7 @@
         auto_reply_model, auto_reply_power_amount, auto_reply_duration_ms, analysis_status, analysis_text,
         analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
         analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
+        complaint_status, complaint_report_type_code, complaint_report_content, complaint_at, complaint_error,
         create_time, update_time
     </sql>
 
@@ -143,6 +149,7 @@
             auto_reply_model, auto_reply_power_amount, auto_reply_duration_ms, analysis_status, analysis_text,
             analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
             analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
+            complaint_status, complaint_report_type_code, complaint_report_content, complaint_at, complaint_error,
             create_time, update_time
         ) VALUES (
             #{shopId}, #{epoiId}, #{poiId}, #{commentId}, #{result}, #{commentContent}, #{orderCommentScore},
@@ -156,6 +163,7 @@
             #{autoReplyModel}, #{autoReplyPowerAmount}, #{autoReplyDurationMs}, #{analysisStatus}, #{analysisText},
             #{analysisModel}, #{analysisPromptKey}, #{analysisPromptVersion}, #{analysisPromptTokens},
             #{analysisCompletionTokens}, #{analysisPowerAmount}, #{analysisDurationMs}, #{analysisError}, #{analysisAt},
+            #{complaintStatus}, #{complaintReportTypeCode}, #{complaintReportContent}, #{complaintAt}, #{complaintError},
             #{createTime}, #{updateTime}
         )
     </insert>
@@ -264,6 +272,38 @@
             update_time = #{updateTime}
         WHERE id = #{id}
           AND analysis_status != 'SUCCESS'
+    </update>
+
+    <update id="markComplaintGenerated">
+        UPDATE mt_comment
+        SET complaint_status = 'GENERATED',
+            complaint_report_type_code = #{reportTypeCode},
+            complaint_report_content = #{reportContent},
+            complaint_error = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND complaint_status != 'SUCCESS'
+    </update>
+
+    <update id="markComplaintSuccess">
+        UPDATE mt_comment
+        SET complaint_status = 'SUCCESS',
+            complaint_report_type_code = #{reportTypeCode},
+            complaint_report_content = #{reportContent},
+            complaint_at = #{complaintAt},
+            complaint_error = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND complaint_status != 'SUCCESS'
+    </update>
+
+    <update id="markComplaintFailed">
+        UPDATE mt_comment
+        SET complaint_status = #{status},
+            complaint_error = #{error},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND complaint_status != 'SUCCESS'
     </update>
 
 </mapper>

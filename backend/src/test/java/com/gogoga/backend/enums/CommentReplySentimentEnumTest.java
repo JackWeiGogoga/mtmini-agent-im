@@ -25,4 +25,9 @@ class CommentReplySentimentEnumTest {
         assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromProductAndPackingScore(5, null));
         assertEquals(CommentReplySentimentEnum.BAD, CommentReplySentimentEnum.fromProductAndPackingScore(null, 2));
     }
+
+    @Test
+    void fromProductAndPackingScoreDoesNotDependOnDeprecatedFoodScore() {
+        assertEquals(CommentReplySentimentEnum.GOOD, CommentReplySentimentEnum.fromProductAndPackingScore(5, 4));
+    }
 }

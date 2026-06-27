@@ -54,6 +54,11 @@ public class ShopOperationSettingsService {
         return setting == null || !Boolean.FALSE.equals(setting.getAutoReplyEnabled());
     }
 
+    public boolean isNegativeCommentAppealEnabled(Long shopId) {
+        MtCommentReplySetting setting = resolveSetting(shopId);
+        return setting != null && Boolean.TRUE.equals(setting.getNegativeCommentAppealEnabled());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ShopOperationSettingsVO updateSettings(Long shopId,
                                                   ShopOperationSettingsUpdateParam param,

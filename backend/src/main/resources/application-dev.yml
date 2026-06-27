@@ -20,6 +20,7 @@ mt:
   comment:
     query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:true}
     reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:true}
+    complaint-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:true}
 
 scheduled:
   enabled: ${SCHEDULED_ENABLED:false}

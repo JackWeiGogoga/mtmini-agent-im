@@ -11,6 +11,8 @@ public final class SystemPromptKeyConstant {
     public static final String COMMENT_REPLY_USER = "COMMENT_REPLY_USER";
     public static final String COMMENT_IMAGE_VISION = "COMMENT_IMAGE_VISION";
     public static final String COMMENT_LOG_ANALYSIS = "COMMENT_LOG_ANALYSIS";
+    public static final String COMMENT_REPORT_TYPE = "COMMENT_REPORT_TYPE";
+    public static final String COMMENT_REPORT_CONTENT = "COMMENT_REPORT_CONTENT";
 
     private SystemPromptKeyConstant() {
     }

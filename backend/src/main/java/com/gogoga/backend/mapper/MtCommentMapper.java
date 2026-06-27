@@ -84,4 +84,26 @@ public interface MtCommentMapper {
             @Param("error") String error,
             @Param("updateTime") LocalDateTime updateTime
     );
+
+    int markComplaintGenerated(
+            @Param("id") Long id,
+            @Param("reportTypeCode") Integer reportTypeCode,
+            @Param("reportContent") String reportContent,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int markComplaintSuccess(
+            @Param("id") Long id,
+            @Param("reportTypeCode") Integer reportTypeCode,
+            @Param("reportContent") String reportContent,
+            @Param("complaintAt") LocalDateTime complaintAt,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int markComplaintFailed(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("error") String error,
+            @Param("updateTime") LocalDateTime updateTime
+    );
 }

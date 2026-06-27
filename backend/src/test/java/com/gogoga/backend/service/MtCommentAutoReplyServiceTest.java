@@ -326,6 +326,67 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
+    void executeCommentAutoReplyTaskEnqueuesComplaintForBadCommentWhenEnabled() throws MtSdkException {
+        service = new MtCommentAutoReplyService(
+                mtAccessTokenMapper,
+                mtShopMapper,
+                mtCommentMapper,
+                meituanClient,
+                mtProperties,
+                mtAsyncTaskService,
+                shopOperationSettingsService,
+                mtCommentReplyContentService,
+                commentLogAnalysisService
+        );
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setShopId(100L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setProductScore(2);
+        comment.setPackingScore(5);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+        when(shopOperationSettingsService.isNegativeCommentAppealEnabled(100L)).thenReturn(true);
+
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        MeituanResponse<String> replyResponse = new MeituanResponse<>();
+        replyResponse.setCode("OP_SUCCESS");
+        replyResponse.setData("ok");
+        when(meituanClient.invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"))).thenReturn(replyResponse);
+        CommentReplyContentResultDTO replyResult = new CommentReplyContentResultDTO();
+        replyResult.setShouldReply(true);
+        replyResult.setReplyContent("抱歉给您带来不好的体验，我们会持续改进。");
+        replyResult.setReplySource("LLM");
+        replyResult.setSentiment("BAD");
+        replyResult.setReplyDurationMs(123);
+        when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        service.executeCommentAutoReplyTask(payload);
+
+        verify(mtAsyncTaskService).enqueueTask(
+                eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT),
+                eq("comment-complaint:542543250001"),
+                eq("100"),
+                any(),
+                any(LocalDateTime.class),
+                eq(3)
+        );
+    }
+
+    @Test
     void executeCommentAutoReplyTaskSkipsWhenContentServiceDeclinesReply() throws MtSdkException {
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,

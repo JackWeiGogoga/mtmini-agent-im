@@ -466,13 +466,19 @@ CREATE TABLE IF NOT EXISTS `mt_comment` (
   `analysis_duration_ms` int DEFAULT NULL COMMENT 'AI分析处理耗时毫秒',
   `analysis_error` varchar(1000) DEFAULT NULL COMMENT 'AI分析错误',
   `analysis_at` datetime DEFAULT NULL COMMENT 'AI分析生成时间',
+  `complaint_status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '差评申诉状态 PENDING/GENERATED/SUCCESS/FAILED/SKIPPED',
+  `complaint_report_type_code` int DEFAULT NULL COMMENT '差评申诉类型编码',
+  `complaint_report_content` varchar(1000) DEFAULT NULL COMMENT '差评申诉内容',
+  `complaint_at` datetime DEFAULT NULL COMMENT '差评申诉成功时间',
+  `complaint_error` varchar(1000) DEFAULT NULL COMMENT '差评申诉错误',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_mt_comment_comment_id` (`comment_id`),
   KEY `idx_mt_comment_shop_reply_status` (`shop_id`, `reply_status`, `auto_reply_status`),
   KEY `idx_mt_comment_shop_comment_time` (`shop_id`, `comment_time`),
-  KEY `idx_mt_comment_shop_analysis_status` (`shop_id`,`analysis_status`,`update_time`)
+  KEY `idx_mt_comment_shop_analysis_status` (`shop_id`,`analysis_status`,`update_time`),
+  KEY `idx_mt_comment_shop_complaint_status` (`shop_id`,`complaint_status`,`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美团门店评价表';
 
 CREATE TABLE IF NOT EXISTS `mt_reply_knowledge_item` (
@@ -595,6 +601,41 @@ CREATE TABLE IF NOT EXISTS `mt_comment_image_summary` (
   KEY `idx_mt_comment_image_summary_comment` (`comment_id`),
   KEY `idx_mt_comment_image_summary_shop_status` (`shop_id`,`status`,`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='评价图片识别摘要表';
+
+CREATE TABLE IF NOT EXISTS `mt_comment_complaint` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint NOT NULL COMMENT '门店ID',
+  `mt_comment_id` bigint DEFAULT NULL COMMENT '本地评价ID',
+  `comment_id` bigint NOT NULL COMMENT '美团评价ID',
+  `status` varchar(32) NOT NULL COMMENT '申诉状态 PENDING/GENERATED/SUCCESS/FAILED/SKIPPED',
+  `report_type_code` int DEFAULT NULL COMMENT '美团申诉类型编码',
+  `report_type_name` varchar(100) DEFAULT NULL COMMENT '美团申诉类型名称',
+  `report_content` varchar(1000) DEFAULT NULL COMMENT '申诉内容',
+  `has_picture` tinyint(1) DEFAULT NULL COMMENT '评价是否包含图片',
+  `type_defaulted` tinyint(1) DEFAULT NULL COMMENT '申诉类型是否使用默认47',
+  `type_reason` varchar(500) DEFAULT NULL COMMENT '申诉类型判断理由',
+  `model_provider` varchar(64) DEFAULT NULL COMMENT '模型提供方',
+  `model` varchar(128) DEFAULT NULL COMMENT '模型名称',
+  `type_prompt_key` varchar(100) DEFAULT NULL COMMENT '类型判断提示词Key',
+  `type_prompt_version` int DEFAULT NULL COMMENT '类型判断提示词版本',
+  `content_prompt_key` varchar(100) DEFAULT NULL COMMENT '内容生成提示词Key',
+  `content_prompt_version` int DEFAULT NULL COMMENT '内容生成提示词版本',
+  `prompt_tokens` int DEFAULT NULL COMMENT '输入token数',
+  `completion_tokens` int DEFAULT NULL COMMENT '输出token数',
+  `total_tokens` int DEFAULT NULL COMMENT '总token数',
+  `power_amount` int DEFAULT NULL COMMENT '消耗算力',
+  `request_payload_json` longtext COMMENT '美团申诉请求JSON',
+  `response_payload_json` longtext COMMENT '美团申诉响应JSON',
+  `error_message` varchar(1000) DEFAULT NULL COMMENT '失败原因',
+  `submitted_at` datetime DEFAULT NULL COMMENT '提交成功时间',
+  `duration_ms` int DEFAULT NULL COMMENT '处理耗时毫秒',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_mt_comment_complaint_shop_comment` (`shop_id`,`comment_id`),
+  KEY `idx_mt_comment_complaint_comment` (`comment_id`),
+  KEY `idx_mt_comment_complaint_shop_status` (`shop_id`,`status`,`update_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='评价差评自动投诉表';
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

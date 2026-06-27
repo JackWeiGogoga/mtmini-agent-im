@@ -66,6 +66,11 @@ public class MtComment {
     private Integer analysisDurationMs;
     private String analysisError;
     private LocalDateTime analysisAt;
+    private String complaintStatus;
+    private Integer complaintReportTypeCode;
+    private String complaintReportContent;
+    private LocalDateTime complaintAt;
+    private String complaintError;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -190,6 +190,11 @@ public class MtProperties {
         private TaskPolicy commentAutoReply = new TaskPolicy();
 
         /**
+         * 差评自动投诉任务策略
+         */
+        private TaskPolicy commentAutoComplaint = new TaskPolicy();
+
+        /**
          * 知识文档解析任务策略
          */
         private TaskPolicy knowledgeDocumentParse = new TaskPolicy();
@@ -287,6 +292,11 @@ public class MtProperties {
         private boolean replyDryRun = false;
 
         /**
+         * 差评申诉 dry run。开启后不调用美团评价申诉接口。
+         */
+        private boolean complaintDryRun = false;
+
+        /**
          * dry run 命中已有异步回复任务时的无损重排秒数。
          */
         private long dryRunRescheduleSeconds = 3600L;
@@ -305,6 +315,25 @@ public class MtProperties {
          * 评论回复敏感词配置。
          */
         private SensitiveWord sensitiveWord = new SensitiveWord();
+
+        /**
+         * 差评自动投诉配置。
+         */
+        private Complaint complaint = new Complaint();
+    }
+
+    @Data
+    public static class Complaint {
+
+        /**
+         * 申诉文本最大长度。
+         */
+        private int maxContentLength = 300;
+
+        /**
+         * 申诉模型 usage 缺失时的兜底算力消耗。
+         */
+        private int fallbackPowerAmount = 1000;
     }
 
     @Data
