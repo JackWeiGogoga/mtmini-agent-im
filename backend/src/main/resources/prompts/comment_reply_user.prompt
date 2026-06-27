@@ -1,7 +1,7 @@
 顾客评价：
 {{commentText}}
 
-可用商户知识：
+高匹配商户知识（无则显示“无”）：
 {{knowledgeContexts}}
 
 请生成一条商家回复。

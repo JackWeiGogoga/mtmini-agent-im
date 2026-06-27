@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,10 +90,6 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         }
 
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
-        if (!knowledge.isEnabled() || !knowledgeVectorStore.hasShopKnowledge(shop.getId())) {
-            return finishResult(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.OFFICIAL_RANDOM, null, null, persistGeneration, durationMs(startNanos)), startNanos, shop, comment, "OFFICIAL_RANDOM");
-        }
-
         MtPowerAccount account = mtPowerAccountService.getAccount(shop.getId());
         if (account == null || account.getBalance() == null || account.getBalance() <= knowledge.getRagBalanceThreshold()) {
             return finishResult(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "POWER_BALANCE_NOT_ENOUGH", null, persistGeneration, durationMs(startNanos)), startNanos, shop, comment, "POWER_BALANCE_NOT_ENOUGH");
@@ -105,18 +102,8 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             log.info("评论回复图片识别阶段完成，shopId={}, commentId={}, durationMs={}",
                     shop.getId(), comment.getCommentId(), durationMs(imageStart));
             String queryText = buildQueryText(comment, imageSummary);
-            long embeddingStart = System.nanoTime();
-            float[] queryEmbedding = commentReplyEmbeddingService.embed(queryText);
-            log.info("评论回复向量阶段完成，shopId={}, commentId={}, durationMs={}",
-                    shop.getId(), comment.getCommentId(), durationMs(embeddingStart));
-            long searchStart = System.nanoTime();
-            List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shop.getId(), sentiment, queryEmbedding);
-            log.info("评论回复知识检索阶段完成，shopId={}, commentId={}, hitCount={}, durationMs={}",
-                    shop.getId(), comment.getCommentId(), hits.size(), durationMs(searchStart));
-            if (hits.isEmpty()) {
-                return finishResult(attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_NO_HIT", null, persistGeneration, durationMs(startNanos)), imageSummary), startNanos, shop, comment, "RAG_NO_HIT");
-            }
-            String knowledgeHitJson = toHitJson(hits);
+            List<KnowledgeSearchHitDTO> hits = resolvePromptKnowledgeHits(shop, sentiment, queryText);
+            String knowledgeHitJson = hits.isEmpty() ? null : toHitJson(hits);
             long chatStart = System.nanoTime();
             String reply = callChatModel(sentiment, comment, imageSummary, hits);
             log.info("评论回复大模型阶段完成，shopId={}, commentId={}, durationMs={}",
@@ -131,7 +118,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             MtCommentReplyGeneration generation = buildGeneration(
                     shop,
                     comment,
-                    CommentReplySourceEnum.SHOP_RAG,
+                    hits.isEmpty() ? CommentReplySourceEnum.LLM : CommentReplySourceEnum.SHOP_RAG,
                     sentiment,
                     StringUtils.left(StringUtils.trim(reply), 1000),
                     null,
@@ -144,11 +131,38 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             if (persistGeneration) {
                 mtCommentReplyGenerationMapper.insert(generation);
             }
-            return finishResult(attachImageSummary(toResult(generation, true, null), imageSummary), startNanos, shop, comment, "SHOP_RAG");
+            return finishResult(attachImageSummary(toResult(generation, true, null), imageSummary), startNanos, shop, comment, generation.getReplySource());
         } catch (Exception e) {
-            log.error("RAG 评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
-            return finishResult(attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "RAG_ERROR", e.getMessage(), persistGeneration, durationMs(startNanos)), imageSummary), startNanos, shop, comment, "RAG_ERROR");
+            log.error("大模型评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+            return finishResult(attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_ERROR", e.getMessage(), persistGeneration, durationMs(startNanos)), imageSummary), startNanos, shop, comment, "LLM_ERROR");
         }
+    }
+
+    private List<KnowledgeSearchHitDTO> resolvePromptKnowledgeHits(MtShop shop,
+                                                                   CommentReplySentimentEnum sentiment,
+                                                                   String queryText) {
+        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        if (!knowledge.isEnabled() || !knowledgeVectorStore.hasShopKnowledge(shop.getId())) {
+            log.info("评论回复跳过知识检索，shopId={}, reason={}",
+                    shop.getId(), knowledge.isEnabled() ? "SHOP_KNOWLEDGE_EMPTY" : "KNOWLEDGE_DISABLED");
+            return Collections.emptyList();
+        }
+        long embeddingStart = System.nanoTime();
+        float[] queryEmbedding = commentReplyEmbeddingService.embed(queryText);
+        log.info("评论回复向量阶段完成，shopId={}, durationMs={}", shop.getId(), durationMs(embeddingStart));
+        long searchStart = System.nanoTime();
+        List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shop.getId(), sentiment, queryEmbedding);
+        if (hits == null) {
+            hits = Collections.emptyList();
+        }
+        double minCosineScore = knowledge.getMinContextCosineScore();
+        List<KnowledgeSearchHitDTO> promptHits = hits.stream()
+                .filter(hit -> hit != null && hit.getChunk() != null)
+                .filter(hit -> hit.getCosineScore() != null && hit.getCosineScore() >= minCosineScore)
+                .collect(Collectors.toList());
+        log.info("评论回复知识检索阶段完成，shopId={}, hitCount={}, promptHitCount={}, minCosineScore={}, durationMs={}",
+                shop.getId(), hits.size(), promptHits.size(), minCosineScore, durationMs(searchStart));
+        return promptHits;
     }
 
     private CommentReplyContentResultDTO buildOfficialResult(MtShop shop,
@@ -210,9 +224,9 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
             case BAD -> "差评回复：先表达歉意，再回应具体问题，表达改进意愿。";
             case UNKNOWN -> "";
         };
-        String fallback = "你是外卖商家客服。只能根据提供的知识和评价内容生成商家回复。"
+        String fallback = "你是外卖商家客服。请根据顾客评价生成商家回复；如果提供了商户知识，只能在和评价高度相关时作为补充依据。"
                 + "回复必须礼貌、自然、简短，30到100个中文字符。"
-                + "不要编造知识库不存在的信息。不要承诺退款、赔偿、补发或私下联系，除非知识库明确提供。"
+                + "不要编造评价和商户知识之外的具体事实。不要承诺退款、赔偿、补发或私下联系，除非商户知识明确提供。"
                 + "只输出最终商家回复文本，不要解释。"
                 + strategy;
         String promptKey = switch (sentiment) {
@@ -232,11 +246,11 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 .map(hit -> "- " + hit.getChunk().getChunkText())
                 .collect(Collectors.joining("\n"));
         String fallback = "顾客评价：\n" + buildQueryText(comment, imageSummary)
-                + "\n\n可用商户知识：\n" + contexts
+                + "\n\n高匹配商户知识（无则显示“无”）：\n" + StringUtils.defaultIfBlank(contexts, "无")
                 + "\n\n请生成一条商家回复。";
         Map<String, Object> variables = new LinkedHashMap<>();
         variables.put("commentText", buildQueryText(comment, imageSummary));
-        variables.put("knowledgeContexts", contexts);
+        variables.put("knowledgeContexts", StringUtils.defaultIfBlank(contexts, "无"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
                 SystemPromptKeyConstant.COMMENT_REPLY_USER,
                 variables,
@@ -308,8 +322,9 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         generation.setReplyContent(reply);
         generation.setOfficialItemId(officialItemId);
         generation.setKnowledgeHitJson(knowledgeHitJson);
-        generation.setLlmProvider(source == CommentReplySourceEnum.SHOP_RAG ? LLM_PROVIDER_TOKENHUB : null);
-        generation.setLlmModel(source == CommentReplySourceEnum.SHOP_RAG ? knowledge.getChatModel() : null);
+        boolean generatedByLlm = source == CommentReplySourceEnum.SHOP_RAG || source == CommentReplySourceEnum.LLM;
+        generation.setLlmProvider(generatedByLlm ? LLM_PROVIDER_TOKENHUB : null);
+        generation.setLlmModel(generatedByLlm ? knowledge.getChatModel() : null);
         generation.setEmbeddingProvider(source == CommentReplySourceEnum.SHOP_RAG ? knowledge.getEmbeddingProvider() : null);
         generation.setEmbeddingModel(source == CommentReplySourceEnum.SHOP_RAG ? knowledge.getEmbeddingModel() : null);
         generation.setPowerAmount(powerAmount);

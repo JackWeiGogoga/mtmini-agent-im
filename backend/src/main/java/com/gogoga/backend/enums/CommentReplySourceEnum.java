@@ -9,6 +9,7 @@ import lombok.Getter;
 public enum CommentReplySourceEnum {
 
     OFFICIAL_RANDOM("官方随机"),
+    LLM("大模型"),
     SHOP_RAG("商户RAG"),
     FALLBACK_OFFICIAL("官方兜底");
 

@@ -2,7 +2,7 @@
 
 ALTER TABLE `mt_comment`
   MODIFY COLUMN `auto_reply_status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '自动回复状态 PENDING/SUCCESS/FAILED/SKIPPED',
-  ADD COLUMN `auto_reply_source` varchar(32) DEFAULT NULL COMMENT '自动回复来源 OFFICIAL_RANDOM/SHOP_RAG/FALLBACK_OFFICIAL',
+  ADD COLUMN `auto_reply_source` varchar(32) DEFAULT NULL COMMENT '自动回复来源 OFFICIAL_RANDOM/LLM/SHOP_RAG/FALLBACK_OFFICIAL',
   ADD COLUMN `auto_reply_sentiment` varchar(32) DEFAULT NULL COMMENT '自动回复评论类型 GOOD/NEUTRAL/BAD',
   ADD COLUMN `auto_reply_generation_id` bigint DEFAULT NULL COMMENT '自动回复生成记录ID',
   ADD COLUMN `auto_reply_knowledge_hit_json` longtext COMMENT '自动回复命中知识JSON',
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `mt_comment_reply_generation` (
   `shop_id` bigint NOT NULL COMMENT '门店ID',
   `mt_comment_id` bigint DEFAULT NULL COMMENT '本地评价ID',
   `comment_id` bigint NOT NULL COMMENT '美团评价ID',
-  `reply_source` varchar(32) NOT NULL COMMENT '回复来源 OFFICIAL_RANDOM/SHOP_RAG/FALLBACK_OFFICIAL',
+  `reply_source` varchar(32) NOT NULL COMMENT '回复来源 OFFICIAL_RANDOM/LLM/SHOP_RAG/FALLBACK_OFFICIAL',
   `sentiment` varchar(32) DEFAULT NULL COMMENT '评论类型 GOOD/NEUTRAL/BAD',
   `reply_content` varchar(1000) DEFAULT NULL COMMENT '生成回复内容',
   `official_item_id` bigint DEFAULT NULL COMMENT '官方文案ID',

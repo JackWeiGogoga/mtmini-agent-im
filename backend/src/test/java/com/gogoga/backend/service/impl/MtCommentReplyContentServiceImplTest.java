@@ -36,6 +36,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -125,7 +126,6 @@ class MtCommentReplyContentServiceImplTest {
 
     @Test
     void insufficientBalanceFallsBackToOfficialWithoutModelCall() {
-        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(true);
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(100000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
@@ -138,6 +138,24 @@ class MtCommentReplyContentServiceImplTest {
         assertEquals("FALLBACK_OFFICIAL", result.getReplySource());
         verify(commentReplyEmbeddingService, never()).embed(any());
         verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+    }
+
+    @Test
+    void noShopKnowledgeStillUsesChatModelWithoutEmbeddingSearch() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(5));
+
+        assertEquals("LLM", result.getReplySource());
+        assertEquals("感谢认可，我们会继续保持。", result.getReplyContent());
+        assertNull(result.getKnowledgeHitJson());
+        verify(commentReplyEmbeddingService, never()).embed(any());
+        verify(knowledgeVectorStore, never()).searchTopK(any(), any(), any());
+        verify(officialTemplateService, never()).selectRandomEnabledTemplate(any());
     }
 
     @Test
@@ -158,6 +176,26 @@ class MtCommentReplyContentServiceImplTest {
         verify(mtPowerConsumeService).consume(consumeCaptor.capture());
         assertEquals("COMMENT_RAG_REPLY:542543250001", consumeCaptor.getValue().getRequestNo());
         verify(mtCommentReplyGenerationMapper).insert(any(MtCommentReplyGeneration.class));
+    }
+
+    @Test
+    void lowSimilarityKnowledgeDoesNotEnterPromptContext() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(true);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+        when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(lowSimilarityHit()));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
+
+        assertEquals("LLM", result.getReplySource());
+        assertNull(result.getKnowledgeHitJson());
+        ArgumentCaptor<MtCommentReplyGeneration> generationCaptor = ArgumentCaptor.forClass(MtCommentReplyGeneration.class);
+        verify(mtCommentReplyGenerationMapper).insert(generationCaptor.capture());
+        assertEquals("LLM", generationCaptor.getValue().getReplySource());
+        assertNull(generationCaptor.getValue().getKnowledgeHitJson());
     }
 
     @Test
@@ -236,6 +274,13 @@ class MtCommentReplyContentServiceImplTest {
         hit.setChunk(chunk);
         hit.setCosineScore(0.9D);
         hit.setScore(0.98D);
+        return hit;
+    }
+
+    private KnowledgeSearchHitDTO lowSimilarityHit() {
+        KnowledgeSearchHitDTO hit = hit();
+        hit.setCosineScore(0.3D);
+        hit.setScore(0.38D);
         return hit;
     }
 

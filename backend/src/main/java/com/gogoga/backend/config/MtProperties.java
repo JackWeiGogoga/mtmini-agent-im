@@ -341,6 +341,11 @@ public class MtProperties {
         private int topK = 5;
 
         /**
+         * 进入回复 prompt 的最低知识片段余弦相似度。
+         */
+        private double minContextCosineScore = 0.75D;
+
+        /**
          * 进入 RAG 前要求门店余额大于该值。
          */
         private int ragBalanceThreshold = 100000;
