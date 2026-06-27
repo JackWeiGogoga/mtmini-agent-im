@@ -14,6 +14,7 @@ import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
+import com.gogoga.backend.service.CommentReplySensitiveWordService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtH5ShopService;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
@@ -39,6 +40,7 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
     private final CommentReplyEmbeddingService commentReplyEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final MtProperties mtProperties;
+    private final CommentReplySensitiveWordService commentReplySensitiveWordService;
 
     @Override
     public List<CommentReplyKnowledgeItemVO> listCurrentShopQa() {
@@ -72,6 +74,7 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
             throw new BusinessException("每个商户最多上传 " + maxCount + " 条问答知识");
         }
         CommentReplySentimentEnum sentiment = requireSentiment(param.getSentiment());
+        validateSensitiveWord(shopId, param);
         LocalDateTime now = LocalDateTime.now();
         MtReplyKnowledgeItem item = new MtReplyKnowledgeItem();
         item.setShopId(shopId);
@@ -103,6 +106,7 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
         requireShopId(shopId);
         MtReplyKnowledgeItem item = requireCurrentShopQa(id, shopId);
         CommentReplySentimentEnum sentiment = requireSentiment(param.getSentiment());
+        validateSensitiveWord(shopId, param);
         item.setSentiment(sentiment.name());
         item.setTitle(StringUtils.trim(param.getTitle()));
         item.setQuestion(StringUtils.trim(param.getQuestion()));
@@ -181,6 +185,13 @@ public class CommentReplyKnowledgeServiceImpl implements CommentReplyKnowledgeSe
                 + "评论类型：" + StringUtils.defaultString(item.getSentiment()) + "\n"
                 + "问题：" + StringUtils.defaultString(item.getQuestion()) + "\n"
                 + "回答：" + StringUtils.defaultString(item.getAnswer());
+    }
+
+    private void validateSensitiveWord(Long shopId, CommentReplyQaKnowledgeParam param) {
+        String text = "标题：" + StringUtils.defaultString(param.getTitle()) + "\n"
+                + "问题：" + StringUtils.defaultString(param.getQuestion()) + "\n"
+                + "回答：" + StringUtils.defaultString(param.getAnswer());
+        commentReplySensitiveWordService.validateKnowledgeText(shopId, CommentReplyKnowledgeSourceTypeEnum.QA.name(), text);
     }
 
     private int estimateTokenCount(String text) {

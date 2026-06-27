@@ -20,12 +20,21 @@ public class CommentReplyOfficialTemplateServiceImpl implements CommentReplyOffi
     private final MtProperties mtProperties;
 
     @Override
-    public MtReplyKnowledgeItem selectRandomEnabledTemplate(CommentReplySentimentEnum sentiment) {
+    public List<MtReplyKnowledgeItem> listEnabledTemplates(CommentReplySentimentEnum sentiment) {
         if (sentiment == null || sentiment == CommentReplySentimentEnum.UNKNOWN) {
-            return null;
+            return List.of();
         }
         List<MtReplyKnowledgeItem> templates = mtReplyKnowledgeItemMapper.selectOfficialTemplates(sentiment.name());
         if (templates == null || templates.isEmpty()) {
+            return List.of();
+        }
+        return templates;
+    }
+
+    @Override
+    public MtReplyKnowledgeItem selectRandomEnabledTemplate(CommentReplySentimentEnum sentiment) {
+        List<MtReplyKnowledgeItem> templates = listEnabledTemplates(sentiment);
+        if (templates.isEmpty()) {
             return null;
         }
         return templates.get(ThreadLocalRandom.current().nextInt(templates.size()));

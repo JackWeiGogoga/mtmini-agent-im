@@ -27,6 +27,8 @@ server:
       suffix: .log
 
 spring:
+  config:
+    import: classpath:comment-reply-sensitive-words.yml
   application:
     name: backend
   profiles:
@@ -198,6 +200,9 @@ mt:
     reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:false}
     dry-run-reschedule-seconds: ${MT_COMMENT_DRY_RUN_RESCHEDULE_SECONDS:3600}
     default-reply: ${MT_COMMENT_DEFAULT_REPLY:很好}
+    sensitive-word:
+      enabled: ${MT_COMMENT_SENSITIVE_WORD_ENABLED:true}
+      max-rewrite-attempts: ${MT_COMMENT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}
     knowledge:
       enabled: ${MT_COMMENT_KNOWLEDGE_ENABLED:true}
       max-qa-items-per-shop: ${MT_COMMENT_KNOWLEDGE_MAX_QA_ITEMS_PER_SHOP:500}

@@ -1,5 +1,6 @@
 package com.gogoga.backend.service.impl;
 
+import com.gogoga.backend.config.CommentReplySensitiveWordsProperties;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.dto.CommentImageSummaryResultDTO;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
@@ -16,6 +17,7 @@ import com.gogoga.backend.mapper.MtCommentReplyGenerationMapper;
 import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyOfficialTemplateService;
+import com.gogoga.backend.service.CommentReplySensitiveWordService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtPowerAccountService;
 import com.gogoga.backend.service.MtPowerConsumeService;
@@ -23,6 +25,7 @@ import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.SystemPromptService;
 import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.ChatCompletion;
+import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,13 +72,18 @@ class MtCommentReplyContentServiceImplTest {
     private SystemPromptService systemPromptService;
 
     private MtProperties mtProperties;
+    private CommentReplySensitiveWordsProperties sensitiveWordsProperties;
     private MtCommentReplyContentServiceImpl service;
+    private CommentReplySensitiveWordService commentReplySensitiveWordService;
 
     @BeforeEach
     void setUp() {
         mtProperties = new MtProperties();
+        sensitiveWordsProperties = new CommentReplySensitiveWordsProperties();
         mtProperties.getComment().setDefaultReply("感谢评价");
         mtProperties.getComment().getKnowledge().setModelApiKey("key");
+        addSensitiveWord("OFF_PLATFORM", "站外导流违规词", "HIGH", "微信");
+        commentReplySensitiveWordService = new CommentReplySensitiveWordServiceImpl(mtProperties, sensitiveWordsProperties);
         service = new MtCommentReplyContentServiceImpl(
                 mtProperties,
                 officialTemplateService,
@@ -85,7 +94,8 @@ class MtCommentReplyContentServiceImplTest {
                 mtPowerAccountService,
                 mtPowerConsumeService,
                 mtCommentReplyGenerationMapper,
-                systemPromptService
+                systemPromptService,
+                commentReplySensitiveWordService
         );
         lenient().doAnswer(invocation -> {
             MtCommentReplyGeneration generation = invocation.getArgument(0);
@@ -159,6 +169,24 @@ class MtCommentReplyContentServiceImplTest {
     }
 
     @Test
+    void chatSystemPromptContainsMeituanComplianceRules() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
+
+        service.generateReply(shop(), comment(5));
+
+        ArgumentCaptor<ChatCompletionCreateParams> paramsCaptor = ArgumentCaptor.forClass(ChatCompletionCreateParams.class);
+        verify(openAiCompatibleChatService).createChatCompletion(any(), any(), paramsCaptor.capture());
+        String paramsText = paramsCaptor.getValue().toString();
+        assertTrue(paramsText.contains("美团平台商家回复规范"));
+        assertTrue(paramsText.contains("不引导用户添加微信"));
+        assertTrue(paramsText.contains("不承诺好评返现"));
+    }
+
+    @Test
     void ragSuccessConsumesPowerAndRecordsGeneration() {
         when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(true);
         MtPowerAccount account = new MtPowerAccount();
@@ -224,6 +252,91 @@ class MtCommentReplyContentServiceImplTest {
     }
 
     @Test
+    void sensitiveReplyRewritesOnceAndUsesRewrittenReply() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+                .thenReturn(chatCompletion("请加微信处理。"))
+                .thenReturn(chatCompletion("非常抱歉给您带来不好的体验，我们会认真改进服务。"));
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(1));
+
+        assertEquals("非常抱歉给您带来不好的体验，我们会认真改进服务。", result.getReplyContent());
+        assertEquals("LLM", result.getReplySource());
+        ArgumentCaptor<MtCommentReplyGeneration> generationCaptor = ArgumentCaptor.forClass(MtCommentReplyGeneration.class);
+        verify(mtCommentReplyGenerationMapper).insert(generationCaptor.capture());
+        assertEquals(1, generationCaptor.getValue().getSensitiveRewriteCount());
+        assertEquals(false, generationCaptor.getValue().getSensitiveFallbackUsed());
+        assertTrue(generationCaptor.getValue().getSensitiveHitJson().contains("站外导流违规词"));
+        ArgumentCaptor<ChatCompletionCreateParams> paramsCaptor = ArgumentCaptor.forClass(ChatCompletionCreateParams.class);
+        verify(openAiCompatibleChatService, times(2)).createChatCompletion(any(), any(), paramsCaptor.capture());
+        String rewriteParamsText = paramsCaptor.getAllValues().get(1).toString();
+        assertTrue(rewriteParamsText.contains("美团平台商家回复规范"));
+        assertTrue(rewriteParamsText.contains("不要解释敏感词规则"));
+        assertTrue(rewriteParamsText.contains("不要复述被命中的词"));
+    }
+
+    @Test
+    void sensitiveReplyFallsBackToSafeOfficialTemplateWhenRewriteStillHits() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+                .thenReturn(chatCompletion("请加微信处理。"))
+                .thenReturn(chatCompletion("还是加微信处理。"));
+        when(officialTemplateService.listEnabledTemplates(any())).thenReturn(List.of(official("感谢反馈，我们会认真改进。")));
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(1));
+
+        assertEquals("感谢反馈，我们会认真改进。", result.getReplyContent());
+        assertEquals("FALLBACK_OFFICIAL", result.getReplySource());
+        ArgumentCaptor<MtCommentReplyGeneration> generationCaptor = ArgumentCaptor.forClass(MtCommentReplyGeneration.class);
+        verify(mtCommentReplyGenerationMapper).insert(generationCaptor.capture());
+        assertEquals(1, generationCaptor.getValue().getSensitiveRewriteCount());
+        assertEquals(true, generationCaptor.getValue().getSensitiveFallbackUsed());
+        assertEquals("SENSITIVE_WORD_FALLBACK", generationCaptor.getValue().getFallbackReason());
+    }
+
+    @Test
+    void sensitiveReplyFallsBackToDefaultReplyWhenOfficialTemplatesUnavailable() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+                .thenReturn(chatCompletion("请加微信处理。"))
+                .thenReturn(chatCompletion("还是加微信处理。"));
+        when(officialTemplateService.listEnabledTemplates(any())).thenReturn(List.of());
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(1));
+
+        assertEquals("感谢评价", result.getReplyContent());
+        assertEquals("FALLBACK_OFFICIAL", result.getReplySource());
+    }
+
+    @Test
+    void sensitiveKnowledgeHitIsFilteredFromRagContext() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(true);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
+        when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(sensitiveHit()));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
+
+        assertEquals("LLM", result.getReplySource());
+        assertNull(result.getKnowledgeHitJson());
+        ArgumentCaptor<MtCommentReplyGeneration> generationCaptor = ArgumentCaptor.forClass(MtCommentReplyGeneration.class);
+        verify(mtCommentReplyGenerationMapper).insert(generationCaptor.capture());
+        assertNull(generationCaptor.getValue().getKnowledgeHitJson());
+    }
+
+    @Test
     void ragFailureFallsBackToOfficialTemplate() {
         when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(true);
         MtPowerAccount account = new MtPowerAccount();
@@ -282,6 +395,25 @@ class MtCommentReplyContentServiceImplTest {
         hit.setCosineScore(0.3D);
         hit.setScore(0.38D);
         return hit;
+    }
+
+    private KnowledgeSearchHitDTO sensitiveHit() {
+        KnowledgeSearchHitDTO hit = hit();
+        hit.getChunk().setChunkText("问题：配送慢\n回答：请加微信处理");
+        hit.setCosineScore(0.95D);
+        hit.setScore(1.0D);
+        return hit;
+    }
+
+    private void addSensitiveWord(String code, String name, String severity, String word) {
+        CommentReplySensitiveWordsProperties.Category category = new CommentReplySensitiveWordsProperties.Category();
+        category.setCode(code);
+        category.setName(name);
+        category.setSeverity(severity);
+        CommentReplySensitiveWordsProperties.Word item = new CommentReplySensitiveWordsProperties.Word();
+        item.setText(word);
+        category.getWords().add(item);
+        sensitiveWordsProperties.getCategories().add(category);
     }
 
     private CommentImageSummaryResultDTO emptyImageSummary() {

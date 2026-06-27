@@ -10,6 +10,7 @@ import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.mapper.MtReplyKnowledgeItemMapper;
 import com.gogoga.backend.param.CommentReplyQaKnowledgeParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
+import com.gogoga.backend.service.CommentReplySensitiveWordService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtH5ShopService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +46,8 @@ class CommentReplyKnowledgeServiceImplTest {
     private CommentReplyEmbeddingService commentReplyEmbeddingService;
     @Mock
     private KnowledgeVectorStore knowledgeVectorStore;
+    @Mock
+    private CommentReplySensitiveWordService commentReplySensitiveWordService;
 
     private CommentReplyKnowledgeServiceImpl service;
 
@@ -58,8 +63,10 @@ class CommentReplyKnowledgeServiceImplTest {
                 mtReplyKnowledgeChunkMapper,
                 commentReplyEmbeddingService,
                 knowledgeVectorStore,
-                new MtProperties()
+                new MtProperties(),
+                commentReplySensitiveWordService
         );
+        lenient().doNothing().when(commentReplySensitiveWordService).validateKnowledgeText(any(), any(), any());
     }
 
     @Test
@@ -90,6 +97,19 @@ class CommentReplyKnowledgeServiceImplTest {
         verify(knowledgeVectorStore).upsertChunk(chunkCaptor.capture());
         assertEquals(100L, chunkCaptor.getValue().getShopId());
         assertEquals("GOOD", chunkCaptor.getValue().getSentiment());
+    }
+
+    @Test
+    void createCurrentShopQaRejectsSensitiveWordsBeforeInsert() {
+        when(mtReplyKnowledgeItemMapper.countEnabledQaByShopId(100L)).thenReturn(0);
+        doThrow(new BusinessException("内容命中敏感词类别：站外导流违规词"))
+                .when(commentReplySensitiveWordService).validateKnowledgeText(eq(100L), eq("QA"), any());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createCurrentShopQa(param(true)));
+
+        assertEquals("内容命中敏感词类别：站外导流违规词", exception.getMessage());
+        verify(mtReplyKnowledgeItemMapper, never()).insert(any());
     }
 
     @Test

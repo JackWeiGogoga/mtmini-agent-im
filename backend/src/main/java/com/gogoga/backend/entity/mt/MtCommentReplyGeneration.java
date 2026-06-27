@@ -27,6 +27,9 @@ public class MtCommentReplyGeneration {
     private Integer completionTokens;
     private Integer powerAmount;
     private Integer durationMs;
+    private String sensitiveHitJson;
+    private Integer sensitiveRewriteCount;
+    private Boolean sensitiveFallbackUsed;
     private String fallbackReason;
     private String errorStage;
     private String errorMessage;

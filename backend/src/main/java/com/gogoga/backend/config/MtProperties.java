@@ -300,6 +300,25 @@ public class MtProperties {
          * 评论知识库与 RAG 回复配置。
          */
         private Knowledge knowledge = new Knowledge();
+
+        /**
+         * 评论回复敏感词配置。
+         */
+        private SensitiveWord sensitiveWord = new SensitiveWord();
+    }
+
+    @Data
+    public static class SensitiveWord {
+
+        /**
+         * 是否启用敏感词检测。
+         */
+        private boolean enabled = true;
+
+        /**
+         * 命中敏感词后的最大改写次数。
+         */
+        private int maxRewriteAttempts = 1;
     }
 
     @Data

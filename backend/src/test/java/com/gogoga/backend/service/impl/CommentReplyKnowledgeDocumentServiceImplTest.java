@@ -9,6 +9,7 @@ import com.gogoga.backend.mapper.MtReplyKnowledgeChunkMapper;
 import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
+import com.gogoga.backend.service.CommentReplySensitiveWordService;
 import com.gogoga.backend.service.CosStorageService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtAsyncTaskService;
@@ -34,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -56,6 +58,8 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
     private KnowledgeVectorStore knowledgeVectorStore;
     @Mock
     private CommentReplyEmbeddingService commentReplyEmbeddingService;
+    @Mock
+    private CommentReplySensitiveWordService commentReplySensitiveWordService;
 
     private MtProperties mtProperties;
     private CommentReplyKnowledgeDocumentServiceImpl service;
@@ -74,8 +78,10 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
                 mtAsyncTaskService,
                 mtProperties,
                 knowledgeVectorStore,
-                commentReplyEmbeddingService
+                commentReplyEmbeddingService,
+                commentReplySensitiveWordService
         );
+        lenient().doNothing().when(commentReplySensitiveWordService).validateKnowledgeText(any(), any(), any());
     }
 
     @Test
@@ -252,6 +258,27 @@ class CommentReplyKnowledgeDocumentServiceImplTest {
 
         verify(knowledgeVectorStore, org.mockito.Mockito.never()).upsertChunks(any());
         verify(mtReplyKnowledgeDocumentMapper).updateParseStatus(eq(7L), eq("FAILED"), eq("知识文档没有可用片段"), eq(0), any());
+    }
+
+    @Test
+    void sensitiveDocumentChunkFailsParseWithoutSavingChunks() {
+        MtReplyKnowledgeDocument document = document("TXT", "sensitive.txt");
+        when(mtReplyKnowledgeDocumentMapper.selectByIdAndShopId(7L, 100L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/100/sensitive.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content("好评 感谢 加微信".getBytes(StandardCharsets.UTF_8))
+                        .fileName("sensitive.txt")
+                        .build());
+        doThrow(new BusinessException("内容命中敏感词类别：站外导流违规词"))
+                .when(commentReplySensitiveWordService).validateKnowledgeText(eq(100L), eq("DOCUMENT"), any());
+
+        MtKnowledgeDocumentParseTaskPayload payload = new MtKnowledgeDocumentParseTaskPayload();
+        payload.setShopId(100L);
+        payload.setDocumentId(7L);
+        service.executeDocumentParseTask(payload);
+
+        verify(knowledgeVectorStore, org.mockito.Mockito.never()).upsertChunks(any());
+        verify(mtReplyKnowledgeDocumentMapper).updateParseStatus(eq(7L), eq("FAILED"), eq("内容命中敏感词类别：站外导流违规词"), eq(0), any());
     }
 
     @Test

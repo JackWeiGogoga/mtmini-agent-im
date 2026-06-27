@@ -14,6 +14,7 @@ import com.gogoga.backend.mapper.MtReplyKnowledgeDocumentMapper;
 import com.gogoga.backend.param.CommentReplyKnowledgeChunkUpdateParam;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
+import com.gogoga.backend.service.CommentReplySensitiveWordService;
 import com.gogoga.backend.service.CosStorageService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtAsyncTaskService;
@@ -66,6 +67,7 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
     private final MtProperties mtProperties;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final CommentReplyEmbeddingService commentReplyEmbeddingService;
+    private final CommentReplySensitiveWordService commentReplySensitiveWordService;
 
     @Override
     public List<CommentReplyKnowledgeDocumentVO> listCurrentShopDocuments() {
@@ -786,6 +788,11 @@ public class CommentReplyKnowledgeDocumentServiceImpl implements CommentReplyKno
         List<MtReplyKnowledgeChunk> chunks = new ArrayList<>();
         for (ParsedDocumentChunk rawChunk : rawChunks) {
             String text = rawChunk.getText();
+            commentReplySensitiveWordService.validateKnowledgeText(
+                    document.getShopId(),
+                    CommentReplyKnowledgeSourceTypeEnum.DOCUMENT.name(),
+                    text
+            );
             float[] embedding = commentReplyEmbeddingService.embed(text);
             MtReplyKnowledgeChunk chunk = new MtReplyKnowledgeChunk();
             chunk.setShopId(document.getShopId());
