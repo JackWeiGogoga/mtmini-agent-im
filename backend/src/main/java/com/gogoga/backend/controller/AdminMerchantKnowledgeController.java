@@ -2,6 +2,7 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
+import com.gogoga.backend.dto.CommentComplaintPreviewDTO;
 import com.gogoga.backend.dto.CommentLogAnalysisPreviewDTO;
 import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.config.MtProperties;
@@ -16,6 +17,7 @@ import com.gogoga.backend.service.CommentReplyKnowledgeService;
 import com.gogoga.backend.service.CommentLogAnalysisService;
 import com.gogoga.backend.service.CosStorageService;
 import com.gogoga.backend.service.MtCommentReplyContentService;
+import com.gogoga.backend.service.MtCommentComplaintService;
 import com.gogoga.backend.service.UserShopBindingService;
 import com.gogoga.backend.util.CommentImageUrlUtil;
 import com.gogoga.backend.vo.CommentReplyImageUploadVO;
@@ -60,6 +62,7 @@ public class AdminMerchantKnowledgeController {
     private final CommentReplyKnowledgeService commentReplyKnowledgeService;
     private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
+    private final MtCommentComplaintService mtCommentComplaintService;
     private final CommentLogAnalysisService commentLogAnalysisService;
     private final CosStorageService cosStorageService;
     private final MtProperties mtProperties;
@@ -187,6 +190,49 @@ public class AdminMerchantKnowledgeController {
     ) {
         long startNanos = System.nanoTime();
         MtShop shop = requireVisibleShop(shopId);
+        MtComment comment = buildTestComment(shop, param);
+        try {
+            CommentReplyContentResultDTO result = mtCommentReplyContentService.previewReply(shop, comment);
+            if (result != null && result.getImageSummaryText() != null) {
+                comment.setImageSummaryText(result.getImageSummaryText());
+            }
+            attachAnalysisPreview(result, comment);
+            if (result != null) {
+                result.setTotalDurationMs(durationMs(startNanos));
+            }
+            log.info("测试回复生成完成，shopId={}, commentId={}, replyDurationMs={}, analysisDurationMs={}, totalDurationMs={}",
+                    shopId,
+                    comment.getCommentId(),
+                    result == null ? null : result.getReplyDurationMs(),
+                    result == null ? null : result.getAnalysisDurationMs(),
+                    result == null ? null : result.getTotalDurationMs());
+            return ResultVO.success(result);
+        } finally {
+            cleanupTemporaryImages(shopId, param.getTemporaryImageObjectKeys());
+        }
+    }
+
+    @PostMapping("/complaint-test")
+    public ResultVO<CommentComplaintPreviewDTO> testComplaint(
+            @RequestParam Long shopId,
+            @Valid @RequestBody CommentReplyTestParam param
+    ) {
+        MtShop shop = requireVisibleShop(shopId);
+        MtComment comment = buildTestComment(shop, param);
+        try {
+            CommentComplaintPreviewDTO result = mtCommentComplaintService.previewComplaint(shop, comment);
+            log.info("测试申诉生成完成，shopId={}, commentId={}, reportTypeCode={}, durationMs={}",
+                    shopId,
+                    comment.getCommentId(),
+                    result == null ? null : result.getReportTypeCode(),
+                    result == null ? null : result.getDurationMs());
+            return ResultVO.success(result);
+        } finally {
+            cleanupTemporaryImages(shopId, param.getTemporaryImageObjectKeys());
+        }
+    }
+
+    private MtComment buildTestComment(MtShop shop, CommentReplyTestParam param) {
         MtComment comment = new MtComment();
         comment.setId(null);
         comment.setShopId(shop.getId());
@@ -207,25 +253,7 @@ public class AdminMerchantKnowledgeController {
         );
         comment.setCommentPictures(String.join(",", imageUrls));
         comment.setImageSummaryText(param.getImageSummaryText());
-        try {
-            CommentReplyContentResultDTO result = mtCommentReplyContentService.previewReply(shop, comment);
-            if (result != null && result.getImageSummaryText() != null) {
-                comment.setImageSummaryText(result.getImageSummaryText());
-            }
-            attachAnalysisPreview(result, comment);
-            if (result != null) {
-                result.setTotalDurationMs(durationMs(startNanos));
-            }
-            log.info("测试回复生成完成，shopId={}, commentId={}, replyDurationMs={}, analysisDurationMs={}, totalDurationMs={}",
-                    shopId,
-                    comment.getCommentId(),
-                    result == null ? null : result.getReplyDurationMs(),
-                    result == null ? null : result.getAnalysisDurationMs(),
-                    result == null ? null : result.getTotalDurationMs());
-            return ResultVO.success(result);
-        } finally {
-            cleanupTemporaryImages(shopId, param.getTemporaryImageObjectKeys());
-        }
+        return comment;
     }
 
     private void attachAnalysisPreview(CommentReplyContentResultDTO result, MtComment comment) {

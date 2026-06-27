@@ -42,6 +42,7 @@ import {
   listMerchantReplyDocuments,
   listMerchantReplyQa,
   previewMerchantReplyDocument,
+  testMerchantComplaint,
   testMerchantReply,
   updateMerchantReplyChunkEnabled,
   updateMerchantReplyChunkSentiment,
@@ -54,6 +55,7 @@ import type {
   CommentReplyKnowledgeDocument,
   CommentReplyKnowledgeDocumentPreview,
   CommentReplyKnowledgeItem,
+  CommentComplaintTestResult,
   CommentReplyQaKnowledgeParam,
   CommentReplySentiment,
   CommentReplyTestParam,
@@ -336,6 +338,7 @@ export default function MerchantKnowledgeManage() {
     currentUser?.activePortal === "ADMIN" && isSuperAdmin;
   const [qaForm] = Form.useForm<CommentReplyQaKnowledgeParam>();
   const [replyTestForm] = Form.useForm<ReplyTestFormValues>();
+  const [complaintTestForm] = Form.useForm<ReplyTestFormValues>();
   const [shops, setShops] = useState<UserShopBinding[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<number | undefined>(
     () => {
@@ -363,15 +366,24 @@ export default function MerchantKnowledgeManage() {
   );
   const [savingQa, setSavingQa] = useState(false);
   const [testingReply, setTestingReply] = useState(false);
+  const [testingComplaint, setTestingComplaint] = useState(false);
   const [uploadingReplyTestImages, setUploadingReplyTestImages] =
+    useState(false);
+  const [uploadingComplaintTestImages, setUploadingComplaintTestImages] =
     useState(false);
   const [replyTestImageObjectKeys, setReplyTestImageObjectKeys] = useState<
     string[]
   >([]);
+  const [complaintTestImageObjectKeys, setComplaintTestImageObjectKeys] =
+    useState<string[]>([]);
   const [replyImageInputMode, setReplyImageInputMode] =
+    useState<ReplyImageInputMode>("url");
+  const [complaintImageInputMode, setComplaintImageInputMode] =
     useState<ReplyImageInputMode>("url");
   const [replyTestResult, setReplyTestResult] =
     useState<CommentReplyTestResult | null>(null);
+  const [complaintTestResult, setComplaintTestResult] =
+    useState<CommentComplaintTestResult | null>(null);
   const [chunkDrawerOpen, setChunkDrawerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] =
     useState<CommentReplyKnowledgeDocument | null>(null);
@@ -576,6 +588,33 @@ export default function MerchantKnowledgeManage() {
     }
   };
 
+  const buildCommentTestPayload = (
+    values: ReplyTestFormValues,
+    imageInputMode: ReplyImageInputMode,
+    imageObjectKeys: string[],
+  ): CommentReplyTestParam => {
+    const useSummary = imageInputMode === "summary";
+    const usePictures = imageInputMode === "url" || imageInputMode === "upload";
+    return {
+      productScore: values.productScore,
+      packingScore: values.packingScore,
+      orderCommentScore: values.orderCommentScore,
+      deliveryCommentScore: values.deliveryCommentScore,
+      commentLabels: values.commentLabels?.length
+        ? values.commentLabels.join(",")
+        : undefined,
+      overDeliveryTimeDesc: values.overDeliveryTimeDesc?.trim() || undefined,
+      commentContent: values.commentContent,
+      addComment: values.addComment?.trim() || undefined,
+      commentPictures: usePictures
+        ? parseReplyImageUrls(values.commentPicturesText)
+        : [],
+      temporaryImageObjectKeys:
+        imageInputMode === "upload" ? imageObjectKeys : [],
+      imageSummaryText: useSummary ? values.imageSummaryText : undefined,
+    };
+  };
+
   const submitReplyTest = async () => {
     if (!selectedShopId) {
       message.warning("请先选择商户");
@@ -585,29 +624,15 @@ export default function MerchantKnowledgeManage() {
     setTestingReply(true);
     setReplyTestResult(null);
     try {
-      const useSummary = replyImageInputMode === "summary";
-      const usePictures =
-        replyImageInputMode === "url" || replyImageInputMode === "upload";
       setReplyTestResult(
-        await testMerchantReply(selectedShopId, {
-          productScore: values.productScore,
-          packingScore: values.packingScore,
-          orderCommentScore: values.orderCommentScore,
-          deliveryCommentScore: values.deliveryCommentScore,
-          commentLabels: values.commentLabels?.length
-            ? values.commentLabels.join(",")
-            : undefined,
-          overDeliveryTimeDesc:
-            values.overDeliveryTimeDesc?.trim() || undefined,
-          commentContent: values.commentContent,
-          addComment: values.addComment?.trim() || undefined,
-          commentPictures: usePictures
-            ? parseReplyImageUrls(values.commentPicturesText)
-            : [],
-          temporaryImageObjectKeys:
-            replyImageInputMode === "upload" ? replyTestImageObjectKeys : [],
-          imageSummaryText: useSummary ? values.imageSummaryText : undefined,
-        }),
+        await testMerchantReply(
+          selectedShopId,
+          buildCommentTestPayload(
+            values,
+            replyImageInputMode,
+            replyTestImageObjectKeys,
+          ),
+        ),
       );
     } catch (error) {
       message.error(error instanceof Error ? error.message : "测试回复失败");
@@ -617,6 +642,36 @@ export default function MerchantKnowledgeManage() {
         replyTestForm.setFieldValue("commentPicturesText", "");
       }
       setTestingReply(false);
+    }
+  };
+
+  const submitComplaintTest = async () => {
+    if (!selectedShopId) {
+      message.warning("请先选择商户");
+      return;
+    }
+    const values = await complaintTestForm.validateFields();
+    setTestingComplaint(true);
+    setComplaintTestResult(null);
+    try {
+      setComplaintTestResult(
+        await testMerchantComplaint(
+          selectedShopId,
+          buildCommentTestPayload(
+            values,
+            complaintImageInputMode,
+            complaintTestImageObjectKeys,
+          ),
+        ),
+      );
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "测试申诉失败");
+    } finally {
+      if (complaintImageInputMode === "upload") {
+        setComplaintTestImageObjectKeys([]);
+        complaintTestForm.setFieldValue("commentPicturesText", "");
+      }
+      setTestingComplaint(false);
     }
   };
 
@@ -658,6 +713,47 @@ export default function MerchantKnowledgeManage() {
       );
     } finally {
       setUploadingReplyTestImages(false);
+    }
+  };
+
+  const handleComplaintTestImageUpload = async (files: File[]) => {
+    if (!selectedShopId) {
+      message.warning("请先选择商户");
+      return;
+    }
+    if (!files.length) {
+      return;
+    }
+    setUploadingComplaintTestImages(true);
+    try {
+      const uploaded = await uploadMerchantReplyTestImages(
+        selectedShopId,
+        files,
+      );
+      const current = complaintTestForm.getFieldValue("commentPicturesText");
+      const urls = [
+        ...parseReplyImageUrls(current),
+        ...uploaded.map((item) => item.url).filter(Boolean),
+      ];
+      setComplaintTestImageObjectKeys((currentKeys) =>
+        Array.from(
+          new Set([
+            ...currentKeys,
+            ...uploaded.map((item) => item.objectKey).filter(Boolean),
+          ]),
+        ),
+      );
+      complaintTestForm.setFieldValue(
+        "commentPicturesText",
+        Array.from(new Set(urls)).join("\n"),
+      );
+      message.success(`已上传 ${uploaded.length} 张图片`);
+    } catch (error) {
+      message.error(
+        error instanceof Error ? error.message : "上传测试图片失败",
+      );
+    } finally {
+      setUploadingComplaintTestImages(false);
     }
   };
 
@@ -1434,6 +1530,359 @@ export default function MerchantKnowledgeManage() {
                           </Space>
                         ) : (
                           <Empty description="输入评价后生成测试回复" />
+                        )}
+                      </Card>
+                    </div>
+                  ),
+                },
+                {
+                  key: "complaint-test",
+                  label: "测试申诉效果",
+                  children: (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "minmax(320px, 420px) minmax(0, 1fr)",
+                        gap: 16,
+                        height: REPLY_TEST_PANEL_HEIGHT,
+                        minHeight: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          minHeight: 0,
+                          overflow: "auto",
+                          paddingRight: 4,
+                        }}
+                      >
+                        <Form
+                          form={complaintTestForm}
+                          layout="vertical"
+                          initialValues={{
+                            productScore: 1,
+                            packingScore: 1,
+                            orderCommentScore: 1,
+                            deliveryCommentScore: 5,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              columnGap: 12,
+                            }}
+                          >
+                            <Form.Item
+                              name="productScore"
+                              label="商品评分"
+                              rules={[
+                                { required: true, message: "请选择商品评分" },
+                              ]}
+                              style={{ marginBottom: 12 }}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="packingScore"
+                              label="包装评分"
+                              rules={[
+                                { required: true, message: "请选择包装评分" },
+                              ]}
+                              style={{ marginBottom: 12 }}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="orderCommentScore"
+                              label="口味评分"
+                              rules={[
+                                { required: true, message: "请选择口味评分" },
+                              ]}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                            <Form.Item
+                              name="deliveryCommentScore"
+                              label="配送评分"
+                              rules={[
+                                { required: true, message: "请选择配送评分" },
+                              ]}
+                            >
+                              <Select options={scoreOptions} />
+                            </Form.Item>
+                          </div>
+                          <Form.Item name="commentLabels" label="评价标签">
+                            <Select
+                              mode="multiple"
+                              allowClear
+                              options={commentLabelOptions}
+                              placeholder="选填，可多选"
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name="overDeliveryTimeDesc"
+                            label="配送超时时间描述"
+                          >
+                            <Input
+                              maxLength={255}
+                              placeholder="选填，例如：超时 12 分钟"
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name="commentContent"
+                            label="评价内容"
+                            rules={[
+                              { required: true, message: "请输入评价内容" },
+                            ]}
+                          >
+                            <Input.TextArea
+                              rows={5}
+                              maxLength={1000}
+                              showCount
+                              placeholder="输入一条顾客差评，测试申诉类型和申诉内容"
+                            />
+                          </Form.Item>
+                          <Form.Item name="addComment" label="追加评论">
+                            <Input.TextArea
+                              rows={3}
+                              maxLength={1000}
+                              showCount
+                              placeholder="选填。用于模拟顾客追评内容"
+                            />
+                          </Form.Item>
+                          <Form.Item label="图片上下文">
+                            <Tabs
+                              size="small"
+                              activeKey={complaintImageInputMode}
+                              onChange={(key) =>
+                                setComplaintImageInputMode(
+                                  key as ReplyImageInputMode,
+                                )
+                              }
+                              items={[
+                                {
+                                  key: "url",
+                                  label: "图片 URL",
+                                  children: (
+                                    <Form.Item
+                                      name="commentPicturesText"
+                                      noStyle
+                                    >
+                                      <Input.TextArea
+                                        rows={3}
+                                        placeholder="每行一个图片 URL。真实图片 URL 会先生成图片摘要。"
+                                      />
+                                    </Form.Item>
+                                  ),
+                                },
+                                {
+                                  key: "upload",
+                                  label: "上传图片",
+                                  children: (
+                                    <Space
+                                      direction="vertical"
+                                      size={8}
+                                      style={{ width: "100%" }}
+                                    >
+                                      <Upload
+                                        multiple
+                                        accept="image/jpeg,image/png,image/webp"
+                                        showUploadList={false}
+                                        beforeUpload={(file) => {
+                                          void handleComplaintTestImageUpload([
+                                            file as File,
+                                          ]);
+                                          return Upload.LIST_IGNORE;
+                                        }}
+                                      >
+                                        <Button
+                                          icon={<UploadOutlined />}
+                                          loading={uploadingComplaintTestImages}
+                                        >
+                                          上传图片并填入 URL
+                                        </Button>
+                                      </Upload>
+                                      <Form.Item
+                                        name="commentPicturesText"
+                                        noStyle
+                                      >
+                                        <Input.TextArea
+                                          rows={3}
+                                          readOnly
+                                          placeholder="上传成功后会自动填入图片 URL。"
+                                        />
+                                      </Form.Item>
+                                    </Space>
+                                  ),
+                                },
+                                {
+                                  key: "summary",
+                                  label: "模拟摘要",
+                                  children: (
+                                    <Form.Item name="imageSummaryText" noStyle>
+                                      <Input.TextArea
+                                        rows={3}
+                                        maxLength={1000}
+                                        placeholder="例如：图片显示餐品包装有汤汁外漏，外包装边缘有明显污渍。填写后不会调用多模态模型。"
+                                      />
+                                    </Form.Item>
+                                  ),
+                                },
+                              ]}
+                            />
+                          </Form.Item>
+                          <Button
+                            type="primary"
+                            loading={testingComplaint}
+                            onClick={() => void submitComplaintTest()}
+                          >
+                            生成测试申诉
+                          </Button>
+                        </Form>
+                      </div>
+
+                      <Card
+                        title="测试结果"
+                        size="small"
+                        style={{ minHeight: 0, overflow: "hidden" }}
+                        styles={{
+                          body: {
+                            height: "calc(100% - 39px)",
+                            overflow: "auto",
+                          },
+                        }}
+                      >
+                        {complaintTestResult ? (
+                          <Space
+                            direction="vertical"
+                            size={12}
+                            style={{ width: "100%" }}
+                          >
+                            <Space wrap>
+                              <Tag
+                                color={
+                                  complaintTestResult.shouldComplain
+                                    ? "green"
+                                    : "default"
+                                }
+                              >
+                                {complaintTestResult.shouldComplain
+                                  ? "可申诉"
+                                  : "不申诉"}
+                              </Tag>
+                              {complaintTestResult.sentiment ? (
+                                <Tag>
+                                  {sentimentText[
+                                    complaintTestResult.sentiment
+                                  ] || complaintTestResult.sentiment}
+                                </Tag>
+                              ) : null}
+                              {complaintTestResult.reportTypeCode ? (
+                                <Tag color="blue">
+                                  {complaintTestResult.reportTypeCode}{" "}
+                                  {complaintTestResult.reportTypeName}
+                                </Tag>
+                              ) : null}
+                              {complaintTestResult.typeDefaulted ? (
+                                <Tag color="orange">默认类型</Tag>
+                              ) : null}
+                              {complaintTestResult.model ? (
+                                <Tag>{complaintTestResult.model}</Tag>
+                              ) : null}
+                              {complaintTestResult.imageSummaryStatus ? (
+                                <Tag color="purple">
+                                  图片：
+                                  {complaintTestResult.imageSummaryStatus}
+                                </Tag>
+                              ) : null}
+                              {complaintTestResult.skipReason ? (
+                                <Tag color="orange">
+                                  {complaintTestResult.skipReason}
+                                </Tag>
+                              ) : null}
+                            </Space>
+                            <Descriptions size="small" column={3} bordered>
+                              <Descriptions.Item label="申诉耗时">
+                                {formatDurationMs(
+                                  complaintTestResult.durationMs,
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="输入Token">
+                                {complaintTestResult.promptTokens ?? "-"}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="输出Token">
+                                {complaintTestResult.completionTokens ?? "-"}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="总Token">
+                                {complaintTestResult.totalTokens ?? "-"}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="预估算力">
+                                {complaintTestResult.estimatedPowerAmount ??
+                                  "-"}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="是否有图">
+                                {complaintTestResult.hasPicture ? "是" : "否"}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="分类 Prompt" span={2}>
+                                {complaintTestResult.typePromptKey || "-"}
+                                {complaintTestResult.typePromptVersion
+                                  ? ` v${complaintTestResult.typePromptVersion}`
+                                  : ""}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="内容 Prompt">
+                                {complaintTestResult.contentPromptKey || "-"}
+                                {complaintTestResult.contentPromptVersion
+                                  ? ` v${complaintTestResult.contentPromptVersion}`
+                                  : ""}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="分类理由" span={3}>
+                                {complaintTestResult.typeReason || "-"}
+                              </Descriptions.Item>
+                              {complaintTestResult.sensitiveErrorMessage ? (
+                                <Descriptions.Item label="敏感词" span={3}>
+                                  {complaintTestResult.sensitiveErrorMessage}
+                                </Descriptions.Item>
+                              ) : null}
+                            </Descriptions>
+                            {complaintTestResult.imageSummaryStatus ? (
+                              <Descriptions size="small" column={4} bordered>
+                                <Descriptions.Item label="图片状态">
+                                  {complaintTestResult.imageSummaryStatus}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片输入Token">
+                                  {complaintTestResult.imagePromptTokens ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片输出Token">
+                                  {complaintTestResult.imageCompletionTokens ??
+                                    "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片扣算力">
+                                  {complaintTestResult.imagePowerAmount ?? "-"}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="图片摘要" span={4}>
+                                  {complaintTestResult.imageSummaryText || "-"}
+                                </Descriptions.Item>
+                                {complaintTestResult.imageSummaryErrorMessage ? (
+                                  <Descriptions.Item
+                                    label="图片识别错误"
+                                    span={4}
+                                  >
+                                    {
+                                      complaintTestResult.imageSummaryErrorMessage
+                                    }
+                                  </Descriptions.Item>
+                                ) : null}
+                              </Descriptions>
+                            ) : null}
+                            <Input.TextArea
+                              value={complaintTestResult.reportContent || ""}
+                              rows={5}
+                              readOnly
+                            />
+                          </Space>
+                        ) : (
+                          <Empty description="输入评价后生成测试申诉" />
                         )}
                       </Card>
                     </div>

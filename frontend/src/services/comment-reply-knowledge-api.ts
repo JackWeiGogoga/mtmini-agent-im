@@ -5,6 +5,7 @@ import type {
   CommentReplyKnowledgeDocument,
   CommentReplyKnowledgeDocumentPreview,
   CommentReplyKnowledgeItem,
+  CommentComplaintTestResult,
   CommentReplyImageUploadResult,
   CommentReplyOfficialTemplateImportResult,
   CommentReplyQaKnowledgeParam,
@@ -199,6 +200,18 @@ export async function testMerchantReply(
 ): Promise<CommentReplyTestResult> {
   const response = await request.post<unknown, { data: CommentReplyTestResult }>(
     `${MERCHANT_BASE_URL}/reply-test`,
+    payload,
+    { params: { shopId }, timeout: 90000 },
+  );
+  return response.data;
+}
+
+export async function testMerchantComplaint(
+  shopId: number,
+  payload: CommentReplyTestParam,
+): Promise<CommentComplaintTestResult> {
+  const response = await request.post<unknown, { data: CommentComplaintTestResult }>(
+    `${MERCHANT_BASE_URL}/complaint-test`,
     payload,
     { params: { shopId }, timeout: 90000 },
   );

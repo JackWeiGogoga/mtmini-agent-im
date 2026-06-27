@@ -1,5 +1,8 @@
 package com.gogoga.backend.service;
 
+import com.gogoga.backend.dto.CommentComplaintPreviewDTO;
+import com.gogoga.backend.entity.mt.MtComment;
+import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 
 /**
@@ -8,4 +11,6 @@ import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 public interface MtCommentComplaintService {
 
     void executeCommentAutoComplaintTask(MtCommentAutoComplaintTaskPayload payload);
+
+    CommentComplaintPreviewDTO previewComplaint(MtShop shop, MtComment comment);
 }

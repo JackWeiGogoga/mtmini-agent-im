@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.config.PowerProperties;
 import com.gogoga.backend.constant.SystemPromptKeyConstant;
+import com.gogoga.backend.dto.CommentComplaintPreviewDTO;
+import com.gogoga.backend.dto.CommentImageSummaryResultDTO;
 import com.gogoga.backend.dto.CommentReplySensitiveWordHitDTO;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
@@ -19,6 +21,7 @@ import com.gogoga.backend.mapper.MtCommentComplaintMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.CommentReplySensitiveWordService;
+import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.MtCommentComplaintService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
@@ -66,6 +69,7 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
     private final SystemPromptService systemPromptService;
     private final OpenAiCompatibleChatService openAiCompatibleChatService;
     private final CommentReplySensitiveWordService commentReplySensitiveWordService;
+    private final CommentImageVisionService commentImageVisionService;
     private final MtPowerConsumeService mtPowerConsumeService;
     private final ShopOperationSettingsService shopOperationSettingsService;
 
@@ -144,6 +148,71 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
             }
             throw new IllegalStateException(error, e);
         }
+    }
+
+    @Override
+    public CommentComplaintPreviewDTO previewComplaint(MtShop shop, MtComment comment) {
+        long startNanos = System.nanoTime();
+        if (shop == null || comment == null || comment.getCommentId() == null) {
+            throw new IllegalArgumentException("COMMENT_COMPLAINT_PREVIEW_CONTEXT_INVALID");
+        }
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+                comment.getProductScore(),
+                comment.getPackingScore()
+        );
+        CommentComplaintPreviewDTO result = new CommentComplaintPreviewDTO();
+        result.setSentiment(sentiment.name());
+        if (sentiment != CommentReplySentimentEnum.BAD) {
+            result.setShouldComplain(false);
+            result.setSkipReason(sentiment == CommentReplySentimentEnum.UNKNOWN
+                    ? "PRODUCT_PACKING_SCORE_INVALID"
+                    : "COMMENT_NOT_BAD");
+            result.setDurationMs(durationMs(startNanos));
+            return result;
+        }
+        CommentImageSummaryResultDTO imageSummary = commentImageVisionService.resolveForReply(shop, comment, false);
+        if (imageSummary != null && StringUtils.isNotBlank(imageSummary.getSummaryText())) {
+            comment.setImageSummaryText(imageSummary.getSummaryText());
+        }
+        ComplaintGeneration generation = generateComplaint(shop, comment, sentiment);
+        CommentReplySensitiveWordHitDTO sensitiveHit = commentReplySensitiveWordService.detect(generation.reportContent);
+        result.setShouldComplain(sensitiveHit == null || !sensitiveHit.isHit());
+        result.setSkipReason(result.isShouldComplain() ? null : "COMMENT_AUTO_COMPLAINT_SENSITIVE");
+        result.setReportTypeCode(generation.reportType.getCode());
+        result.setReportTypeName(generation.reportType.getName());
+        result.setTypeDefaulted(generation.typeDefaulted);
+        result.setTypeReason(generation.typeReason);
+        result.setReportContent(generation.reportContent);
+        result.setHasPicture(generation.hasPicture);
+        result.setModel(generation.model);
+        result.setTypePromptKey(generation.typePromptKey);
+        result.setTypePromptVersion(generation.typePromptVersion);
+        result.setContentPromptKey(generation.contentPromptKey);
+        result.setContentPromptVersion(generation.contentPromptVersion);
+        result.setPromptTokens(generation.promptTokens);
+        result.setCompletionTokens(generation.completionTokens);
+        result.setTotalTokens(generation.totalTokens);
+        result.setEstimatedPowerAmount(calculatePowerAmount(generation));
+        if (sensitiveHit != null && sensitiveHit.isHit()) {
+            result.setSensitiveErrorMessage("命中敏感词：" + StringUtils.join(sensitiveHit.getCategories(), "、"));
+        }
+        attachImageSummary(result, imageSummary);
+        result.setDurationMs(durationMs(startNanos));
+        return result;
+    }
+
+    private void attachImageSummary(CommentComplaintPreviewDTO result, CommentImageSummaryResultDTO imageSummary) {
+        if (result == null || imageSummary == null) {
+            return;
+        }
+        result.setImageSummaryStatus(imageSummary.getStatus());
+        result.setImageSummaryText(imageSummary.getSummaryText());
+        result.setImageSummaryJson(imageSummary.getSummaryJson());
+        result.setImageSummaryErrorMessage(imageSummary.getErrorMessage());
+        result.setImagePromptTokens(imageSummary.getPromptTokens());
+        result.setImageCompletionTokens(imageSummary.getCompletionTokens());
+        result.setImageTotalTokens(imageSummary.getTotalTokens());
+        result.setImagePowerAmount(imageSummary.getPowerAmount());
     }
 
     private boolean canReuseGenerated(MtCommentComplaint record) {

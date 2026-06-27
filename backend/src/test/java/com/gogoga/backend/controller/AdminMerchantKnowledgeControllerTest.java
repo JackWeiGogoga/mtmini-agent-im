@@ -10,6 +10,7 @@ import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.CommentReplyKnowledgeService;
 import com.gogoga.backend.service.CommentLogAnalysisService;
 import com.gogoga.backend.service.CosStorageService;
+import com.gogoga.backend.service.MtCommentComplaintService;
 import com.gogoga.backend.service.MtCommentReplyContentService;
 import com.gogoga.backend.service.UserShopBindingService;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,8 @@ class AdminMerchantKnowledgeControllerTest {
     @Mock
     private MtCommentReplyContentService mtCommentReplyContentService;
     @Mock
+    private MtCommentComplaintService mtCommentComplaintService;
+    @Mock
     private CommentLogAnalysisService commentLogAnalysisService;
     @Mock
     private CosStorageService cosStorageService;
@@ -56,6 +59,7 @@ class AdminMerchantKnowledgeControllerTest {
                 commentReplyKnowledgeService,
                 commentReplyKnowledgeDocumentService,
                 mtCommentReplyContentService,
+                mtCommentComplaintService,
                 commentLogAnalysisService,
                 cosStorageService,
                 new MtProperties()

@@ -14,6 +14,7 @@ import com.gogoga.backend.mapper.MtCommentComplaintMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.CommentReplySensitiveWordService;
+import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
@@ -65,6 +66,8 @@ class MtCommentComplaintServiceImplTest {
     @Mock
     private CommentReplySensitiveWordService commentReplySensitiveWordService;
     @Mock
+    private CommentImageVisionService commentImageVisionService;
+    @Mock
     private MtPowerConsumeService mtPowerConsumeService;
     @Mock
     private ShopOperationSettingsService shopOperationSettingsService;
@@ -86,6 +89,7 @@ class MtCommentComplaintServiceImplTest {
                 systemPromptService,
                 openAiCompatibleChatService,
                 commentReplySensitiveWordService,
+                commentImageVisionService,
                 mtPowerConsumeService,
                 shopOperationSettingsService
         );

@@ -113,6 +113,37 @@ export interface CommentReplyTestResult {
   totalDurationMs?: number;
 }
 
+export interface CommentComplaintTestResult {
+  shouldComplain: boolean;
+  skipReason?: string;
+  sentiment?: CommentReplySentiment;
+  reportTypeCode?: number;
+  reportTypeName?: string;
+  typeDefaulted?: boolean;
+  typeReason?: string;
+  reportContent?: string;
+  hasPicture?: boolean;
+  model?: string;
+  typePromptKey?: string;
+  typePromptVersion?: number;
+  contentPromptKey?: string;
+  contentPromptVersion?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  estimatedPowerAmount?: number;
+  sensitiveErrorMessage?: string;
+  imageSummaryStatus?: string;
+  imageSummaryText?: string;
+  imageSummaryJson?: string;
+  imageSummaryErrorMessage?: string;
+  imagePromptTokens?: number;
+  imageCompletionTokens?: number;
+  imageTotalTokens?: number;
+  imagePowerAmount?: number;
+  durationMs?: number;
+}
+
 export interface CommentReplyImageUploadResult {
   fileName: string;
   objectKey: string;
