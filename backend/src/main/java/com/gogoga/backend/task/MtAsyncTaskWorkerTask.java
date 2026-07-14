@@ -38,6 +38,7 @@ public class MtAsyncTaskWorkerTask {
 
     private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
+            MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
             MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL,
             MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
@@ -140,6 +141,7 @@ public class MtAsyncTaskWorkerTask {
         try {
             switch (taskType) {
                 case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
+                case AUTH_BACKFILL_POI_ID -> executeAuthBackfillPoiIdTask(task);
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
                 case AUTH_COMMENT_BACKFILL -> executeAuthCommentBackfillTask(task);
                 case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
@@ -162,6 +164,10 @@ public class MtAsyncTaskWorkerTask {
 
     private void executeAuthSyncRightsTask(MtAsyncTask task) {
         mtAuthAsyncTaskService.executeAuthSyncRightsTask(parseAuthPayload(task));
+    }
+
+    private void executeAuthBackfillPoiIdTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthBackfillPoiIdTask(parseAuthPayload(task));
     }
 
     private void executeAuthBlockOrderPushTask(MtAsyncTask task) {
@@ -199,6 +205,7 @@ public class MtAsyncTaskWorkerTask {
         MtProperties.AsyncTask asyncTask = mtProperties.getAsyncTask();
         return switch (taskType) {
             case AUTH_SYNC_RIGHTS -> resolvePolicy(asyncTask.getAuthSyncRights());
+            case AUTH_BACKFILL_POI_ID -> resolvePolicy(asyncTask.getAuthBackfillPoiId());
             case AUTH_COMMENT_BACKFILL -> resolvePolicy(asyncTask.getAuthCommentBackfill());
             case AUTH_BLOCK_ORDER_PUSH -> MtAsyncTaskExecutionPolicy.builder()
                     .maxRetryCount(0)

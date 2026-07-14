@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -68,6 +69,35 @@ class MtShopServiceTest {
         service.saveAuthorizedShop(tokenData(), null);
 
         verify(mtPowerAccountService, never()).addAdminGrant(any(), any());
+    }
+
+    @Test
+    void updatePoiIdIfMissingShouldPersistPoiId() {
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        MtShopService service = new MtShopService(
+                mtShopMapper, mtPowerGrantMapper, mtPowerAccountService, new PowerProperties());
+
+        MtShop result = service.updatePoiIdIfMissing(shop, "poi-100");
+
+        assertSame(shop, result);
+        assertEquals("poi-100", shop.getPoiId());
+        verify(mtShopMapper).updateById(shop);
+    }
+
+    @Test
+    void updatePoiIdIfMissingShouldKeepExistingPoiId() {
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setPoiId("poi-existing");
+        MtShopService service = new MtShopService(
+                mtShopMapper, mtPowerGrantMapper, mtPowerAccountService, new PowerProperties());
+
+        MtShop result = service.updatePoiIdIfMissing(shop, "poi-new");
+
+        assertSame(shop, result);
+        assertEquals("poi-existing", shop.getPoiId());
+        verify(mtShopMapper, never()).updateById(any());
     }
 
     private MeituanTokenData tokenData() {

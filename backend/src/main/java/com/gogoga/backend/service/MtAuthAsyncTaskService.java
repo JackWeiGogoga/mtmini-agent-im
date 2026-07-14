@@ -28,6 +28,7 @@ public class MtAuthAsyncTaskService {
     private final MtAccessTokenService mtAccessTokenService;
     private final MtShopService mtShopService;
     private final MtShopRightService mtShopRightService;
+    private final MtShopPoiIdBackfillService mtShopPoiIdBackfillService;
     private final MtOrderPushControlService mtOrderPushControlService;
 
     public void enqueuePostAuthorizationTasks(Long shopId, String accessToken) {
@@ -38,6 +39,7 @@ public class MtAuthAsyncTaskService {
         MtAuthPostProcessTaskPayload payload = new MtAuthPostProcessTaskPayload();
         payload.setShopId(shopId);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH, payload);
+        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID, payload);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL, payload);
     }
@@ -45,6 +47,12 @@ public class MtAuthAsyncTaskService {
     public void executeAuthSyncRightsTask(MtAuthPostProcessTaskPayload payload) {
         ShopContext context = loadContext(payload);
         mtShopRightService.syncRightsFromBuyInfo(context.shop(), context.token().getAccessToken());
+    }
+
+    public void executeAuthBackfillPoiIdTask(MtAuthPostProcessTaskPayload payload) {
+        ShopContext context = loadContext(payload);
+        mtShopPoiIdBackfillService.tryBackfillAfterAuthorization(
+                context.shop(), context.token().getAccessToken());
     }
 
     public void executeAuthBlockOrderPushTask(MtAuthPostProcessTaskPayload payload) {
@@ -90,6 +98,7 @@ public class MtAuthAsyncTaskService {
         return switch (taskType) {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
             case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
+            case AUTH_BACKFILL_POI_ID -> mtProperties.getAsyncTask().getAuthBackfillPoiId().getMaxRetryCount();
             case AUTH_COMMENT_BACKFILL -> mtProperties.getAsyncTask().getAuthCommentBackfill().getMaxRetryCount();
             default -> throw new IllegalArgumentException("不支持的授权后任务类型: " + taskType);
         };
