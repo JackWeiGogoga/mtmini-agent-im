@@ -200,6 +200,11 @@ public class MtProperties {
         private TaskPolicy commentAutoComplaint = new TaskPolicy();
 
         /**
+         * 差评 IM 跟进任务策略
+         */
+        private TaskPolicy commentAutoImFollowUp = noRetryTaskPolicy();
+
+        /**
          * 知识文档解析任务策略
          */
         private TaskPolicy knowledgeDocumentParse = new TaskPolicy();
@@ -208,6 +213,12 @@ public class MtProperties {
          * 历史终态任务清理配置
          */
         private Cleanup cleanup = new Cleanup();
+
+        private static TaskPolicy noRetryTaskPolicy() {
+            TaskPolicy policy = new TaskPolicy();
+            policy.setMaxRetryCount(0);
+            return policy;
+        }
     }
 
     @Data
@@ -325,6 +336,45 @@ public class MtProperties {
          * 差评自动投诉配置。
          */
         private Complaint complaint = new Complaint();
+
+        /**
+         * 差评匿名群聊跟进配置。
+         */
+        private ImFollowUp imFollowUp = new ImFollowUp();
+    }
+
+    @Data
+    public static class ImFollowUp {
+
+        /**
+         * 美团 IM 加密密钥，UTF-8 编码必须恰好 16 字节。
+         */
+        private String imSecret;
+
+        /**
+         * 建群 dry run，默认禁止真实调用。
+         */
+        private boolean createGroupDryRun = true;
+
+        /**
+         * 发送消息 dry run，默认禁止真实调用。
+         */
+        private boolean sendMessageDryRun = true;
+
+        /**
+         * dry run 无损重排秒数。
+         */
+        private long dryRunRescheduleSeconds = 3600L;
+
+        /**
+         * 固定兜底消息消耗算力。
+         */
+        private int fallbackPowerAmount = 1000;
+
+        /**
+         * 模型不可用或内容不合规时使用的固定消息。
+         */
+        private String fallbackMessage = "您好，看到您的反馈后我们非常重视，给您带来不好的体验很抱歉🙏为了进一步核实并妥善处理，麻烦您提供一下对应订单信息和方便联系的手机号码，我们会尽快跟进，谢谢。";
     }
 
     @Data

@@ -71,6 +71,10 @@ public class MtComment {
     private String complaintReportContent;
     private LocalDateTime complaintAt;
     private String complaintError;
+    private String imFollowUpStatus;
+    private Long imGroupId;
+    private LocalDateTime imMessageAt;
+    private String imFollowUpError;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

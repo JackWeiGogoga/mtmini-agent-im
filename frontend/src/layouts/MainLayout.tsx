@@ -30,6 +30,7 @@ import {
   CommentOutlined,
   BulbOutlined,
   DatabaseOutlined,
+  FileSearchOutlined,
   FileTextOutlined,
   OpenAIOutlined,
   MessageOutlined,
@@ -65,6 +66,7 @@ const iconMap: Record<string, React.ReactNode> = {
   CommentOutlined: <CommentOutlined />,
   BulbOutlined: <BulbOutlined />,
   DatabaseOutlined: <DatabaseOutlined />,
+  FileSearchOutlined: <FileSearchOutlined />,
   FileTextOutlined: <FileTextOutlined />,
   MessageOutlined: <MessageOutlined />,
   ShopOutlined: <ShopOutlined />,
@@ -170,6 +172,7 @@ const defaultRouteTitles: Record<string, string> = {
   "/analytics/user-behavior": "行为统计",
   "/merchant-knowledge": "知识库管理",
   "/comment-reply-knowledge": "回复文案",
+  "/comment-processing-logs": "评价处理日志",
   "/system": "系统管理",
   "/system/user": "用户管理",
   "/system/role": "角色管理",
@@ -414,7 +417,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </span>
             )}
           </div>
-          <div style={{ height: "calc(100vh - 64px)", overflowY: "auto", paddingTop: 8 }}>
+          <div
+            style={{
+              height: "calc(100vh - 64px)",
+              overflowY: "auto",
+              paddingTop: 8,
+            }}
+          >
             {renderMenu()}
           </div>
         </Sider>

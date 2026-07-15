@@ -63,6 +63,10 @@
         <result column="complaint_report_content" property="complaintReportContent"/>
         <result column="complaint_at" property="complaintAt"/>
         <result column="complaint_error" property="complaintError"/>
+        <result column="im_follow_up_status" property="imFollowUpStatus"/>
+        <result column="im_group_id" property="imGroupId"/>
+        <result column="im_message_at" property="imMessageAt"/>
+        <result column="im_follow_up_error" property="imFollowUpError"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -80,6 +84,7 @@
         analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
         analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
         complaint_status, complaint_report_type_code, complaint_report_content, complaint_at, complaint_error,
+        im_follow_up_status, im_group_id, im_message_at, im_follow_up_error,
         create_time, update_time
     </sql>
 
@@ -150,6 +155,7 @@
             analysis_model, analysis_prompt_key, analysis_prompt_version, analysis_prompt_tokens,
             analysis_completion_tokens, analysis_power_amount, analysis_duration_ms, analysis_error, analysis_at,
             complaint_status, complaint_report_type_code, complaint_report_content, complaint_at, complaint_error,
+            im_follow_up_status, im_group_id, im_message_at, im_follow_up_error,
             create_time, update_time
         ) VALUES (
             #{shopId}, #{epoiId}, #{poiId}, #{commentId}, #{result}, #{commentContent}, #{orderCommentScore},
@@ -164,6 +170,7 @@
             #{analysisModel}, #{analysisPromptKey}, #{analysisPromptVersion}, #{analysisPromptTokens},
             #{analysisCompletionTokens}, #{analysisPowerAmount}, #{analysisDurationMs}, #{analysisError}, #{analysisAt},
             #{complaintStatus}, #{complaintReportTypeCode}, #{complaintReportContent}, #{complaintAt}, #{complaintError},
+            #{imFollowUpStatus}, #{imGroupId}, #{imMessageAt}, #{imFollowUpError},
             #{createTime}, #{updateTime}
         )
     </insert>
@@ -304,6 +311,17 @@
             update_time = #{updateTime}
         WHERE id = #{id}
           AND complaint_status != 'SUCCESS'
+    </update>
+
+    <update id="markImFollowUpStatus">
+        UPDATE mt_comment
+        SET im_follow_up_status = #{status},
+            im_group_id = COALESCE(#{groupId}, im_group_id),
+            im_message_at = COALESCE(#{messageAt}, im_message_at),
+            im_follow_up_error = #{error},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND im_follow_up_status != 'SUCCESS'
     </update>
 
 </mapper>

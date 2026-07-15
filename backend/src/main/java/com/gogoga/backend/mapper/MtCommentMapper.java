@@ -106,4 +106,13 @@ public interface MtCommentMapper {
             @Param("error") String error,
             @Param("updateTime") LocalDateTime updateTime
     );
+
+    int markImFollowUpStatus(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("groupId") Long groupId,
+            @Param("messageAt") LocalDateTime messageAt,
+            @Param("error") String error,
+            @Param("updateTime") LocalDateTime updateTime
+    );
 }

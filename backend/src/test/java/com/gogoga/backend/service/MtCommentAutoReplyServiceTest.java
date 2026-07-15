@@ -32,9 +32,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -326,7 +328,7 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
-    void executeCommentAutoReplyTaskEnqueuesComplaintForBadCommentWhenEnabled() throws MtSdkException {
+    void executeCommentAutoReplyTaskEnqueuesIndependentComplaintAndImTasksForBadComment() throws MtSdkException {
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,
                 mtShopMapper,
@@ -373,6 +375,15 @@ class MtCommentAutoReplyServiceTest {
         MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
         payload.setShopId(100L);
         payload.setCommentId(542543250001L);
+        doThrow(new IllegalStateException("complaint enqueue failed"))
+                .when(mtAsyncTaskService).enqueueTask(
+                        eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT),
+                        eq("comment-complaint:542543250001"),
+                        eq("100"),
+                        any(),
+                        any(LocalDateTime.class),
+                        eq(3)
+                );
 
         service.executeCommentAutoReplyTask(payload);
 
@@ -383,6 +394,18 @@ class MtCommentAutoReplyServiceTest {
                 any(),
                 any(LocalDateTime.class),
                 eq(3)
+        );
+        verify(mtAsyncTaskService).enqueueTask(
+                eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP),
+                eq("comment-im-follow-up:542543250001"),
+                eq("100"),
+                any(),
+                any(LocalDateTime.class),
+                eq(0)
+        );
+        verify(mtCommentMapper).markAutoReplySuccessWithGeneration(
+                eq(9L), anyString(), any(LocalDateTime.class), anyString(), eq("BAD"),
+                any(), any(), any(), any(), eq(123), any(LocalDateTime.class)
         );
     }
 

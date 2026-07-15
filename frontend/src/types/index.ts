@@ -44,6 +44,9 @@ export * from "./comment-reply-knowledge-types";
 // 系统提示词类型
 export * from "./system-prompt-types";
 
+// 评价处理日志类型
+export * from "./comment-processing-log-types";
+
 // 菜单管理类型
 export type {
   Menu,

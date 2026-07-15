@@ -13,6 +13,7 @@ import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
+import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
@@ -267,7 +268,7 @@ public class MtCommentAutoReplyService {
             comment.setAutoReplyDurationMs(replyResult.getReplyDurationMs());
             comment.setImageSummaryText(replyResult.getImageSummaryText());
             commentLogAnalysisService.generateAfterAutoReply(shop, comment);
-            enqueueCommentComplaintTaskIfNeeded(shop, comment);
+            enqueueNegativeCommentPostTasksIfNeeded(shop, comment);
         } catch (MtSdkException e) {
             mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
             log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
@@ -316,6 +317,7 @@ public class MtCommentAutoReplyService {
         comment.setAutoReplyStatus("PENDING");
         comment.setAnalysisStatus("PENDING");
         comment.setComplaintStatus("PENDING");
+        comment.setImFollowUpStatus("PENDING");
         comment.setCreateTime(now);
         comment.setUpdateTime(now);
         return comment;
@@ -325,7 +327,7 @@ public class MtCommentAutoReplyService {
         return "comment:" + commentId;
     }
 
-    private void enqueueCommentComplaintTaskIfNeeded(MtShop shop, MtComment comment) {
+    private void enqueueNegativeCommentPostTasksIfNeeded(MtShop shop, MtComment comment) {
         if (shop == null || shop.getId() == null || comment == null || comment.getCommentId() == null) {
             return;
         }
@@ -339,20 +341,43 @@ public class MtCommentAutoReplyService {
         if (sentiment != CommentReplySentimentEnum.BAD) {
             return;
         }
-        MtCommentAutoComplaintTaskPayload payload = new MtCommentAutoComplaintTaskPayload();
-        payload.setShopId(shop.getId());
-        payload.setCommentId(comment.getCommentId());
-        mtAsyncTaskService.enqueueTask(
-                MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
-                buildCommentComplaintTaskBizKey(comment.getCommentId()),
-                String.valueOf(shop.getId()),
-                payload,
-                LocalDateTime.now(),
-                mtProperties.getAsyncTask().getCommentAutoComplaint().getMaxRetryCount()
-        );
+        try {
+            MtCommentAutoComplaintTaskPayload payload = new MtCommentAutoComplaintTaskPayload();
+            payload.setShopId(shop.getId());
+            payload.setCommentId(comment.getCommentId());
+            mtAsyncTaskService.enqueueTask(
+                    MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
+                    buildCommentComplaintTaskBizKey(comment.getCommentId()),
+                    String.valueOf(shop.getId()),
+                    payload,
+                    LocalDateTime.now(),
+                    mtProperties.getAsyncTask().getCommentAutoComplaint().getMaxRetryCount()
+            );
+        } catch (Exception e) {
+            log.error("差评自动申诉任务入队失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+        }
+        try {
+            MtCommentAutoImFollowUpTaskPayload payload = new MtCommentAutoImFollowUpTaskPayload();
+            payload.setShopId(shop.getId());
+            payload.setCommentId(comment.getCommentId());
+            mtAsyncTaskService.enqueueTask(
+                    MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP,
+                    buildCommentImFollowUpTaskBizKey(comment.getCommentId()),
+                    String.valueOf(shop.getId()),
+                    payload,
+                    LocalDateTime.now(),
+                    mtProperties.getAsyncTask().getCommentAutoImFollowUp().getMaxRetryCount()
+            );
+        } catch (Exception e) {
+            log.error("差评IM跟进任务入队失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+        }
     }
 
     private String buildCommentComplaintTaskBizKey(Long commentId) {
         return "comment-complaint:" + commentId;
+    }
+
+    private String buildCommentImFollowUpTaskBizKey(Long commentId) {
+        return "comment-im-follow-up:" + commentId;
     }
 }

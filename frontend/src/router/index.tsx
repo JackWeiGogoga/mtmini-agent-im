@@ -42,6 +42,9 @@ const UserManage = lazy(() => import("@/pages/user-manage"));
 const RoleManage = lazy(() => import("@/pages/role-manage"));
 const MenuManage = lazy(() => import("@/pages/menu-manage"));
 const SystemPromptManage = lazy(() => import("@/pages/system-prompt"));
+const CommentProcessingLog = lazy(
+  () => import("@/pages/comment-processing-log"),
+);
 const Forbidden = lazy(() => import("@/pages/error/Forbidden"));
 
 /**
@@ -210,6 +213,16 @@ const router = createBrowserRouter(
             <AuthLayout permission="comment:reply-knowledge:list">
               <LazyWrapper>
                 <CommentReplyKnowledgeManage />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
+        {
+          path: "/comment-processing-logs",
+          element: (
+            <AuthLayout permission="comment:processing-log:list">
+              <LazyWrapper>
+                <CommentProcessingLog />
               </LazyWrapper>
             </AuthLayout>
           ),

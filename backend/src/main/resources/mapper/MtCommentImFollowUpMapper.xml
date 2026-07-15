@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtCommentImFollowUpMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtCommentImFollowUp">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="mt_comment_id" property="mtCommentId"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="status" property="status"/>
+        <result column="failed_stage" property="failedStage"/>
+        <result column="error_code" property="errorCode"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="message_content" property="messageContent"/>
+        <result column="message_source" property="messageSource"/>
+        <result column="fallback_reason" property="fallbackReason"/>
+        <result column="model_provider" property="modelProvider"/>
+        <result column="model" property="model"/>
+        <result column="prompt_key" property="promptKey"/>
+        <result column="prompt_version" property="promptVersion"/>
+        <result column="prompt_tokens" property="promptTokens"/>
+        <result column="completion_tokens" property="completionTokens"/>
+        <result column="total_tokens" property="totalTokens"/>
+        <result column="power_amount" property="powerAmount"/>
+        <result column="generated_at" property="generatedAt"/>
+        <result column="create_group_attempted_at" property="createGroupAttemptedAt"/>
+        <result column="group_id" property="groupId"/>
+        <result column="new_group" property="newGroup"/>
+        <result column="group_ctime" property="groupCtime"/>
+        <result column="group_state" property="groupState"/>
+        <result column="group_close_type" property="groupCloseType"/>
+        <result column="create_group_response_summary" property="createGroupResponseSummary"/>
+        <result column="group_created_at" property="groupCreatedAt"/>
+        <result column="message_id" property="messageId"/>
+        <result column="message_cts" property="messageCts"/>
+        <result column="send_attempted_at" property="sendAttemptedAt"/>
+        <result column="message_content_hash" property="messageContentHash"/>
+        <result column="send_response_summary" property="sendResponseSummary"/>
+        <result column="sent_at" property="sentAt"/>
+        <result column="generation_duration_ms" property="generationDurationMs"/>
+        <result column="create_group_duration_ms" property="createGroupDurationMs"/>
+        <result column="send_duration_ms" property="sendDurationMs"/>
+        <result column="duration_ms" property="durationMs"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, shop_id, mt_comment_id, comment_id, status, failed_stage, error_code, error_message,
+        message_content, message_source, fallback_reason, model_provider, model, prompt_key, prompt_version,
+        prompt_tokens, completion_tokens, total_tokens, power_amount, generated_at,
+        create_group_attempted_at, group_id, new_group, group_ctime, group_state, group_close_type,
+        create_group_response_summary, group_created_at, message_id, message_cts, send_attempted_at,
+        message_content_hash, send_response_summary, sent_at, generation_duration_ms,
+        create_group_duration_ms, send_duration_ms, duration_ms, create_time, update_time
+    </sql>
+
+    <select id="selectByShopIdAndCommentId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_comment_im_follow_up
+        WHERE shop_id = #{shopId} AND comment_id = #{commentId} LIMIT 1
+    </select>
+
+    <select id="selectByMtCommentId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_comment_im_follow_up
+        WHERE mt_comment_id = #{mtCommentId} LIMIT 1
+    </select>
+
+    <select id="selectByMtCommentIds" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_comment_im_follow_up
+        WHERE mt_comment_id IN
+        <foreach collection="mtCommentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtCommentImFollowUp" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_comment_im_follow_up (
+            shop_id, mt_comment_id, comment_id, status, create_time, update_time
+        ) VALUES (#{shopId}, #{mtCommentId}, #{commentId}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="markGenerated" parameterType="com.gogoga.backend.entity.mt.MtCommentImFollowUp">
+        UPDATE mt_comment_im_follow_up
+        SET status = 'GENERATED', failed_stage = NULL, error_code = NULL, error_message = NULL,
+            message_content = #{messageContent}, message_source = #{messageSource}, fallback_reason = #{fallbackReason},
+            model_provider = #{modelProvider}, model = #{model}, prompt_key = #{promptKey},
+            prompt_version = #{promptVersion}, prompt_tokens = #{promptTokens},
+            completion_tokens = #{completionTokens}, total_tokens = #{totalTokens}, power_amount = #{powerAmount},
+            generated_at = #{generatedAt}, generation_duration_ms = #{generationDurationMs},
+            duration_ms = #{durationMs}, update_time = #{updateTime}
+        WHERE id = #{id} AND status = 'PENDING'
+    </update>
+
+    <update id="claimCreateGroupAttempt">
+        UPDATE mt_comment_im_follow_up
+        SET create_group_attempted_at = #{attemptedAt}, update_time = #{updateTime}
+        WHERE id = #{id} AND status = 'GENERATED' AND group_id IS NULL AND create_group_attempted_at IS NULL
+    </update>
+
+    <update id="markGroupCreated" parameterType="com.gogoga.backend.entity.mt.MtCommentImFollowUp">
+        UPDATE mt_comment_im_follow_up
+        SET status = 'GROUP_CREATED', failed_stage = NULL, error_code = NULL, error_message = NULL,
+            group_id = #{groupId}, new_group = #{newGroup}, group_ctime = #{groupCtime},
+            group_state = #{groupState}, group_close_type = #{groupCloseType},
+            create_group_response_summary = #{createGroupResponseSummary}, group_created_at = #{groupCreatedAt},
+            create_group_duration_ms = #{createGroupDurationMs}, duration_ms = #{durationMs}, update_time = #{updateTime}
+        WHERE id = #{id} AND create_group_attempted_at IS NOT NULL AND group_id IS NULL
+    </update>
+
+    <update id="initializeMessageIdentity">
+        UPDATE mt_comment_im_follow_up
+        SET message_id = #{messageId}, message_cts = #{messageCts}, message_content_hash = #{messageContentHash},
+            update_time = #{updateTime}
+        WHERE id = #{id} AND status = 'GROUP_CREATED' AND message_id IS NULL
+    </update>
+
+    <update id="claimSendAttempt">
+        UPDATE mt_comment_im_follow_up
+        SET send_attempted_at = #{attemptedAt}, update_time = #{updateTime}
+        WHERE id = #{id} AND status = 'GROUP_CREATED' AND group_id IS NOT NULL
+          AND message_id IS NOT NULL AND send_attempted_at IS NULL
+    </update>
+
+    <update id="markSuccess" parameterType="com.gogoga.backend.entity.mt.MtCommentImFollowUp">
+        UPDATE mt_comment_im_follow_up
+        SET status = 'SUCCESS', failed_stage = NULL, error_code = NULL, error_message = NULL,
+            send_response_summary = #{sendResponseSummary}, sent_at = #{sentAt},
+            send_duration_ms = #{sendDurationMs}, duration_ms = #{durationMs}, update_time = #{updateTime}
+        WHERE id = #{id} AND send_attempted_at IS NOT NULL AND status = 'GROUP_CREATED'
+    </update>
+
+    <update id="markTerminal">
+        UPDATE mt_comment_im_follow_up
+        SET status = #{status}, failed_stage = #{failedStage}, error_code = #{errorCode},
+            error_message = #{errorMessage}, duration_ms = #{durationMs}, update_time = #{updateTime}
+        WHERE id = #{id} AND status NOT IN ('SUCCESS', 'FAILED', 'SKIPPED')
+    </update>
+</mapper>

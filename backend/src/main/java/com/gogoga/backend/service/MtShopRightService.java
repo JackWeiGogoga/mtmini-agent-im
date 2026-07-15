@@ -104,7 +104,17 @@ public class MtShopRightService {
      */
     public boolean hasCurrentRight(RequiresShopRight.Logical logical, String... serviceCodes) {
         MtShop shop = mtH5ShopService.getCurrentShop();
-        List<MtShopRight> rights = mtShopRightMapper.selectByShopId(shop.getId());
+        return hasShopRight(shop.getId(), logical, serviceCodes);
+    }
+
+    /**
+     * 校验指定门店是否拥有有效权益，供异步任务使用。
+     */
+    public boolean hasShopRight(Long shopId, RequiresShopRight.Logical logical, String... serviceCodes) {
+        if (shopId == null) {
+            return false;
+        }
+        List<MtShopRight> rights = mtShopRightMapper.selectByShopId(shopId);
         if (CollectionUtils.isEmpty(rights) || serviceCodes == null || serviceCodes.length == 0) {
             return false;
         }
