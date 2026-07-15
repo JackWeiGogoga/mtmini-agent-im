@@ -58,26 +58,29 @@
     </select>
 
     <select id="selectCommentAutoReplyCandidates" resultMap="BaseResultMap">
-        SELECT <include refid="BaseColumnList"/>
-        FROM mt_access_token
-        LEFT JOIN mt_comment_reply_setting crs ON crs.shop_id = mt_access_token.shop_id
-        WHERE mt_access_token.shop_id IS NOT NULL
+        SELECT token.id, token.access_token, token.shop_id, token.create_time, token.update_time,
+               token.op_biz_code, token.refresh_token, token.expires_at, token.auth_status,
+               token.auth_status_changed_at, token.last_auth_failure_at, token.order_push_blocked,
+               token.order_push_last_sync_at, token.order_push_last_sync_error
+        FROM mt_access_token token
+        LEFT JOIN mt_comment_reply_setting crs ON crs.shop_id = token.shop_id
+        WHERE token.shop_id IS NOT NULL
           AND COALESCE(crs.auto_reply_enabled, 1) = 1
-          AND access_token IS NOT NULL
-          AND access_token != ''
-          AND auth_status = 1
-          AND (expires_at IS NULL OR expires_at &gt; #{now})
+          AND token.access_token IS NOT NULL
+          AND token.access_token != ''
+          AND token.auth_status = 1
+          AND (token.expires_at IS NULL OR token.expires_at &gt; #{now})
           AND EXISTS (
                 SELECT 1
                 FROM mt_shop_right r
-                WHERE r.shop_id = mt_access_token.shop_id
+                WHERE r.shop_id = token.shop_id
                   AND r.service_code IN ('H5_PROMOTION', 'VIP_CODE')
                   AND (
                         (r.type = 2 AND r.expire_at IS NOT NULL AND r.expire_at &gt; #{now})
                         OR (r.type != 2 AND r.remaining_times IS NOT NULL AND r.remaining_times &gt; 0)
                       )
             )
-        ORDER BY shop_id ASC
+        ORDER BY token.shop_id ASC
     </select>
 
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtAccessToken" useGeneratedKeys="true" keyProperty="id">

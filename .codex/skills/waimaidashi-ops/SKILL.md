@@ -30,7 +30,7 @@ description: 用于 Waimaidashi/外卖大师/美团评价自动回复项目的�
    - 需要查库时：读 `references/database-readonly-queries.md`
    - 发版后验证、Caddy、站点检查：读 `references/deployment-verification.md`
 
-3. 默认 SSH alias 是 `mt4` Web 节点和 `mt3` DB 节点；如本地 alias 不匹配，用环境变量覆盖：
+3. 默认 SSH alias 是 `mt4` Web/后端节点和 `mt3` 数据/后端节点；两台机器都运行 `waimaidashi-backend`。如本地 alias 不匹配，用环境变量覆盖：
 
    ```bash
    WMD_WEB_HOST=<web-ssh-alias> WMD_DB_HOST=<db-ssh-alias> \

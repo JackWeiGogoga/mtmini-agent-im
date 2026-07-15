@@ -24,6 +24,18 @@ LOCAL_ENV_FILE="${LOCAL_ENV_FILE:-${REPO_ROOT}/deploy-local/backend.env}"
 LOCAL_WECHAT_KEY_FILE="${LOCAL_WECHAT_KEY_FILE:-}"
 LOCAL_WECHAT_PUB_KEY_FILE="${LOCAL_WECHAT_PUB_KEY_FILE:-}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-3}"
+SSH_CONNECT_TIMEOUT_SECONDS="${SSH_CONNECT_TIMEOUT_SECONDS:-10}"
+SSH_CONNECTION_ATTEMPTS="${SSH_CONNECTION_ATTEMPTS:-2}"
+SSH_SERVER_ALIVE_INTERVAL_SECONDS="${SSH_SERVER_ALIVE_INTERVAL_SECONDS:-15}"
+SSH_SERVER_ALIVE_COUNT_MAX="${SSH_SERVER_ALIVE_COUNT_MAX:-4}"
+SSH_RETRY_ATTEMPTS="${SSH_RETRY_ATTEMPTS:-5}"
+SSH_RETRY_DELAY_SECONDS="${SSH_RETRY_DELAY_SECONDS:-3}"
+TRANSFER_MODE="${TRANSFER_MODE:-auto}"
+RSYNC_IO_TIMEOUT_SECONDS="${RSYNC_IO_TIMEOUT_SECONDS:-60}"
+
+SSH_OPTIONS=()
+RSYNC_SSH_COMMAND=""
+USE_RSYNC=0
 
 DEPLOY_BACKEND=1
 DEPLOY_H5=1
@@ -75,6 +87,15 @@ Environment variables:
   LOCAL_WECHAT_KEY_FILE       Local apiclient_key.pem path
   LOCAL_WECHAT_PUB_KEY_FILE   Local pub_key.pem path
   BACKUP_RETENTION_DAYS       Backup retention days, default: 3
+  SSH_CONNECT_TIMEOUT_SECONDS SSH connection timeout, default: 10
+  SSH_CONNECTION_ATTEMPTS     Attempts made by each SSH connection, default: 2
+  SSH_SERVER_ALIVE_INTERVAL_SECONDS
+                              SSH keepalive interval, default: 15
+  SSH_SERVER_ALIVE_COUNT_MAX  Missed keepalives before disconnect, default: 4
+  SSH_RETRY_ATTEMPTS          Retries after SSH transport failures, default: 5
+  SSH_RETRY_DELAY_SECONDS     Initial retry delay, default: 3
+  TRANSFER_MODE               auto/rsync/scp, default: auto
+  RSYNC_IO_TIMEOUT_SECONDS    Rsync I/O timeout, default: 60
 EOF
 }
 
@@ -89,6 +110,150 @@ fail() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+is_positive_integer() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+build_ssh_options() {
+  SSH_OPTIONS=(
+    -o "ConnectTimeout=${SSH_CONNECT_TIMEOUT_SECONDS}"
+    -o "ConnectionAttempts=${SSH_CONNECTION_ATTEMPTS}"
+    -o "ServerAliveInterval=${SSH_SERVER_ALIVE_INTERVAL_SECONDS}"
+    -o "ServerAliveCountMax=${SSH_SERVER_ALIVE_COUNT_MAX}"
+    -o "TCPKeepAlive=yes"
+    -o "ControlMaster=no"
+  )
+  RSYNC_SSH_COMMAND="ssh -o ConnectTimeout=${SSH_CONNECT_TIMEOUT_SECONDS} -o ConnectionAttempts=${SSH_CONNECTION_ATTEMPTS} -o ServerAliveInterval=${SSH_SERVER_ALIVE_INTERVAL_SECONDS} -o ServerAliveCountMax=${SSH_SERVER_ALIVE_COUNT_MAX} -o TCPKeepAlive=yes -o ControlMaster=no"
+}
+
+retry_delay_for_attempt() {
+  local attempt="$1"
+  local delay=$((SSH_RETRY_DELAY_SECONDS * attempt))
+  (( delay <= 30 )) || delay=30
+  printf '%s\n' "${delay}"
+}
+
+ssh_remote() {
+  local remote_command="$1"
+  local attempt=1
+  local exit_code=0
+  local delay=0
+
+  while true; do
+    if ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" "${remote_command}"; then
+      return 0
+    else
+      exit_code=$?
+    fi
+
+    # OpenSSH uses 255 for connection/transport failures. Do not retry a
+    # deterministic non-zero status returned by the remote command itself.
+    if (( exit_code != 255 || attempt >= SSH_RETRY_ATTEMPTS )); then
+      return "${exit_code}"
+    fi
+
+    delay="$(retry_delay_for_attempt "${attempt}")"
+    log "SSH connection to ${REMOTE_HOST} dropped (attempt ${attempt}/${SSH_RETRY_ATTEMPTS}); retrying in ${delay}s"
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
+}
+
+run_transfer_with_retry() {
+  local description="$1"
+  shift
+  local attempt=1
+  local exit_code=0
+  local delay=0
+
+  while true; do
+    if "$@"; then
+      return 0
+    else
+      exit_code=$?
+    fi
+
+    if (( attempt >= SSH_RETRY_ATTEMPTS )); then
+      return "${exit_code}"
+    fi
+
+    delay="$(retry_delay_for_attempt "${attempt}")"
+    log "${description} interrupted (attempt ${attempt}/${SSH_RETRY_ATTEMPTS}); retrying in ${delay}s"
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
+}
+
+scp_transfer() {
+  run_transfer_with_retry "SCP transfer" scp "${SSH_OPTIONS[@]}" "$@"
+}
+
+rsync_transfer() {
+  run_transfer_with_retry "Rsync transfer" \
+    rsync -a --partial --timeout="${RSYNC_IO_TIMEOUT_SECONDS}" -e "${RSYNC_SSH_COMMAND}" "$@"
+}
+
+transfer_file() {
+  if (( USE_RSYNC == 1 )); then
+    rsync_transfer "$@"
+  else
+    scp_transfer "$@"
+  fi
+}
+
+transfer_directory_contents() {
+  local source_dir="$1"
+  local remote_dir="$2"
+  if (( USE_RSYNC == 1 )); then
+    rsync_transfer "${source_dir}/" "${REMOTE_HOST}:${remote_dir}/"
+  else
+    scp_transfer -r "${source_dir}/." "${REMOTE_HOST}:${remote_dir}/"
+  fi
+}
+
+configure_transfer_mode() {
+  case "${TRANSFER_MODE}" in
+    auto)
+      if command -v rsync >/dev/null 2>&1 && ssh_remote "command -v rsync >/dev/null 2>&1"; then
+        USE_RSYNC=1
+      else
+        require_cmd scp
+        USE_RSYNC=0
+      fi
+      ;;
+    rsync)
+      require_cmd rsync
+      ssh_remote "command -v rsync >/dev/null 2>&1" || fail "rsync is not available on ${REMOTE_HOST}"
+      USE_RSYNC=1
+      ;;
+    scp)
+      require_cmd scp
+      USE_RSYNC=0
+      ;;
+    *)
+      fail "TRANSFER_MODE must be auto, rsync, or scp"
+      ;;
+  esac
+  if (( USE_RSYNC == 1 )); then
+    log "Transfer mode: rsync (partial transfers will resume after reconnect)"
+  else
+    log "Transfer mode: scp (transfers retry from the beginning)"
+  fi
+}
+
+local_sha256() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${file}" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "${file}" | awk '{print $1}'
+    return 0
+  fi
+  fail "sha256sum/shasum is required for backend artifact verification"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -169,9 +334,16 @@ done
 
 (( DEPLOY_BACKEND == 1 || DEPLOY_H5 == 1 || DEPLOY_FRONTEND == 1 )) || fail "Nothing to deploy"
 [[ "${BACKUP_RETENTION_DAYS}" =~ ^[0-9]+$ ]] || fail "BACKUP_RETENTION_DAYS must be a non-negative integer"
+is_positive_integer "${SSH_CONNECT_TIMEOUT_SECONDS}" || fail "SSH_CONNECT_TIMEOUT_SECONDS must be a positive integer"
+is_positive_integer "${SSH_CONNECTION_ATTEMPTS}" || fail "SSH_CONNECTION_ATTEMPTS must be a positive integer"
+is_positive_integer "${SSH_SERVER_ALIVE_INTERVAL_SECONDS}" || fail "SSH_SERVER_ALIVE_INTERVAL_SECONDS must be a positive integer"
+is_positive_integer "${SSH_SERVER_ALIVE_COUNT_MAX}" || fail "SSH_SERVER_ALIVE_COUNT_MAX must be a positive integer"
+is_positive_integer "${SSH_RETRY_ATTEMPTS}" || fail "SSH_RETRY_ATTEMPTS must be a positive integer"
+is_positive_integer "${SSH_RETRY_DELAY_SECONDS}" || fail "SSH_RETRY_DELAY_SECONDS must be a positive integer"
+is_positive_integer "${RSYNC_IO_TIMEOUT_SECONDS}" || fail "RSYNC_IO_TIMEOUT_SECONDS must be a positive integer"
 
 require_cmd ssh
-require_cmd scp
+build_ssh_options
 
 if [[ ! -x "${MVN_BIN}" ]]; then
   if command -v mvn >/dev/null 2>&1; then
@@ -217,8 +389,8 @@ upload_env_file() {
   [[ -f "${LOCAL_ENV_FILE}" ]] || fail "Env file not found: ${LOCAL_ENV_FILE}"
   assert_safe_remote_path "${REMOTE_ENV_PATH}" "Remote env path"
   log "Uploading backend env to ${REMOTE_HOST}:${REMOTE_ENV_PATH}"
-  scp "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
-  ssh "${REMOTE_HOST}" "
+  transfer_file "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
+  ssh_remote "
     set -eu
     mkdir -p \"$(dirname "${REMOTE_ENV_PATH}")\"
     mv -f /tmp/waimaidashi-backend.env '${REMOTE_ENV_PATH}'
@@ -233,11 +405,11 @@ upload_cert_files() {
   [[ -f "${LOCAL_WECHAT_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_KEY_FILE}"
   [[ -f "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_PUB_KEY_FILE}"
   assert_safe_remote_path "${REMOTE_CERT_DIR}" "Remote cert directory"
-  ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_CERT_DIR}'"
+  ssh_remote "mkdir -p '${REMOTE_CERT_DIR}'"
   log "Uploading WeChat cert files to ${REMOTE_HOST}:${REMOTE_CERT_DIR}"
-  scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
-  scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
-  ssh "${REMOTE_HOST}" "
+  transfer_file "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
+  transfer_file "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
+  ssh_remote "
     set -eu
     mkdir -p '${REMOTE_CERT_DIR}'
     mv -f /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
@@ -265,7 +437,7 @@ cleanup_remote_file_backups() {
   (( BACKUP_RETENTION_DAYS > 0 )) || return 0
   assert_safe_remote_path "${remote_dir}" "Remote backup cleanup directory"
   log "Cleaning ${remote_dir}/${name_pattern} backups older than ${BACKUP_RETENTION_DAYS} days"
-  ssh "${REMOTE_HOST}" "
+  ssh_remote "
     set -eu
     find '${remote_dir}' -maxdepth 1 -type f -name '${name_pattern}' -mmin +${retention_minutes} -delete
   "
@@ -285,7 +457,7 @@ cleanup_remote_dir_backups() {
   [[ -n "${remote_base}" && "${remote_base}" != "." && "${remote_base}" != "/" ]] || fail "Remote backup cleanup basename is invalid"
   [[ "${remote_base}" != *"*"* && "${remote_base}" != *"?"* && "${remote_base}" != *"["* ]] || fail "Remote backup cleanup basename must not contain glob characters"
   log "Cleaning ${remote_parent}/${remote_base}-backup-* backups older than ${BACKUP_RETENTION_DAYS} days"
-  ssh "${REMOTE_HOST}" "
+  ssh_remote "
     set -eu
     find '${remote_parent}' -maxdepth 1 -type d -name '${remote_base}-backup-*' -mmin +${retention_minutes} -exec rm -rf {} +
   "
@@ -298,8 +470,10 @@ deploy_backend() {
 
   local jar_path="${REPO_ROOT}/backend/target/backend.jar"
   [[ -f "${jar_path}" ]] || fail "Backend jar not found: ${jar_path}"
+  local jar_sha256
+  jar_sha256="$(local_sha256 "${jar_path}")"
 
-  ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_BACKEND_DIR}'"
+  ssh_remote "mkdir -p '${REMOTE_BACKEND_DIR}'"
 
   local remote_jar="${REMOTE_BACKEND_DIR}/backend.jar"
   local remote_new_jar="${REMOTE_BACKEND_DIR}/backend.jar.new"
@@ -309,23 +483,39 @@ deploy_backend() {
   fi
 
   log "Uploading backend jar to ${REMOTE_HOST}:${remote_new_jar}"
-  scp "${jar_path}" "${REMOTE_HOST}:${remote_new_jar}"
+  transfer_file "${jar_path}" "${REMOTE_HOST}:${remote_new_jar}"
 
   log "Installing backend jar atomically"
   if (( BACKUP_BACKEND == 1 )); then
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      if [ -f '${remote_jar}' ]; then
-        cp -a '${remote_jar}' '${remote_backup_jar}'
+      command -v sha256sum >/dev/null 2>&1
+      if [ -f '${remote_new_jar}' ]; then
+        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
+          rm -f '${remote_new_jar}'
+        else
+          if [ -f '${remote_jar}' ]; then
+            cp -a '${remote_jar}' '${remote_backup_jar}'
+          fi
+          mv -f '${remote_new_jar}' '${remote_jar}'
+        fi
       fi
-      mv -f '${remote_new_jar}' '${remote_jar}'
+      printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null
       chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
       chmod 644 '${remote_jar}'
     "
   else
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      mv -f '${remote_new_jar}' '${remote_jar}'
+      command -v sha256sum >/dev/null 2>&1
+      if [ -f '${remote_new_jar}' ]; then
+        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
+          rm -f '${remote_new_jar}'
+        else
+          mv -f '${remote_new_jar}' '${remote_jar}'
+        fi
+      fi
+      printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null
       chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
       chmod 644 '${remote_jar}'
     "
@@ -333,7 +523,7 @@ deploy_backend() {
 
   if (( RESTART_BACKEND == 1 )); then
     log "Restarting backend service ${BACKEND_SERVICE_NAME}"
-    if ! ssh "${REMOTE_HOST}" "
+    if ! ssh_remote "
       sudo systemctl restart '${BACKEND_SERVICE_NAME}'
       sudo systemctl is-active --quiet '${BACKEND_SERVICE_NAME}'
       if [ -n '${BACKEND_HEALTH_URL}' ]; then
@@ -348,20 +538,20 @@ deploy_backend() {
     "; then
       if (( BACKUP_BACKEND == 1 )); then
         log "Backend restart failed; restoring backup ${remote_backup_jar}"
-        ssh "${REMOTE_HOST}" "
+        ssh_remote "
           set -eu
           if [ -f '${remote_backup_jar}' ]; then
             mv -f '${remote_backup_jar}' '${remote_jar}'
-            sudo systemctl restart '${BACKEND_SERVICE_NAME}' || true
           fi
+          sudo systemctl restart '${BACKEND_SERVICE_NAME}' || true
           sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager || true
         "
       else
-        ssh "${REMOTE_HOST}" "sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager || true"
+        ssh_remote "sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager || true"
       fi
       fail "Backend service restart failed"
     fi
-    ssh "${REMOTE_HOST}" "sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager"
+    ssh_remote "sudo systemctl status '${BACKEND_SERVICE_NAME}' --no-pager"
   else
     log "Skipping backend restart"
   fi
@@ -387,30 +577,40 @@ deploy_h5() {
   remote_base="$(basename "${REMOTE_H5_DIR}")"
   remote_tmp="${remote_parent}/.${remote_base}.new-$(date +%Y%m%d-%H%M%S)"
   assert_safe_remote_path "${remote_parent}" "Remote H5 parent directory"
-  ssh "${REMOTE_HOST}" "mkdir -p '${remote_tmp}'"
+  ssh_remote "mkdir -p '${remote_tmp}'"
 
   log "Uploading H5 dist to ${REMOTE_HOST}:${remote_tmp}"
-  scp -r "${H5_BUILD_DIR}/." "${REMOTE_HOST}:${remote_tmp}/"
+  transfer_directory_contents "${H5_BUILD_DIR}" "${remote_tmp}"
 
   if (( BACKUP_H5 == 1 )); then
     log "Backing up remote H5 files at ${REMOTE_H5_DIR}"
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      backup_dir=${REMOTE_H5_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
-      if [ -d '${REMOTE_H5_DIR}' ]; then
-        mv '${REMOTE_H5_DIR}' \"\$backup_dir\"
+      if [ -d '${remote_tmp}' ]; then
+        backup_dir=${REMOTE_H5_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
+        if [ -d '${REMOTE_H5_DIR}' ]; then
+          mv '${REMOTE_H5_DIR}' \"\$backup_dir\"
+        fi
+        mv '${remote_tmp}' '${REMOTE_H5_DIR}'
+      elif [ ! -d '${REMOTE_H5_DIR}' ]; then
+        echo 'H5 staging and target directories are both missing' >&2
+        exit 1
       fi
-      mv '${remote_tmp}' '${REMOTE_H5_DIR}'
       chown -R root:root '${REMOTE_H5_DIR}'
       find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
       find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
     "
   else
     log "Replacing remote H5 files without backup"
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      rm -rf '${REMOTE_H5_DIR}'
-      mv '${remote_tmp}' '${REMOTE_H5_DIR}'
+      if [ -d '${remote_tmp}' ]; then
+        rm -rf '${REMOTE_H5_DIR}'
+        mv '${remote_tmp}' '${REMOTE_H5_DIR}'
+      elif [ ! -d '${REMOTE_H5_DIR}' ]; then
+        echo 'H5 staging and target directories are both missing' >&2
+        exit 1
+      fi
       chown -R root:root '${REMOTE_H5_DIR}'
       find '${REMOTE_H5_DIR}' -type d -exec chmod 755 {} +
       find '${REMOTE_H5_DIR}' -type f -exec chmod 644 {} +
@@ -438,30 +638,40 @@ deploy_frontend() {
   remote_base="$(basename "${REMOTE_FRONTEND_DIR}")"
   remote_tmp="${remote_parent}/.${remote_base}.new-$(date +%Y%m%d-%H%M%S)"
   assert_safe_remote_path "${remote_parent}" "Remote frontend parent directory"
-  ssh "${REMOTE_HOST}" "mkdir -p '${remote_tmp}'"
+  ssh_remote "mkdir -p '${remote_tmp}'"
 
   log "Uploading frontend dist to ${REMOTE_HOST}:${remote_tmp}"
-  scp -r "${FRONTEND_BUILD_DIR}/." "${REMOTE_HOST}:${remote_tmp}/"
+  transfer_directory_contents "${FRONTEND_BUILD_DIR}" "${remote_tmp}"
 
   if (( BACKUP_FRONTEND == 1 )); then
     log "Backing up remote frontend files at ${REMOTE_FRONTEND_DIR}"
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      backup_dir=${REMOTE_FRONTEND_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
-      if [ -d '${REMOTE_FRONTEND_DIR}' ]; then
-        mv '${REMOTE_FRONTEND_DIR}' \"\$backup_dir\"
+      if [ -d '${remote_tmp}' ]; then
+        backup_dir=${REMOTE_FRONTEND_DIR}-backup-\$(date +%Y%m%d-%H%M%S)
+        if [ -d '${REMOTE_FRONTEND_DIR}' ]; then
+          mv '${REMOTE_FRONTEND_DIR}' \"\$backup_dir\"
+        fi
+        mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
+      elif [ ! -d '${REMOTE_FRONTEND_DIR}' ]; then
+        echo 'Frontend staging and target directories are both missing' >&2
+        exit 1
       fi
-      mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
       chown -R root:root '${REMOTE_FRONTEND_DIR}'
       find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
       find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
     "
   else
     log "Replacing remote frontend files without backup"
-    ssh "${REMOTE_HOST}" "
+    ssh_remote "
       set -eu
-      rm -rf '${REMOTE_FRONTEND_DIR}'
-      mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
+      if [ -d '${remote_tmp}' ]; then
+        rm -rf '${REMOTE_FRONTEND_DIR}'
+        mv '${remote_tmp}' '${REMOTE_FRONTEND_DIR}'
+      elif [ ! -d '${REMOTE_FRONTEND_DIR}' ]; then
+        echo 'Frontend staging and target directories are both missing' >&2
+        exit 1
+      fi
       chown -R root:root '${REMOTE_FRONTEND_DIR}'
       find '${REMOTE_FRONTEND_DIR}' -type d -exec chmod 755 {} +
       find '${REMOTE_FRONTEND_DIR}' -type f -exec chmod 644 {} +
@@ -474,6 +684,7 @@ deploy_frontend() {
 }
 
 log "Deploy target: ${REMOTE_HOST}"
+configure_transfer_mode
 
 if (( UPLOAD_ENV == 1 )); then
   upload_env_file

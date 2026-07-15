@@ -42,7 +42,6 @@ public class MtCommentAutoReplyService {
 
     private static final int REPLY_STATUS_UNREPLIED = 0;
     private static final int MAX_PAGE_SIZE = 20;
-    private static final int DAILY_INCREMENTAL_LOOKBACK_DAYS = 1;
     private static final DateTimeFormatter COMMENT_QUERY_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final MtAccessTokenMapper mtAccessTokenMapper;
@@ -57,11 +56,12 @@ public class MtCommentAutoReplyService {
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
+        LocalDate queryDate = now.toLocalDate().minusDays(1);
         List<MtAccessToken> candidates = mtAccessTokenMapper.selectCommentAutoReplyCandidates(now);
         log.info("评价自动回复任务开始，candidateCount={}", candidates.size());
         for (MtAccessToken token : candidates) {
             try {
-                syncAndReplyShop(token, now.toLocalDate(), DAILY_INCREMENTAL_LOOKBACK_DAYS, "DAILY_INCREMENTAL");
+                syncAndReplyShop(token, queryDate, queryDate, "DAILY_INCREMENTAL");
             } catch (RuntimeException e) {
                 log.error("评价自动回复门店处理失败，shopId={}, opBizCode={}", token.getShopId(), token.getOpBizCode(), e);
             }
@@ -70,7 +70,12 @@ public class MtCommentAutoReplyService {
     }
 
     void syncAndReplyShopForAuthBackfill(MtAccessToken token, LocalDate currentDate) {
-        syncAndReplyShop(token, currentDate, Math.max(mtProperties.getComment().getLookbackDays(), 1), "AUTH_BACKFILL");
+        syncAndReplyShopForLookback(
+                token,
+                currentDate,
+                Math.max(mtProperties.getComment().getLookbackDays(), 1),
+                "AUTH_BACKFILL"
+        );
     }
 
     public void executeAuthCommentBackfillTask(MtAuthPostProcessTaskPayload payload) {
@@ -81,10 +86,26 @@ public class MtCommentAutoReplyService {
         if (token == null || StringUtils.isBlank(token.getAccessToken())) {
             throw new IllegalStateException("AUTH_COMMENT_BACKFILL_TOKEN_MISSING");
         }
-        syncAndReplyShop(token, LocalDate.now(), Math.max(mtProperties.getComment().getLookbackDays(), 1), "AUTH_BACKFILL");
+        syncAndReplyShopForLookback(
+                token,
+                LocalDate.now(),
+                Math.max(mtProperties.getComment().getLookbackDays(), 1),
+                "AUTH_BACKFILL"
+        );
     }
 
-    private void syncAndReplyShop(MtAccessToken token, LocalDate currentDate, int lookbackDays, String scene) {
+    private void syncAndReplyShopForLookback(
+            MtAccessToken token,
+            LocalDate currentDate,
+            int lookbackDays,
+            String scene
+    ) {
+        LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
+        LocalDate startDate = endDate.minusDays(Math.max(lookbackDays, 1));
+        syncAndReplyShop(token, startDate, endDate, scene);
+    }
+
+    private void syncAndReplyShop(MtAccessToken token, LocalDate startDate, LocalDate endDate, String scene) {
         if (token == null || token.getShopId() == null || StringUtils.isBlank(token.getAccessToken())) {
             return;
         }
@@ -97,8 +118,6 @@ public class MtCommentAutoReplyService {
             log.info("评价自动回复跳过门店，原因=AI回复主开关关闭, shopId={}", token.getShopId());
             return;
         }
-        LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
-        LocalDate startDate = endDate.minusDays(Math.max(lookbackDays, 1));
         log.info("评价自动回复同步开始，scene={}, shopId={}, startDate={}, endDate={}",
                 scene, token.getShopId(), startDate, endDate);
         syncUnrepliedComments(token, shop, startDate, endDate);

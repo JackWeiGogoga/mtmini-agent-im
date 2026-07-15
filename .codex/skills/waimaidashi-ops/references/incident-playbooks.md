@@ -13,8 +13,8 @@
 
 1. `mt4` backend 是否 active，`/health/check` 是否正常
 2. `mt4` Caddy 是否 active 且配置有效
-3. `mt3` MySQL/Redis 是否监听内网端口
-4. `mt4` 是否能通过内网访问 `mt3` MySQL/Redis
+3. `mt3` MySQL/Redis 是否监听内网端口，`mt3` 后端是否 active
+4. `mt4` 后端是否 active，且能否通过内网访问 `mt3` MySQL/Redis
 5. 是否集中出现美团、微信、Redis、MySQL、COS、短信相关错误
 6. 定时任务和异步 worker 是否按当前发布策略开启或关闭
 
@@ -45,7 +45,7 @@
 
 ## 定时任务与异步消费
 
-当前新项目只有 `mt4` 运行 backend。线上默认配置下普通定时任务和数据库异步 worker 可以关闭，排查时先确认 jar 内 `application-online.yml` 和 `/etc/waimaidashi/backend.env` 的最终开关。
+当前 `mt3`、`mt4` 都运行 backend，并连接同一个 MySQL 和 Redis。定时任务会在双节点同时触发，由共享 Redis 锁决定实际执行节点；数据库异步 worker 通过数据库原子领取任务。排查时必须同时确认两台 JAR 内配置、`/etc/waimaidashi/backend.env` 的最终开关和两台应用文件日志，不能只依据 `mt4` 的抢锁失败日志判断任务未执行。
 
 ```bash
 .codex/skills/waimaidashi-ops/scripts/ops.sh tasks --host web --since "6 hours ago"

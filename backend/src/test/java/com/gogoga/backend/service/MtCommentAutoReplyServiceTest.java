@@ -144,7 +144,7 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
-    void scheduledSyncUsesPreviousOneDayWindow() throws MtSdkException {
+    void scheduledSyncQueriesYesterdayOnly() throws MtSdkException {
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,
                 mtShopMapper,
@@ -180,7 +180,7 @@ class MtCommentAutoReplyServiceTest {
         LocalDate today = LocalDate.now();
         assertEquals(today.minusDays(1).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
                 requestCaptor.getValue().getStartTime());
-        assertEquals(today.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+        assertEquals(today.minusDays(1).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
                 requestCaptor.getValue().getEndTime());
     }
 
