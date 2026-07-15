@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,6 +34,7 @@ class CommentProcessingLogServiceTest {
     @Mock private CommentProcessingLogMapper processingLogMapper;
     @Mock private MtCommentMapper commentMapper;
     @Mock private AdminDataScopeService dataScopeService;
+    @Captor private ArgumentCaptor<List<String>> visibleUserIdsCaptor;
 
     private CommentProcessingLogService service;
 
@@ -76,9 +78,8 @@ class CommentProcessingLogServiceTest {
 
         service.list(new CommentProcessingLogQueryParam());
 
-        ArgumentCaptor<List<String>> ids = ArgumentCaptor.forClass(List.class);
-        verify(processingLogMapper).selectForAdmin(any(), ids.capture());
-        assertEquals(Set.of("user-1", "user-2"), Set.copyOf(ids.getValue()));
+        verify(processingLogMapper).selectForAdmin(any(), visibleUserIdsCaptor.capture());
+        assertEquals(Set.of("user-1", "user-2"), Set.copyOf(visibleUserIdsCaptor.getValue()));
     }
 
     @Test
