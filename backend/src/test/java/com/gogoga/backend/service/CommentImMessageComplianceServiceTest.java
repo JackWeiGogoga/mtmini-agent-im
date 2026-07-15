@@ -16,8 +16,19 @@ class CommentImMessageComplianceServiceTest {
     }
 
     @Test
-    void blocksCompensationReviewInducementAndOffPlatformContact() {
+    void allowsCompensationWhenClearlyConditionedOnVerification() {
+        assertTrue(service.validate("方便我核实后给您补偿处理☺️").isPassed());
+        assertTrue(service.validate("确认订单后再为您补偿处理🙏").isPassed());
+    }
+
+    @Test
+    void blocksDirectOrConcreteCompensationReviewInducementAndOffPlatformContact() {
+        assertBlocked("可以给您补偿处理🙏", "COMPENSATION");
+        assertBlocked("核实后一定给您补偿🙏", "COMPENSATION");
+        assertBlocked("核实后给您补偿优惠券🙏", "COMPENSATION");
+        assertBlocked("核实后给您退款处理🙏", "COMPENSATION");
         assertBlocked("可以给您补偿优惠券", "COMPENSATION");
+        assertBlocked("核实后补偿改差评🙏", "REVIEW_INDUCEMENT");
         assertBlocked("处理后麻烦删除评价", "REVIEW_INDUCEMENT");
         assertBlocked("请添加微信进一步沟通", "OFF_PLATFORM");
     }

@@ -2,8 +2,9 @@
 
 ## 上线前
 
-- 执行 `20260714_add_negative_comment_im_follow_up.sql`，确认 IM 表、评价快照字段、提示词、菜单与权限初始化成功。
+- 执行 `20260714_add_negative_comment_im_follow_up.sql` 和 `20260715_allow_conditional_comment_im_compensation.sql`，确认 IM 表、评价快照字段、条件式补偿提示词、菜单与权限初始化成功。
 - 配置 `MT_IM_SECRET`，确认其 UTF-8 编码长度恰好为 16 字节；不得把值写入仓库、工单、日志或截图。
+- 确认 `MT_COMMENT_IM_FALLBACK_MESSAGE` 包含 `{{commentContent}}`，并抽查模型失败时评价变量已渲染、超长内容已截断且整条消息不超过 150 个 Unicode 字符。
 - 保持 `MT_COMMENT_IM_CREATE_GROUP_DRY_RUN=true` 和 `MT_COMMENT_IM_SEND_MESSAGE_DRY_RUN=true`。
 - 确认 `COMMENT_AUTO_IM_FOLLOW_UP` 的 `max_retry_count=0`，并确认美团建群、发消息客户端没有重试器。
 

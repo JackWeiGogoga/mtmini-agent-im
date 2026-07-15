@@ -367,14 +367,14 @@ public class MtProperties {
         private long dryRunRescheduleSeconds = 3600L;
 
         /**
-         * 固定兜底消息消耗算力。
+         * 兜底消息消耗算力。
          */
         private int fallbackPowerAmount = 1000;
 
         /**
-         * 模型不可用或内容不合规时使用的固定消息。
+         * 模型不可用或内容不合规时使用的消息模板，支持 {{commentContent}}。
          */
-        private String fallbackMessage = "您好，看到您的反馈后我们非常重视，给您带来不好的体验很抱歉🙏为了进一步核实并妥善处理，麻烦您提供一下对应订单信息和方便联系的手机号码，我们会尽快跟进，谢谢。";
+        private String fallbackMessage = "我是售后处理专员：亲~收到了您的一条差评[{{commentContent}}]，抱歉给您带来不好的体验，能提供一下订单号和联系号码吗？方便我核实后给您补偿处理☺️";
     }
 
     @Data

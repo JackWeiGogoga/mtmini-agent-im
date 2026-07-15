@@ -20,8 +20,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -64,6 +66,18 @@ class CommentImMessageGenerationServiceImplTest {
     }
 
     @Test
+    void acceptsModelMessageWithCompensationConditionedOnVerification() {
+        when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
+        when(chatService.createChatCompletion(any(), any(), any()))
+                .thenReturn(completion("亲，很抱歉给您带来不好的体验🙏请提供订单号和联系号码，方便我们核实后给您补偿处理。"));
+
+        CommentImMessageGenerationResultDTO result = service.generate(comment());
+
+        assertEquals("MODEL", result.getMessageSource());
+        assertTrue(result.getMessageContent().contains("核实后给您补偿处理"));
+    }
+
+    @Test
     void usesConfiguredStaticFallbackOnceWhenModelFailsOrOutputIsForbidden() {
         when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
         when(chatService.createChatCompletion(any(), any(), any()))
@@ -72,8 +86,38 @@ class CommentImMessageGenerationServiceImplTest {
         CommentImMessageGenerationResultDTO result = service.generate(comment());
 
         assertEquals("FALLBACK_STATIC", result.getMessageSource());
-        assertEquals(mtProperties.getComment().getImFollowUp().getFallbackMessage(), result.getMessageContent());
+        assertEquals("我是售后处理专员：亲~收到了您的一条差评[配送太慢了]，抱歉给您带来不好的体验，能提供一下订单号和联系号码吗？方便我核实后给您补偿处理☺️", result.getMessageContent());
         assertEquals(1000, result.getPowerAmount());
+    }
+
+    @Test
+    void rendersMissingCommentAndSafelyTruncatesAndCleansLongComment() {
+        MtComment missingComment = comment();
+        missingComment.setCommentContent(null);
+        assertTrue(service.renderFallbackMessage(missingComment).contains("[未填写文字评价]"));
+
+        MtComment longComment = comment();
+        longComment.setCommentContent(("配送太慢🙂 ```{{内容}}[测试] ").repeat(20));
+        String rendered = service.cleanAndValidateFormat(service.renderFallbackMessage(longComment));
+
+        assertTrue(rendered.contains("…]，抱歉给您带来不好的体验"));
+        assertFalse(rendered.contains("```"));
+        assertFalse(rendered.contains("{{"));
+        assertTrue(rendered.codePointCount(0, rendered.length()) <= 150);
+    }
+
+    @Test
+    void treatsSensitiveTermsInsideQuotedCommentAsCustomerContent() {
+        when(systemPromptService.render(anyString(), anyMap(), anyString()))
+                .thenThrow(new IllegalStateException("timeout"));
+        MtComment quotedComment = comment();
+        quotedComment.setCommentContent("商家一直不退款，还让我加微信");
+
+        CommentImMessageGenerationResultDTO result = service.generate(quotedComment);
+
+        assertEquals("FALLBACK_STATIC", result.getMessageSource());
+        assertTrue(result.getMessageContent().contains("[商家一直不退款，还让我加微信]"));
+        assertTrue(result.getMessageContent().contains("核实后给您补偿处理"));
     }
 
     @Test

@@ -18,13 +18,15 @@
 
 ## 3. 提示词、固定兜底、合规与算力
 
-- [x] 3.1 新增 `prompts/comment_im_follow_up_message.prompt` 和 `SystemPromptKeyConstant.COMMENT_IM_FOLLOW_UP_MESSAGE`，采用 design 中禁止补偿、委婉索取订单和手机号的最终模板。
+- [x] 3.1 新增 `prompts/comment_im_follow_up_message.prompt` 和 `SystemPromptKeyConstant.COMMENT_IM_FOLLOW_UP_MESSAGE`，采用 design 中约束售后承诺、委婉索取订单和手机号的最终模板。
 - [x] 3.2 实现首条消息生成服务，通过 `SystemPromptService.render` 注入 `commentContent/addComment`，记录 provider/model、prompt key/version 和 token usage。
 - [x] 3.3 实现单段纯文本清理、Unicode code point 150 字限制、变量残留、Markdown/JSON 和 1 至 2 个表情符号检查。
-- [x] 3.4 新增 IM 渠道合规服务：允许礼貌索取订单和手机号；拦截任何补偿/退款/赔付/补发/利益、评价诱导、站外导流、高风险个人信息、攻击和违法内容。
+- [x] 3.4 新增 IM 渠道合规服务：允许礼貌索取订单和手机号；按当前规范校验补偿/退款/赔付/补发/利益、评价诱导、站外导流、高风险个人信息、攻击和违法内容。
 - [x] 3.5 实现固定兜底路径，默认文案采用 design 确定版本；模型调用/输出失败时不重试模型，记录 `FALLBACK_STATIC` 和原因并重新执行格式、合规检查。
 - [x] 3.6 使用 `COMMENT_IM_FOLLOW_UP:{commentId}` 唯一 requestNo 接入算力；模型成功按 usage、兜底按配置金额扣费，dry run 重排和重复任务不得重复扣费，扣费失败不得建群。
-- [x] 3.7 补充后台配置优先/资源兜底、正常生成、模型异常/超时/空输出、静态兜底、兜底不合规、禁止补偿、允许手机号、格式边界和幂等计费测试。
+- [x] 3.7 补充后台配置优先/资源兜底、正常生成、模型异常/超时/空输出、静态兜底、兜底不合规、补偿合规边界、允许手机号、格式边界和幂等计费测试。
+- [x] 3.8 调整 IM 提示词与渠道合规规则，允许“核实后补偿”等条件式补偿表述，继续拦截直接补偿、具体利益承诺和评价诱导，并补充边界测试。
+- [x] 3.9 将固定兜底改为包含 `commentContent` 的可配置模板，安全清理和按 150 字总上限截断评价变量，缺失时使用明确占位，并补充渲染测试。
 
 ## 4. AES 与美团 IM 客户端
 
@@ -72,3 +74,4 @@
 - [x] 8.4 在两个 dry run 均为 true 时验证新差评只生成、扣费和落库而不外呼；核对所有评价在新后台页面可检索并能查看三条链路详情。
 - [ ] 8.5 先关闭建群 dry run，小范围验证每条评价最多一次建群及 `group_id` 落库；再关闭发送 dry run，验证 AES 解密、群消息内容和每条评价最多一次发送。
 - [ ] 8.6 核查生产日志、数据库摘要和后台接口不包含 access token、`imSecret`、完整密文或完整外部请求，记录上线、逐步启用和回滚检查清单。
+- [x] 8.7 同步更新默认提示词数据库迁移、环境变量示例和美团接口调用索引，并运行 IM 消息生成与合规测试及后端编译。
