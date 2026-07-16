@@ -26,3 +26,12 @@ export async function getCommentProcessingLog(
   >(`${BASE_URL}/${id}`);
   return response.data;
 }
+
+export type CommentProcessingRetryType = "auto-reply" | "complaint" | "im-follow-up";
+
+export async function retryCommentProcessing(
+  id: number,
+  retryType: CommentProcessingRetryType,
+): Promise<void> {
+  await request.post(`${BASE_URL}/${id}/retry/${retryType}`);
+}

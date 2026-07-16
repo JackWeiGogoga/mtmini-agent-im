@@ -74,13 +74,36 @@ class MtPowerConsumeServiceTest {
         account.setBalance(50);
         account.setVersion(1);
         when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
-        when(mtPowerAccountService.getOrCreateAccount(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> mtPowerConsumeService.consume(buildRequest()));
 
         assertEquals("当前算力余额不足", exception.getMessage());
         verify(mtPowerAccountMapper, never()).deductBySource(anyLong(), anyInt(), anyInt(), anyInt(), anyInt(), any());
         verify(mtPowerConsumeMapper, never()).insert(any());
+    }
+
+    @Test
+    void shouldRecheckIdempotencyAfterAcquiringAccountLock() {
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(300);
+        account.setGrantBalance(100);
+        account.setRechargeBalance(200);
+        account.setVersion(2);
+        MtPowerConsume existing = new MtPowerConsume();
+        existing.setConsumeNo("PC-LOCKED");
+        existing.setBalanceAfter(200);
+        when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1"))
+                .thenReturn(null, existing);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
+
+        PowerConsumeResultDTO result = mtPowerConsumeService.consume(buildRequest());
+
+        assertTrue(result.isDuplicate());
+        assertEquals("PC-LOCKED", result.getConsumeNo());
+        verify(mtPowerAccountService).ensureAccountInitialized(1L);
+        verify(mtPowerAccountMapper).selectByShopIdForUpdate(1L);
+        verify(mtPowerAccountMapper, never()).deductBySource(anyLong(), anyInt(), anyInt(), anyInt(), anyInt(), any());
     }
 
     @Test
@@ -91,7 +114,7 @@ class MtPowerConsumeServiceTest {
         account.setRechargeBalance(220);
         account.setVersion(2);
         when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
-        when(mtPowerAccountService.getOrCreateAccount(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
         when(mtPowerAccountMapper.deductBySource(eq(1L), eq(100), eq(80), eq(20), eq(2), any())).thenReturn(1);
 
         ArgumentCaptor<MtPowerConsume> consumeCaptor = ArgumentCaptor.forClass(MtPowerConsume.class);
@@ -128,7 +151,7 @@ class MtPowerConsumeServiceTest {
         account.setRechargeBalance(300);
         account.setVersion(2);
         when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
-        when(mtPowerAccountService.getOrCreateAccount(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
         when(mtPowerAccountMapper.deductBySource(eq(1L), eq(100), eq(0), eq(100), eq(2), any())).thenReturn(1);
         when(mtPowerConsumeMapper.insert(any(MtPowerConsume.class))).thenAnswer(invocation -> {
             MtPowerConsume consume = invocation.getArgument(0);

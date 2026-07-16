@@ -42,4 +42,10 @@ public interface MtCommentImFollowUpMapper {
                      @Param("failedStage") String failedStage, @Param("errorCode") String errorCode,
                      @Param("errorMessage") String errorMessage, @Param("durationMs") Integer durationMs,
                      @Param("updateTime") LocalDateTime updateTime);
+
+    int resetFailedForManualRetry(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("updateTime") LocalDateTime updateTime
+    );
 }

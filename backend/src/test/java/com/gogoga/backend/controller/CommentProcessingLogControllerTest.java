@@ -18,8 +18,14 @@ class CommentProcessingLogControllerTest {
 
         Method list = CommentProcessingLogController.class.getMethod("list", CommentProcessingLogQueryParam.class);
         Method detail = CommentProcessingLogController.class.getMethod("detail", Long.class);
+        Method retryAutoReply = CommentProcessingLogController.class.getMethod("retryAutoReply", Long.class);
+        Method retryComplaint = CommentProcessingLogController.class.getMethod("retryComplaint", Long.class);
+        Method retryImFollowUp = CommentProcessingLogController.class.getMethod("retryImFollowUp", Long.class);
 
         assertEquals("comment:processing-log:list", list.getAnnotation(RequiresPermission.class).value());
         assertEquals("comment:processing-log:query", detail.getAnnotation(RequiresPermission.class).value());
+        assertEquals("comment:processing-log:retry", retryAutoReply.getAnnotation(RequiresPermission.class).value());
+        assertEquals("comment:processing-log:retry", retryComplaint.getAnnotation(RequiresPermission.class).value());
+        assertEquals("comment:processing-log:retry", retryImFollowUp.getAnnotation(RequiresPermission.class).value());
     }
 }

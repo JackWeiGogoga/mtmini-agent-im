@@ -115,4 +115,22 @@ public interface MtCommentMapper {
             @Param("error") String error,
             @Param("updateTime") LocalDateTime updateTime
     );
+
+    int resetAutoReplyForManualRetry(
+            @Param("id") Long id,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int resetComplaintForManualRetry(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("updateTime") LocalDateTime updateTime
+    );
+
+    int resetImFollowUpForManualRetry(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("groupId") Long groupId,
+            @Param("updateTime") LocalDateTime updateTime
+    );
 }

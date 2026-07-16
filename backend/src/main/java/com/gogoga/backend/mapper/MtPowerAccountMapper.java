@@ -19,6 +19,8 @@ public interface MtPowerAccountMapper {
 
     MtPowerAccount selectByShopId(@Param("shopId") Long shopId);
 
+    MtPowerAccount selectByShopIdForUpdate(@Param("shopId") Long shopId);
+
     int initAccountIfAbsent(@Param("shopId") Long shopId, @Param("now") LocalDateTime now);
 
     int insert(MtPowerAccount account);

@@ -26,6 +26,7 @@ import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.MtShopRightService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,6 +79,9 @@ public class MtCommentImFollowUpServiceImpl implements MtCommentImFollowUpServic
 
         MtCommentImFollowUp record = selectOrCreate(shop, comment);
         if (isTerminal(record)) {
+            if (StringUtils.equals(record.getStatus(), CommentImFollowUpStatusEnum.FAILED.name())) {
+                throw terminalFailure(record.getErrorCode(), record.getErrorMessage());
+            }
             return;
         }
         if (!isExecutionContextValid(shop, comment, record, startNanos)) {
@@ -346,6 +350,17 @@ public class MtCommentImFollowUpServiceImpl implements MtCommentImFollowUpServic
                 null, safeMessage, now);
         log.warn("差评IM跟进终止，shopId={}, commentId={}, status={}, stage={}, errorCode={}",
                 comment.getShopId(), comment.getCommentId(), status.name(), stage, errorCode);
+        if (status == CommentImFollowUpStatusEnum.FAILED) {
+            throw terminalFailure(errorCode, safeMessage);
+        }
+    }
+
+    private MtAsyncTaskTerminalFailureException terminalFailure(String errorCode, String errorMessage) {
+        String summary = StringUtils.defaultIfBlank(errorCode, "COMMENT_IM_FAILED");
+        if (StringUtils.isNotBlank(errorMessage) && !StringUtils.equals(errorMessage, summary)) {
+            summary += ":" + errorMessage;
+        }
+        return new MtAsyncTaskTerminalFailureException(StringUtils.left(summary, 1000));
     }
 
     private boolean isTerminal(MtCommentImFollowUp record) {

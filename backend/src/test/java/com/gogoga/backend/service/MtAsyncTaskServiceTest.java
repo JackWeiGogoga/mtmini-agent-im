@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -111,6 +112,23 @@ class MtAsyncTaskServiceTest {
     }
 
     @Test
+    void shouldMarkTerminalBusinessFailureDeadWithoutSchedulingRetry() {
+        MtAsyncTask task = buildProcessingTask(8L, 0, 3);
+        LocalDateTime now = LocalDateTime.of(2026, 7, 16, 0, 35);
+
+        mtAsyncTaskService.markTerminalFailure(task, "COMMENT_IM_CREATE_GROUP_FAILED", now);
+
+        verify(mtAsyncTaskMapper).markDead(
+                8L,
+                MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),
+                1,
+                now,
+                "COMMENT_IM_CREATE_GROUP_FAILED"
+        );
+        verify(mtAsyncTaskMapper, never()).rescheduleFromProcessing(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void shouldRescheduleWithoutIncrementingRetryCount() {
         MtAsyncTask task = buildProcessingTask(2L, 2, 3);
         LocalDateTime now = LocalDateTime.of(2026, 4, 18, 12, 0);
@@ -180,6 +198,49 @@ class MtAsyncTaskServiceTest {
         verify(mtAsyncTaskMapper).insert(taskCaptor.capture());
         assertEquals("PENDING", taskCaptor.getValue().getStatus());
         assertEquals("record#1", taskCaptor.getValue().getBizKey());
+    }
+
+    @Test
+    void shouldResetTerminalTaskForManualRetry() {
+        MtAsyncTask existing = new MtAsyncTask();
+        existing.setId(21L);
+        existing.setStatus("DEAD");
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("COMMENT_AUTO_REPLY", "comment:9001"))
+                .thenReturn(existing);
+        when(mtAsyncTaskMapper.resetForManualRetry(eq(21L), eq("COMMENT_AUTO_REPLY"), eq(3), any()))
+                .thenReturn(1);
+
+        MtAsyncTaskEnqueueResult result = mtAsyncTaskService.enqueueOrResetForManualRetry(
+                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+                "comment:9001",
+                "100",
+                java.util.Map.of("commentId", 9001L),
+                3
+        );
+
+        assertEquals(21L, result.getTaskId());
+        assertFalse(result.isCreated());
+        verify(mtAsyncTaskMapper).resetForManualRetry(eq(21L), eq("COMMENT_AUTO_REPLY"), eq(3), any());
+    }
+
+    @Test
+    void shouldRejectManualRetryWhileTaskIsProcessing() {
+        MtAsyncTask existing = new MtAsyncTask();
+        existing.setId(22L);
+        existing.setStatus("PROCESSING");
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("COMMENT_AUTO_REPLY", "comment:9002"))
+                .thenReturn(existing);
+
+        assertThrows(com.gogoga.backend.exception.BusinessException.class,
+                () -> mtAsyncTaskService.enqueueOrResetForManualRetry(
+                        MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+                        "comment:9002",
+                        "100",
+                        java.util.Map.of("commentId", 9002L),
+                        3
+                ));
+
+        verify(mtAsyncTaskMapper, never()).resetForManualRetry(any(), any(), any(), any());
     }
 
     @Test

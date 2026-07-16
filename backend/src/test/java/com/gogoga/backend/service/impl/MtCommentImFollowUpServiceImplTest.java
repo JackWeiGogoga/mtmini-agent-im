@@ -21,6 +21,7 @@ import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.MtShopRightService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,7 +98,8 @@ class MtCommentImFollowUpServiceImplTest {
         generated.setCreateGroupAttemptedAt(LocalDateTime.now().minusMinutes(1));
         stubExecutableContext(generated);
 
-        service.executeCommentAutoImFollowUpTask(payload());
+        assertThrows(MtAsyncTaskTerminalFailureException.class,
+                () -> service.executeCommentAutoImFollowUpTask(payload()));
 
         verify(imClient, never()).createCommentGroup(anyString(), anyLong());
         verify(followUpMapper).markTerminal(eq(9L), eq("FAILED"), eq("CREATE_GROUP"),
@@ -168,7 +170,8 @@ class MtCommentImFollowUpServiceImplTest {
         when(imClient.sendCommentMessage(anyString(), anyLong(), anyLong(), anyLong(), anyLong(), anyString()))
                 .thenThrow(new IllegalStateException("timeout"));
 
-        service.executeCommentAutoImFollowUpTask(payload());
+        assertThrows(MtAsyncTaskTerminalFailureException.class,
+                () -> service.executeCommentAutoImFollowUpTask(payload()));
 
         verify(imClient, times(1)).sendCommentMessage(anyString(), anyLong(), anyLong(), anyLong(), anyLong(), anyString());
         verify(followUpMapper).markTerminal(eq(9L), eq("FAILED"), eq("SEND_MESSAGE"),

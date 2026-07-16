@@ -133,4 +133,26 @@
             error_message = #{errorMessage}, duration_ms = #{durationMs}, update_time = #{updateTime}
         WHERE id = #{id} AND status NOT IN ('SUCCESS', 'FAILED', 'SKIPPED')
     </update>
+
+    <update id="resetFailedForManualRetry">
+        UPDATE mt_comment_im_follow_up
+        SET status = #{status},
+            failed_stage = NULL,
+            error_code = NULL,
+            error_message = NULL,
+            create_group_attempted_at = CASE
+                WHEN #{status} IN ('PENDING', 'GENERATED') THEN NULL
+                ELSE create_group_attempted_at
+            END,
+            create_group_response_summary = CASE
+                WHEN #{status} IN ('PENDING', 'GENERATED') THEN NULL
+                ELSE create_group_response_summary
+            END,
+            send_attempted_at = NULL,
+            send_response_summary = NULL,
+            sent_at = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND status = 'FAILED'
+    </update>
 </mapper>

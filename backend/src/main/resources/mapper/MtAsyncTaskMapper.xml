@@ -118,6 +118,22 @@
           AND status = 'PROCESSING'
     </update>
 
+    <update id="resetForManualRetry">
+        UPDATE mt_async_task
+        SET status = 'PENDING',
+            retry_count = 0,
+            max_retry_count = #{maxRetryCount},
+            available_at = #{availableAt},
+            claimed_at = NULL,
+            finished_at = NULL,
+            worker_id = NULL,
+            last_error = NULL,
+            update_time = #{availableAt}
+        WHERE id = #{id}
+          AND task_type = #{taskType}
+          AND status IN ('PENDING', 'SUCCESS', 'DEAD')
+    </update>
+
     <select id="selectStaleProcessingTasks" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
         FROM mt_async_task

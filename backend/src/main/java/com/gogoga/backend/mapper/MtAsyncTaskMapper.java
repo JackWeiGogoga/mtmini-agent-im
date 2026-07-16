@@ -59,6 +59,13 @@ public interface MtAsyncTaskMapper {
             @Param("lastError") String lastError
     );
 
+    int resetForManualRetry(
+            @Param("id") Long id,
+            @Param("taskType") String taskType,
+            @Param("maxRetryCount") Integer maxRetryCount,
+            @Param("availableAt") LocalDateTime availableAt
+    );
+
     List<MtAsyncTask> selectStaleProcessingTasks(
             @Param("taskType") String taskType,
             @Param("claimedBefore") LocalDateTime claimedBefore,

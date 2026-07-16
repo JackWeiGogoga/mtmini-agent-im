@@ -324,4 +324,34 @@
           AND im_follow_up_status != 'SUCCESS'
     </update>
 
+    <update id="resetAutoReplyForManualRetry">
+        UPDATE mt_comment
+        SET auto_reply_status = 'PENDING',
+            auto_reply_error = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND auto_reply_status = 'FAILED'
+    </update>
+
+    <update id="resetComplaintForManualRetry">
+        UPDATE mt_comment
+        SET complaint_status = #{status},
+            complaint_error = NULL,
+            complaint_at = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND complaint_status = 'FAILED'
+    </update>
+
+    <update id="resetImFollowUpForManualRetry">
+        UPDATE mt_comment
+        SET im_follow_up_status = #{status},
+            im_group_id = COALESCE(#{groupId}, im_group_id),
+            im_message_at = NULL,
+            im_follow_up_error = NULL,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+          AND im_follow_up_status = 'FAILED'
+    </update>
+
 </mapper>

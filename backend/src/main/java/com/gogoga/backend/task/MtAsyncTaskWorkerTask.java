@@ -12,6 +12,7 @@ import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
@@ -163,6 +164,10 @@ public class MtAsyncTaskWorkerTask {
             mtAsyncTaskService.rescheduleWithoutRetry(task, nextAvailableAt, e.getMessage(), now);
             log.warn("数据库异步任务 dry run 跳过执行，taskType={}, taskId={}, nextAvailableAt={}",
                     taskType.name(), taskId, nextAvailableAt);
+        } catch (MtAsyncTaskTerminalFailureException e) {
+            log.warn("数据库异步任务业务终态失败，taskType={}, taskId={}, error={}",
+                    taskType.name(), taskId, e.getMessage());
+            mtAsyncTaskService.markTerminalFailure(task, e.getMessage(), LocalDateTime.now());
         } catch (Exception e) {
             log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
             mtAsyncTaskService.handleFailure(task, resolvePolicy(taskType), e.getMessage(), LocalDateTime.now());

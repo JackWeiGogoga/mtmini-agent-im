@@ -4,6 +4,7 @@ import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.entity.mt.MtAsyncTaskBacklogSummary;
 import com.gogoga.backend.enums.MtAsyncTaskStatusEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtAsyncTaskMapper;
 import com.gogoga.backend.service.async.MtAsyncTaskEnqueueResult;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
@@ -86,6 +87,36 @@ public class MtAsyncTaskService {
         return mtAsyncTaskMapper.selectByTaskTypeAndBizKey(taskType.name(), bizKey);
     }
 
+    public MtAsyncTaskEnqueueResult enqueueOrResetForManualRetry(
+            MtAsyncTaskTypeEnum taskType,
+            String bizKey,
+            String scopeKey,
+            Object payload,
+            int maxRetryCount
+    ) {
+        MtAsyncTask existingTask = selectByTaskTypeAndBizKey(taskType, bizKey);
+        if (existingTask == null) {
+            return enqueueTask(taskType, bizKey, scopeKey, payload, LocalDateTime.now(), maxRetryCount);
+        }
+        if (StringUtils.equals(existingTask.getStatus(), MtAsyncTaskStatusEnum.PROCESSING.name())) {
+            throw new BusinessException(409, "任务正在处理中，请稍后再试");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updated = mtAsyncTaskMapper.resetForManualRetry(
+                existingTask.getId(),
+                taskType.name(),
+                Math.max(maxRetryCount, 0),
+                now
+        );
+        if (updated != 1) {
+            throw new BusinessException(409, "任务状态已变化，请刷新后重试");
+        }
+        mtAsyncTaskMetricsService.increment(taskType.name(), "manual_retry");
+        log.info("数据库异步任务已由管理员重新入队，taskType={}, bizKey={}, scopeKey={}, taskId={}",
+                taskType.name(), bizKey, scopeKey, existingTask.getId());
+        return new MtAsyncTaskEnqueueResult(existingTask.getId(), false);
+    }
+
     public MtAsyncTask claimTask(MtAsyncTaskTypeEnum taskType, Long taskId, String workerId, LocalDateTime claimedAt) {
         if (taskType == null || taskId == null || StringUtils.isBlank(workerId)) {
             return null;
@@ -162,6 +193,28 @@ public class MtAsyncTaskService {
         mtAsyncTaskMetricsService.increment(task.getTaskType(), "retry");
         log.warn("数据库异步任务重试回退，taskType={}, taskId={}, retryCount={}, nextAvailableAt={}, error={}",
                 task.getTaskType(), task.getId(), nextRetryCount, nextAvailableAt, safeErrorSummary);
+    }
+
+    public void markTerminalFailure(MtAsyncTask task, String errorSummary, LocalDateTime now) {
+        if (task == null) {
+            return;
+        }
+        LocalDateTime currentTime = now == null ? LocalDateTime.now() : now;
+        String safeErrorSummary = StringUtils.left(
+                StringUtils.defaultIfBlank(errorSummary, "TERMINAL_BUSINESS_FAILURE"),
+                LAST_ERROR_MAX_LENGTH
+        );
+        int nextRetryCount = defaultRetryCount(task) + 1;
+        mtAsyncTaskMapper.markDead(
+                task.getId(),
+                task.getTaskType(),
+                nextRetryCount,
+                currentTime,
+                safeErrorSummary
+        );
+        mtAsyncTaskMetricsService.increment(task.getTaskType(), "dead");
+        log.warn("数据库异步任务业务失败并进入终态，taskType={}, taskId={}, retryCount={}, error={}",
+                task.getTaskType(), task.getId(), nextRetryCount, safeErrorSummary);
     }
 
     public int recoverStaleTasks(

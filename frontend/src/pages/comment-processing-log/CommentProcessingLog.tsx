@@ -21,14 +21,16 @@ import {
 import type { DescriptionsProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { RedoOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import PageContainer from "@/components/PageContainer";
-import { message } from "@/components/AppMessageContext";
+import { message, modal } from "@/components/AppMessageContext";
 import { PermissionControl } from "@/components/PermissionControl";
 import {
   getCommentProcessingLog,
   listCommentProcessingLogs,
+  retryCommentProcessing,
 } from "@/services/comment-processing-log-api";
+import type { CommentProcessingRetryType } from "@/services/comment-processing-log-api";
 import type {
   CommentProcessingLogQuery,
   CommentProcessingLogRecord,
@@ -89,6 +91,12 @@ const sentimentMeta: Record<string, { label: string; color: string }> = {
   UNKNOWN: { label: "未知", color: "default" },
 };
 
+const retryMeta: Record<CommentProcessingRetryType, { label: string; success: string }> = {
+  "auto-reply": { label: "自动回复", success: "自动回复已重新入队" },
+  complaint: { label: "差评申诉", success: "差评申诉已重新入队" },
+  "im-follow-up": { label: "群聊跟进", success: "群聊跟进已重新入队" },
+};
+
 function statusTag(status?: string) {
   const normalized = status || "NOT_TRIGGERED";
   const meta = statusMeta[normalized] || { label: normalized };
@@ -121,6 +129,7 @@ export default function CommentProcessingLog() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<CommentProcessingLogRecord>();
+  const [retryingKey, setRetryingKey] = useState<string>();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -151,6 +160,38 @@ export default function CommentProcessingLog() {
       setDetailLoading(false);
     }
   }, []);
+
+  const confirmRetry = useCallback((
+    record: CommentProcessingLogRecord,
+    retryType: CommentProcessingRetryType,
+  ) => {
+    const meta = retryMeta[retryType];
+    const key = `${record.id}:${retryType}`;
+    modal.confirm({
+      title: `确认重试${meta.label}？`,
+      content: retryType === "im-follow-up"
+        ? "请先确认美团侧门店 IM 开关或上次失败原因已处理。重试可能再次发起建群或消息发送。"
+        : "任务会立即重新进入异步队列，请确认失败原因已处理。",
+      okText: "确认重试",
+      cancelText: "取消",
+      onOk: async () => {
+        setRetryingKey(key);
+        try {
+          await retryCommentProcessing(record.id, retryType);
+          message.success(meta.success);
+          await loadData();
+          if (detailOpen && detail?.id === record.id) {
+            setDetail(await getCommentProcessingLog(record.id));
+          }
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : `${meta.label}重试失败`);
+          throw error;
+        } finally {
+          setRetryingKey(undefined);
+        }
+      },
+    });
+  }, [detail?.id, detailOpen, loadData]);
 
   const columns = useMemo<ColumnsType<CommentProcessingLogRecord>>(
     () => [
@@ -209,19 +250,52 @@ export default function CommentProcessingLog() {
       },
       {
         title: "操作",
-        width: 90,
+        width: 300,
         fixed: "right",
         render: (_, record) => (
-          <PermissionControl
-            permission="comment:processing-log:query"
-            fallback={<Text type="secondary">—</Text>}
-          >
-            <Button type="link" onClick={() => void openDetail(record)}>详情</Button>
-          </PermissionControl>
+          <Space size={0} wrap>
+            <PermissionControl permission="comment:processing-log:query">
+              <Button type="link" onClick={() => void openDetail(record)}>详情</Button>
+            </PermissionControl>
+            <PermissionControl permission="comment:processing-log:retry">
+              <Space size={0} wrap>
+                {record.autoReplyStatus === "FAILED" && (
+                  <Button
+                    type="link"
+                    icon={<RedoOutlined />}
+                    loading={retryingKey === `${record.id}:auto-reply`}
+                    onClick={() => confirmRetry(record, "auto-reply")}
+                  >
+                    重试回复
+                  </Button>
+                )}
+                {record.complaintStatus === "FAILED" && (
+                  <Button
+                    type="link"
+                    icon={<RedoOutlined />}
+                    loading={retryingKey === `${record.id}:complaint`}
+                    onClick={() => confirmRetry(record, "complaint")}
+                  >
+                    重试申诉
+                  </Button>
+                )}
+                {record.imFollowUpStatus === "FAILED" && (
+                  <Button
+                    type="link"
+                    icon={<RedoOutlined />}
+                    loading={retryingKey === `${record.id}:im-follow-up`}
+                    onClick={() => confirmRetry(record, "im-follow-up")}
+                  >
+                    重试群聊
+                  </Button>
+                )}
+              </Space>
+            </PermissionControl>
+          </Space>
         ),
       },
     ],
-    [openDetail],
+    [confirmRetry, openDetail, retryingKey],
   );
 
   const submitFilters = (values: FilterValues) => {
@@ -279,7 +353,7 @@ export default function CommentProcessingLog() {
           loading={loading}
           columns={columns}
           dataSource={records}
-          scroll={{ x: 1420 }}
+          scroll={{ x: 1630 }}
           pagination={{
             current: query.pageNum,
             pageSize: query.pageSize,

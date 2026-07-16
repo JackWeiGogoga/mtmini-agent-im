@@ -12,6 +12,7 @@ import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtCommentAsyncTaskKeys;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
@@ -196,7 +197,7 @@ public class MtCommentAutoReplyService {
             payload.setCommentId(comment.getCommentId());
             mtAsyncTaskService.enqueueTask(
                     MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
-                    buildCommentReplyTaskBizKey(comment.getCommentId()),
+                    MtCommentAsyncTaskKeys.autoReply(comment.getCommentId()),
                     String.valueOf(shop.getId()),
                     payload,
                     LocalDateTime.now(),
@@ -342,10 +343,6 @@ public class MtCommentAutoReplyService {
         return comment;
     }
 
-    private String buildCommentReplyTaskBizKey(Long commentId) {
-        return "comment:" + commentId;
-    }
-
     private void enqueueNegativeCommentPostTasksIfNeeded(MtShop shop, MtComment comment) {
         if (shop == null || shop.getId() == null || comment == null || comment.getCommentId() == null) {
             return;
@@ -366,7 +363,7 @@ public class MtCommentAutoReplyService {
             payload.setCommentId(comment.getCommentId());
             mtAsyncTaskService.enqueueTask(
                     MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
-                    buildCommentComplaintTaskBizKey(comment.getCommentId()),
+                    MtCommentAsyncTaskKeys.complaint(comment.getCommentId()),
                     String.valueOf(shop.getId()),
                     payload,
                     LocalDateTime.now(),
@@ -381,7 +378,7 @@ public class MtCommentAutoReplyService {
             payload.setCommentId(comment.getCommentId());
             mtAsyncTaskService.enqueueTask(
                     MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP,
-                    buildCommentImFollowUpTaskBizKey(comment.getCommentId()),
+                    MtCommentAsyncTaskKeys.imFollowUp(comment.getCommentId()),
                     String.valueOf(shop.getId()),
                     payload,
                     LocalDateTime.now(),
@@ -392,11 +389,4 @@ public class MtCommentAutoReplyService {
         }
     }
 
-    private String buildCommentComplaintTaskBizKey(Long commentId) {
-        return "comment-complaint:" + commentId;
-    }
-
-    private String buildCommentImFollowUpTaskBizKey(Long commentId) {
-        return "comment-im-follow-up:" + commentId;
-    }
 }

@@ -10,9 +10,7 @@ import com.gogoga.backend.mapper.MtPowerAccountMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeDetailMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,14 +25,12 @@ import java.util.UUID;
  * @author system
  * @since 2026-03-23
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MtPowerConsumeService {
 
     public static final String SOURCE_BALANCE_GRANT = "GRANT";
     public static final String SOURCE_BALANCE_RECHARGE = "RECHARGE";
-    private static final int MAX_RETRY_TIMES = 3;
 
     private final MtPowerAccountService mtPowerAccountService;
     private final MtPowerAccountMapper mtPowerAccountMapper;
@@ -56,46 +52,48 @@ public class MtPowerConsumeService {
             return buildDuplicateResult(existing);
         }
 
-        for (int i = 0; i < MAX_RETRY_TIMES; i++) {
-            MtPowerAccount account = mtPowerAccountService.getOrCreateAccount(request.getShopId());
-            if (defaultInt(account.getBalance()) < request.getPowerAmount()) {
-                throw new BusinessException(400, "当前算力余额不足");
-            }
-
-            DeductionSplit split = DeductionSplit.of(account, request.getPowerAmount());
-            int rows = mtPowerAccountMapper.deductBySource(
-                    request.getShopId(),
-                    request.getPowerAmount(),
-                    split.getGrantAmount(),
-                    split.getRechargeAmount(),
-                    account.getVersion(),
-                    LocalDateTime.now()
-            );
-            if (rows <= 0) {
-                continue;
-            }
-
-            MtPowerConsume consume = buildConsume(request, defaultInt(account.getBalance()), defaultInt(account.getBalance()) - request.getPowerAmount());
-            try {
-                mtPowerConsumeMapper.insert(consume);
-                mtPowerConsumeDetailMapper.insertBatch(buildDetails(consume, account, split));
-            } catch (DuplicateKeyException e) {
-                log.info("算力消费请求重复，shopId={}, requestNo={}", request.getShopId(), request.getRequestNo());
-                MtPowerConsume duplicate = mtPowerConsumeMapper.selectByShopIdAndRequestNo(request.getShopId(), request.getRequestNo());
-                if (duplicate == null) {
-                    throw e;
-                }
-                return buildDuplicateResult(duplicate);
-            }
-
-            PowerConsumeResultDTO result = new PowerConsumeResultDTO();
-            result.setDuplicate(false);
-            result.setConsumeNo(consume.getConsumeNo());
-            result.setBalanceAfter(consume.getBalanceAfter());
-            return result;
+        mtPowerAccountService.ensureAccountInitialized(request.getShopId());
+        MtPowerAccount account = mtPowerAccountMapper.selectByShopIdForUpdate(request.getShopId());
+        if (account == null) {
+            throw new BusinessException(500, "初始化算力账户失败");
         }
 
-        throw new BusinessException(409, "算力消费处理冲突，请稍后重试");
+        // 同一门店的消费请求会在账户行锁上串行化。获取锁后再次检查幂等记录，
+        // 避免两个相同请求在首次无记录后依次扣减。
+        existing = mtPowerConsumeMapper.selectByShopIdAndRequestNo(request.getShopId(), request.getRequestNo());
+        if (existing != null) {
+            return buildDuplicateResult(existing);
+        }
+        if (defaultInt(account.getBalance()) < request.getPowerAmount()) {
+            throw new BusinessException(400, "当前算力余额不足");
+        }
+
+        DeductionSplit split = DeductionSplit.of(account, request.getPowerAmount());
+        int rows = mtPowerAccountMapper.deductBySource(
+                request.getShopId(),
+                request.getPowerAmount(),
+                split.getGrantAmount(),
+                split.getRechargeAmount(),
+                account.getVersion(),
+                LocalDateTime.now()
+        );
+        if (rows != 1) {
+            throw new BusinessException(409, "算力消费处理冲突，请稍后重试");
+        }
+
+        MtPowerConsume consume = buildConsume(
+                request,
+                defaultInt(account.getBalance()),
+                defaultInt(account.getBalance()) - request.getPowerAmount()
+        );
+        mtPowerConsumeMapper.insert(consume);
+        mtPowerConsumeDetailMapper.insertBatch(buildDetails(consume, account, split));
+
+        PowerConsumeResultDTO result = new PowerConsumeResultDTO();
+        result.setDuplicate(false);
+        result.setConsumeNo(consume.getConsumeNo());
+        result.setBalanceAfter(consume.getBalanceAfter());
+        return result;
     }
 
     private List<MtPowerConsumeDetail> buildDetails(MtPowerConsume consume, MtPowerAccount account, DeductionSplit split) {

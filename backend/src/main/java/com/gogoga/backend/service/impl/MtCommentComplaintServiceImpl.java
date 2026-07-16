@@ -28,6 +28,7 @@ import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
 import com.gogoga.backend.service.SystemPromptService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.util.CommentImageUrlUtil;
 import com.gogoga.backend.util.JsonUtil;
@@ -120,8 +121,10 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
                     : generateComplaint(shop, comment, sentiment);
             CommentReplySensitiveWordHitDTO sensitiveHit = commentReplySensitiveWordService.detect(generation.reportContent);
             if (sensitiveHit != null && sensitiveHit.isHit()) {
-                markFailed(comment, record, "COMMENT_AUTO_COMPLAINT_SENSITIVE:" + StringUtils.join(sensitiveHit.getCategories(), "、"), durationMs(startNanos));
-                return;
+                String error = "COMMENT_AUTO_COMPLAINT_SENSITIVE:"
+                        + StringUtils.join(sensitiveHit.getCategories(), "、");
+                markFailed(comment, record, error, durationMs(startNanos));
+                throw new MtAsyncTaskTerminalFailureException(error);
             }
             if (!reuseGenerated) {
                 int powerAmount = calculatePowerAmount(generation);
@@ -138,6 +141,8 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
             }
             submitComplaint(shop, token, comment, record, generation, startNanos);
         } catch (MtAsyncTaskDryRunException e) {
+            throw e;
+        } catch (MtAsyncTaskTerminalFailureException e) {
             throw e;
         } catch (Exception e) {
             String error = StringUtils.left(StringUtils.defaultIfBlank(e.getMessage(), "COMMENT_AUTO_COMPLAINT_FAILED"), 1000);
