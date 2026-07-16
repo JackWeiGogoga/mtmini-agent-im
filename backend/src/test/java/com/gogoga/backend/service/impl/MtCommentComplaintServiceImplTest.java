@@ -190,6 +190,40 @@ class MtCommentComplaintServiceImplTest {
     }
 
     @Test
+    void invalidCommentIsMarkedSkippedWithoutModelOrMeituanCall() throws Exception {
+        MtComment comment = comment();
+        comment.setValid(0);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+        when(mtShopMapper.selectById(100L)).thenReturn(shop());
+        when(mtCommentComplaintMapper.selectByShopIdAndCommentId(100L, 542543250001L)).thenReturn(record());
+
+        service.executeCommentAutoComplaintTask(payload());
+
+        verify(mtCommentComplaintMapper).markFailed(
+                eq(9L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_INVALID"), any(), any());
+        verify(mtCommentMapper).markComplaintFailed(
+                eq(1L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_INVALID"), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(meituanClient, never()).invokeApi(any(CommentComplainReportRequest.class), anyString());
+    }
+
+    @Test
+    void unsupportedSensitiveTypeIsMarkedSkippedWithoutModelOrMeituanCall() throws Exception {
+        MtComment comment = comment();
+        comment.setCommentType(3);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+        when(mtShopMapper.selectById(100L)).thenReturn(shop());
+        when(mtCommentComplaintMapper.selectByShopIdAndCommentId(100L, 542543250001L)).thenReturn(record());
+
+        service.executeCommentAutoComplaintTask(payload());
+
+        verify(mtCommentComplaintMapper).markFailed(
+                eq(9L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_TYPE_UNSUPPORTED"), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(meituanClient, never()).invokeApi(any(CommentComplainReportRequest.class), anyString());
+    }
+
+    @Test
     void generatedRecordReusesContentWithoutModelOrDuplicatePower() throws Exception {
         MtComment comment = comment();
         when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
@@ -245,6 +279,8 @@ class MtCommentComplaintServiceImplTest {
         comment.setId(1L);
         comment.setShopId(100L);
         comment.setCommentId(542543250001L);
+        comment.setValid(1);
+        comment.setCommentType(4);
         comment.setProductScore(2);
         comment.setPackingScore(5);
         comment.setDeliveryCommentScore(1);

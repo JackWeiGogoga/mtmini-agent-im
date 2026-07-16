@@ -122,7 +122,7 @@ class MtCommentReplyContentServiceImplTest {
     }
 
     @Test
-    void invalidProductPackingScoreSkipsReplyWithoutGeneration() {
+    void noValidCommentScoreSkipsReplyWithoutGeneration() {
         MtComment comment = comment(6);
         comment.setProductScore(6);
         comment.setPackingScore(null);
@@ -130,7 +130,7 @@ class MtCommentReplyContentServiceImplTest {
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment);
 
         assertFalse(result.isShouldReply());
-        assertEquals("PRODUCT_PACKING_SCORE_INVALID", result.getSkipReason());
+        assertEquals("COMMENT_SCORE_INVALID", result.getSkipReason());
         verify(mtCommentReplyGenerationMapper, never()).insert(any());
     }
 

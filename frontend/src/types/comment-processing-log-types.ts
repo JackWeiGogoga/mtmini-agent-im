@@ -20,11 +20,15 @@ export interface CommentProcessingLogRecord {
   epoiId?: string;
   poiId?: string;
   commentId: number;
+  bizCode?: number;
+  valid?: number;
+  commentType?: number;
   commentTime?: string;
   commentContent?: string;
   addComment?: string;
   addCommentTime?: string;
   orderCommentScore?: number;
+  foodCommentScore?: number;
   deliveryCommentScore?: number;
   productScore?: number;
   packingScore?: number;

@@ -17,11 +17,15 @@ public class CommentProcessingLogVO {
     private String epoiId;
     private String poiId;
     private Long commentId;
+    private Integer bizCode;
+    private Integer valid;
+    private Integer commentType;
     private String commentTime;
     private String commentContent;
     private String addComment;
     private String addCommentTime;
     private Integer orderCommentScore;
+    private Integer foodCommentScore;
     private Integer deliveryCommentScore;
     private Integer productScore;
     private Integer packingScore;

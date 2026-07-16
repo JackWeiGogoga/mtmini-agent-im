@@ -190,6 +190,40 @@ class MtCommentImFollowUpServiceImplTest {
         verify(generationService, never()).generate(any());
     }
 
+    @Test
+    void invalidCommentIsMarkedSkippedBeforeGenerationOrMeituanCalls() {
+        MtComment comment = comment();
+        comment.setValid(0);
+        when(commentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+        when(shopMapper.selectById(100L)).thenReturn(shop());
+        when(followUpMapper.selectByShopIdAndCommentId(100L, 542543250001L)).thenReturn(record("PENDING"));
+
+        service.executeCommentAutoImFollowUpTask(payload());
+
+        verify(followUpMapper).markTerminal(
+                eq(9L), eq("SKIPPED"), eq(null), eq("COMMENT_IM_INVALID"), eq("评价已失效"), any(), any());
+        verify(generationService, never()).generate(any());
+        verify(imClient, never()).createCommentGroup(anyString(), anyLong());
+        verify(imClient, never()).sendCommentMessage(anyString(), anyLong(), anyLong(), anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void unsupportedSensitiveTypeIsMarkedSkippedBeforeGenerationOrMeituanCalls() {
+        MtComment comment = comment();
+        comment.setCommentType(3);
+        when(commentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+        when(shopMapper.selectById(100L)).thenReturn(shop());
+        when(followUpMapper.selectByShopIdAndCommentId(100L, 542543250001L)).thenReturn(record("PENDING"));
+
+        service.executeCommentAutoImFollowUpTask(payload());
+
+        verify(followUpMapper).markTerminal(
+                eq(9L), eq("SKIPPED"), eq(null), eq("COMMENT_IM_TYPE_UNSUPPORTED"),
+                eq("评论敏感类型不处理"), any(), any());
+        verify(generationService, never()).generate(any());
+        verify(imClient, never()).createCommentGroup(anyString(), anyLong());
+    }
+
     private void stubExecutableContext(MtCommentImFollowUp record) {
         when(commentMapper.selectByCommentId(542543250001L)).thenReturn(comment());
         when(shopMapper.selectById(100L)).thenReturn(shop());
@@ -212,6 +246,8 @@ class MtCommentImFollowUpServiceImplTest {
         comment.setId(1L);
         comment.setShopId(100L);
         comment.setCommentId(542543250001L);
+        comment.setValid(1);
+        comment.setCommentType(4);
         comment.setProductScore(2);
         comment.setPackingScore(5);
         comment.setReplyStatus(1);

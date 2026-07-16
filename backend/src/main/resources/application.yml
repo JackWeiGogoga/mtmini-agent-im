@@ -208,7 +208,7 @@ mt:
       initial-backoff-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_MAX_BACKOFF_SECONDS:900}
   comment:
-    pull-cron: ${MT_COMMENT_PULL_CRON:0 25 10,13,19 * * ?}
+    pull-cron: ${MT_COMMENT_PULL_CRON:0 0 8,13,19 * * ?}
     lookback-days: ${MT_COMMENT_LOOKBACK_DAYS:7}
     page-size: ${MT_COMMENT_PAGE_SIZE:20}
     query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:false}

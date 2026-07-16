@@ -3,24 +3,58 @@
 ## Purpose
 TBD - created by archiving change add-comment-reply-knowledge-rag. Update Purpose after archive.
 ## Requirements
-### Requirement: 评论类型按 food_comment_score 判定
-系统 SHALL 使用 `mt_comment.food_comment_score` 作为评论好中差分类依据，0-2 判定为差评 `BAD`，3 判定为中评 `NEUTRAL`，4-5 判定为好评 `GOOD`。
+### Requirement: 评论类型按四维最低有效分判定
+系统 SHALL 先忽略 0 分、空值和不在 1-5 范围内的评分，再取 `mt_comment.product_score`、`mt_comment.packing_score`、`mt_comment.delivery_comment_score` 与 `mt_comment.food_comment_score` 的最低有效分作为评论好中差分类依据；1-2 判定为差评 `BAD`，3 判定为中评 `NEUTRAL`，4-5 判定为好评 `GOOD`。
 
 #### Scenario: 差评分类
-- **WHEN** 待回复评价的 `food_comment_score` 为 0、1 或 2
+- **WHEN** 四个评分字段过滤无效值后的最低分为 1 或 2
 - **THEN** 系统将该评价的回复评论类型判定为 `BAD`
 
 #### Scenario: 中评分类
-- **WHEN** 待回复评价的 `food_comment_score` 为 3
+- **WHEN** 四个评分字段过滤无效值后的最低分为 3
 - **THEN** 系统将该评价的回复评论类型判定为 `NEUTRAL`
 
 #### Scenario: 好评分类
-- **WHEN** 待回复评价的 `food_comment_score` 为 4 或 5
+- **WHEN** 四个评分字段过滤无效值后的最低分为 4 或 5
 - **THEN** 系统将该评价的回复评论类型判定为 `GOOD`
 
-#### Scenario: 评分缺失
-- **WHEN** 待回复评价的 `food_comment_score` 为空或不在 0-5 范围内
+#### Scenario: 零分与无效评分不参与评级
+- **WHEN** 四个评分字段均为 0、空值或不在 1-5 范围内
 - **THEN** 系统 MUST 记录异常日志，并 SHALL 暂不进入回复生成或美团回复调用链路
+
+### Requirement: 无效评价仅保留审计记录
+系统 SHALL 保存美团返回的评价 `valid` 字段；仅 `valid=1` 的有效评价可参与自动回复、商家端日志展示、评价统计、差评申诉与 IM 跟进，`valid=0` 或其他非 1 值的评价 MUST NOT 进入上述链路。管理后台 SHALL 保留全部评价并展示其有效性，且 MUST NOT 允许重试无效评价。
+
+#### Scenario: 无效评价落库但不处理
+- **WHEN** 拉取到 `valid=0` 的评价
+- **THEN** 系统 SHALL 保存评价全量字段，但 MUST NOT 将其加入自动回复候选或商家端日志与统计
+
+#### Scenario: 已入队评价执行前失效
+- **WHEN** 自动回复、差评申诉或 IM 跟进任务执行时评价的 `valid` 不为 1
+- **THEN** 系统 SHALL 跳过任务且 MUST NOT 调用对应美团外部接口
+
+#### Scenario: 管理后台审计无效评价
+- **WHEN** 管理员查看评价处理日志
+- **THEN** 系统 SHALL 展示有效与无效评价的有效性标记，并 SHALL 禁止对无效评价发起手动重试
+
+### Requirement: 评论敏感类型控制处理范围
+系统 SHALL 仅处理 `comment_type` 为 4、5、10 的评价，其他类型仅落库审计，不得进入自动回复、商家端日志、评价统计、差评申诉或 IM 跟进。类型 4 的评价内容可展示且计入商家评分；类型 5 的评价内容必须在商家端屏蔽但计入商家评分；类型 10 的评价内容可展示但不计入商家评分。
+
+#### Scenario: 可展示且计分评价
+- **WHEN** 评价 `comment_type=4`
+- **THEN** 系统 SHALL 允许展示评价内容、自动处理并计入评价统计
+
+#### Scenario: 敏感内容屏蔽但计分
+- **WHEN** 评价 `comment_type=5`
+- **THEN** 系统 SHALL 允许自动处理并计入评价统计，但商家端 MUST NOT 返回评价原文
+
+#### Scenario: 展示但不计分
+- **WHEN** 评价 `comment_type=10`
+- **THEN** 系统 SHALL 允许展示评价内容和自动处理，但 MUST NOT 计入评价统计
+
+#### Scenario: 其他评论敏感类型
+- **WHEN** 评价 `comment_type` 不为 4、5、10
+- **THEN** 系统 SHALL 仅保留管理后台审计记录，并 MUST NOT 允许自动处理或手动重试
 
 ### Requirement: 官方回复知识管理
 系统 SHALL 支持后台管理官方回复知识，每条官方知识 MUST 包含标题、评论类型、回复内容和启用状态，并可用于无商户自有知识或智能生成失败时的随机回复。
@@ -251,4 +285,3 @@ TBD - created by archiving change add-comment-reply-knowledge-rag. Update Purpos
 #### Scenario: 生成失败记录
 - **WHEN** RAG、embedding 或大模型生成发生失败并触发回退
 - **THEN** 系统 SHALL 记录失败阶段和失败原因
-

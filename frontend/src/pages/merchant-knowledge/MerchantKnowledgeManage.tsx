@@ -69,7 +69,7 @@ const sentimentOptions: {
 }[] = [
   { label: "好评（4-5星）", value: "GOOD" },
   { label: "中评（3星）", value: "NEUTRAL" },
-  { label: "差评（0-2星）", value: "BAD" },
+  { label: "差评（1-2星）", value: "BAD" },
 ];
 
 const chunkSentimentOptions: { label: string; value: CommentReplySentiment }[] =
@@ -102,7 +102,7 @@ const scoreOptions = [
   { label: "3星（中评）", value: 3 },
   { label: "2星（差评）", value: 2 },
   { label: "1星（差评）", value: 1 },
-  { label: "0星（差评）", value: 0 },
+  { label: "0星（不参与评级）", value: 0 },
 ];
 
 const commentLabelOptions = [

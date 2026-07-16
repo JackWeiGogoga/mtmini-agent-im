@@ -88,7 +88,7 @@ const sentimentMeta: Record<string, { label: string; color: string }> = {
   GOOD: { label: "好评", color: "green" },
   NEUTRAL: { label: "中评", color: "orange" },
   BAD: { label: "差评", color: "red" },
-  UNKNOWN: { label: "未知", color: "default" },
+  UNKNOWN: { label: "未评级", color: "default" },
 };
 
 const retryMeta: Record<CommentProcessingRetryType, { label: string; success: string }> = {
@@ -107,6 +107,43 @@ function sentimentTag(sentiment?: string) {
   const normalized = sentiment || "UNKNOWN";
   const meta = sentimentMeta[normalized] || sentimentMeta.UNKNOWN;
   return <Tag color={meta.color}>{meta.label}</Tag>;
+}
+
+function bizLineTag(bizCode?: number) {
+  if (bizCode === 1) {
+    return <Tag color="blue">外卖（1）</Tag>;
+  }
+  if (bizCode === 4) {
+    return <Tag color="purple">拼好饭（4）</Tag>;
+  }
+  return <Tag>{bizCode === undefined || bizCode === null ? "未知业务线" : `其他（${bizCode}）`}</Tag>;
+}
+
+function validityTag(valid?: number) {
+  if (valid === 1) {
+    return <Tag color="green">有效</Tag>;
+  }
+  if (valid === 0) {
+    return <Tag color="red">无效</Tag>;
+  }
+  return <Tag>有效性未知</Tag>;
+}
+
+function sensitiveTypeTag(commentType?: number) {
+  if (commentType === 4) {
+    return <Tag color="green">展示·计分（4）</Tag>;
+  }
+  if (commentType === 5) {
+    return <Tag color="orange">屏蔽·计分（5）</Tag>;
+  }
+  if (commentType === 10) {
+    return <Tag color="blue">展示·不计分（10）</Tag>;
+  }
+  return <Tag color="red">不处理（{commentType ?? "未知"}）</Tag>;
+}
+
+function isProcessableCommentType(commentType?: number) {
+  return commentType === 4 || commentType === 5 || commentType === 10;
 }
 
 function text(value?: string | number | null) {
@@ -219,6 +256,24 @@ export default function CommentProcessingLog() {
         ),
       },
       {
+        title: "业务线",
+        dataIndex: "bizCode",
+        width: 120,
+        render: (value) => bizLineTag(value),
+      },
+      {
+        title: "有效性",
+        dataIndex: "valid",
+        width: 100,
+        render: (value) => validityTag(value),
+      },
+      {
+        title: "敏感类型",
+        dataIndex: "commentType",
+        width: 170,
+        render: (value) => sensitiveTypeTag(value),
+      },
+      {
         title: "自动回复",
         dataIndex: "autoReplyStatus",
         width: 130,
@@ -257,7 +312,7 @@ export default function CommentProcessingLog() {
             <PermissionControl permission="comment:processing-log:query">
               <Button type="link" onClick={() => void openDetail(record)}>详情</Button>
             </PermissionControl>
-            <PermissionControl permission="comment:processing-log:retry">
+            {record.valid === 1 && isProcessableCommentType(record.commentType) && <PermissionControl permission="comment:processing-log:retry">
               <Space size={0} wrap>
                 {record.autoReplyStatus === "FAILED" && (
                   <Button
@@ -290,7 +345,7 @@ export default function CommentProcessingLog() {
                   </Button>
                 )}
               </Space>
-            </PermissionControl>
+            </PermissionControl>}
           </Space>
         ),
       },
@@ -353,7 +408,7 @@ export default function CommentProcessingLog() {
           loading={loading}
           columns={columns}
           dataSource={records}
-          scroll={{ x: 1630 }}
+          scroll={{ x: 2020 }}
           pagination={{
             current: query.pageNum,
             pageSize: query.pageSize,
@@ -382,9 +437,12 @@ function ProcessingDetail({ record }: { record: CommentProcessingLogRecord }) {
   const reviewItems: DescriptionsProps["items"] = [
     { key: "shop", label: "门店", children: `${text(record.shopName)}（${record.shopId}）` },
     { key: "commentId", label: "评价 ID", children: record.commentId },
+    { key: "bizCode", label: "评价业务线", children: bizLineTag(record.bizCode) },
+    { key: "valid", label: "评价有效性", children: validityTag(record.valid) },
+    { key: "commentType", label: "评论敏感类型", children: sensitiveTypeTag(record.commentType) },
     { key: "sentiment", label: "评价类型", children: sentimentTag(record.sentiment) },
     { key: "time", label: "评价时间", children: text(record.commentTime) },
-    { key: "score", label: "商品 / 包装 / 配送", children: `${text(record.productScore)} / ${text(record.packingScore)} / ${text(record.deliveryCommentScore)}` },
+    { key: "score", label: "商品 / 包装 / 配送 / 商家", children: `${text(record.productScore)} / ${text(record.packingScore)} / ${text(record.deliveryCommentScore)} / ${text(record.foodCommentScore)}` },
     { key: "content", label: "评价内容", span: 2, children: text(record.commentContent) },
     { key: "add", label: "追评内容", span: 2, children: text(record.addComment) },
   ];

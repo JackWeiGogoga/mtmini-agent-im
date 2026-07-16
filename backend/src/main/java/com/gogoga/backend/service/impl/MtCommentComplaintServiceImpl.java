@@ -16,6 +16,7 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentComplaintReportTypeEnum;
 import com.gogoga.backend.enums.CommentComplaintStatusEnum;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentComplaintMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
@@ -97,13 +98,24 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
             log.info("差评自动投诉跳过，原因=已成功申诉，shopId={}, commentId={}", shop.getId(), comment.getCommentId());
             return;
         }
+        if (!Integer.valueOf(1).equals(comment.getValid())) {
+            markSkipped(comment, record, "COMMENT_AUTO_COMPLAINT_INVALID", durationMs(startNanos));
+            return;
+        }
+        if (!MtCommentSensitiveTypeEnum.isProcessable(comment.getCommentType())) {
+            markSkipped(comment, record, "COMMENT_AUTO_COMPLAINT_TYPE_UNSUPPORTED", durationMs(startNanos));
+            return;
+        }
         if (!shopOperationSettingsService.isAutoReplyEnabled(shop.getId())
                 || !shopOperationSettingsService.isNegativeCommentAppealEnabled(shop.getId())) {
             markSkipped(comment, record, "COMMENT_AUTO_COMPLAINT_SWITCH_DISABLED", durationMs(startNanos));
             return;
         }
-        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
-                comment.getProductScore(), comment.getPackingScore());
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromScores(
+                comment.getProductScore(),
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore());
         if (sentiment != CommentReplySentimentEnum.BAD) {
             markSkipped(comment, record, "COMMENT_AUTO_COMPLAINT_NOT_BAD", durationMs(startNanos));
             return;
@@ -161,16 +173,18 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
         if (shop == null || comment == null || comment.getCommentId() == null) {
             throw new IllegalArgumentException("COMMENT_COMPLAINT_PREVIEW_CONTEXT_INVALID");
         }
-        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromScores(
                 comment.getProductScore(),
-                comment.getPackingScore()
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
         );
         CommentComplaintPreviewDTO result = new CommentComplaintPreviewDTO();
         result.setSentiment(sentiment.name());
         if (sentiment != CommentReplySentimentEnum.BAD) {
             result.setShouldComplain(false);
             result.setSkipReason(sentiment == CommentReplySentimentEnum.UNKNOWN
-                    ? "PRODUCT_PACKING_SCORE_INVALID"
+                    ? "COMMENT_SCORE_INVALID"
                     : "COMMENT_NOT_BAD");
             result.setDurationMs(durationMs(startNanos));
             return result;

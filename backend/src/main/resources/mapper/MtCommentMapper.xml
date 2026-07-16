@@ -106,6 +106,8 @@
         SELECT <include refid="BaseColumnList"/>
         FROM mt_comment
         WHERE shop_id = #{shopId}
+          AND valid = 1
+          AND comment_type IN (4, 5, 10)
           AND reply_status = 0
           AND auto_reply_status IN ('PENDING', 'FAILED')
         ORDER BY comment_time ASC, id ASC
@@ -115,6 +117,8 @@
         SELECT <include refid="BaseColumnList"/>
         FROM mt_comment
         WHERE shop_id = #{shopId}
+          AND valid = 1
+          AND comment_type IN (4, 5, 10)
         ORDER BY auto_reply_at DESC, comment_time DESC, create_time DESC, id DESC
     </select>
 
@@ -123,19 +127,21 @@
         SELECT
             COALESCE(SUM(CASE WHEN effective_score BETWEEN 4 AND 5 THEN 1 ELSE 0 END), 0) AS goodCommentCount,
             COALESCE(SUM(CASE WHEN effective_score = 3 THEN 1 ELSE 0 END), 0) AS neutralCommentCount,
-            COALESCE(SUM(CASE WHEN effective_score BETWEEN 0 AND 2 THEN 1 ELSE 0 END), 0) AS badCommentCount,
-            COALESCE(SUM(CASE WHEN effective_score BETWEEN 0 AND 2 AND reply_status = 1 THEN 1 ELSE 0 END), 0) AS repliedBadCommentCount
+            COALESCE(SUM(CASE WHEN effective_score BETWEEN 1 AND 2 THEN 1 ELSE 0 END), 0) AS badCommentCount,
+            COALESCE(SUM(CASE WHEN effective_score BETWEEN 1 AND 2 AND reply_status = 1 THEN 1 ELSE 0 END), 0) AS repliedBadCommentCount
         FROM (
             SELECT
                 reply_status,
-                CASE
-                    WHEN product_score BETWEEN 0 AND 5 AND packing_score BETWEEN 0 AND 5 THEN LEAST(product_score, packing_score)
-                    WHEN product_score BETWEEN 0 AND 5 THEN product_score
-                    WHEN packing_score BETWEEN 0 AND 5 THEN packing_score
-                    ELSE NULL
-                END AS effective_score
+                NULLIF(LEAST(
+                    CASE WHEN product_score BETWEEN 1 AND 5 THEN product_score ELSE 6 END,
+                    CASE WHEN packing_score BETWEEN 1 AND 5 THEN packing_score ELSE 6 END,
+                    CASE WHEN delivery_comment_score BETWEEN 1 AND 5 THEN delivery_comment_score ELSE 6 END,
+                    CASE WHEN food_comment_score BETWEEN 1 AND 5 THEN food_comment_score ELSE 6 END
+                ), 6) AS effective_score
             FROM mt_comment
             WHERE shop_id = #{shopId}
+              AND valid = 1
+              AND comment_type IN (4, 5)
               AND create_time &gt;= #{from}
               AND create_time &lt; #{to}
         ) comment_scores

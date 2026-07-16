@@ -5,6 +5,7 @@ import com.github.pagehelper.PageInfo;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.util.CommentImageUrlUtil;
 import com.gogoga.backend.vo.MtH5CommentReplyLogVO;
@@ -27,6 +28,7 @@ public class MtH5CommentReplyLogService {
     private static final int MAX_PAGE_SIZE = 50;
     private static final int MAX_IMAGE_COUNT = 20;
     private static final String DEFAULT_ANALYSIS_TEXT = "AI 分析结果";
+    private static final String SENSITIVE_CONTENT_HIDDEN_TEXT = "评价内容因敏感词已屏蔽";
 
     private final MtCommentMapper mtCommentMapper;
 
@@ -61,10 +63,14 @@ public class MtH5CommentReplyLogService {
         vo.setCommentTime(comment.getCommentTime());
         vo.setReplyTime(comment.getAutoReplyAt());
         vo.setSentiment(resolveSentiment(comment));
-        vo.setScore(CommentReplySentimentEnum.resolveProductPackingScore(comment.getProductScore(), comment.getPackingScore()));
-        vo.setCustomerMessage(StringUtils.trimToNull(comment.getCommentContent()));
-        vo.setAddComment(StringUtils.trimToNull(comment.getAddComment()));
-        vo.setAddCommentTime(StringUtils.trimToNull(comment.getAddCommentTime()));
+        vo.setScore(resolveScore(comment));
+        if (MtCommentSensitiveTypeEnum.isContentVisible(comment.getCommentType())) {
+            vo.setCustomerMessage(StringUtils.trimToNull(comment.getCommentContent()));
+            vo.setAddComment(StringUtils.trimToNull(comment.getAddComment()));
+            vo.setAddCommentTime(StringUtils.trimToNull(comment.getAddCommentTime()));
+        } else {
+            vo.setCustomerMessage(SENSITIVE_CONTENT_HIDDEN_TEXT);
+        }
         vo.setImageUrls(CommentImageUrlUtil.parseImageUrls(comment.getCommentPictures(), MAX_IMAGE_COUNT));
         vo.setAiReplyText(comment.getAutoReplyContent());
         vo.setAnalysisText(StringUtils.defaultIfBlank(comment.getAnalysisText(), DEFAULT_ANALYSIS_TEXT));
@@ -73,27 +79,21 @@ public class MtH5CommentReplyLogService {
     }
 
     private String resolveSentiment(MtComment comment) {
-        String storedSentiment = StringUtils.trimToNull(comment.getAutoReplySentiment());
-        if (storedSentiment != null) {
-            try {
-                CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.valueOf(storedSentiment);
-                if (sentiment == CommentReplySentimentEnum.GOOD
-                        || sentiment == CommentReplySentimentEnum.NEUTRAL
-                        || sentiment == CommentReplySentimentEnum.BAD) {
-                    return sentiment.name();
-                }
-            } catch (IllegalArgumentException ignored) {
-                // 历史脏数据按评分兜底。
-            }
-        }
-        CommentReplySentimentEnum fromScore = CommentReplySentimentEnum.fromProductAndPackingScore(
+        return CommentReplySentimentEnum.fromScores(
                 comment.getProductScore(),
-                comment.getPackingScore()
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
+        ).name();
+    }
+
+    private Integer resolveScore(MtComment comment) {
+        return CommentReplySentimentEnum.resolveMinimumScore(
+                comment.getProductScore(),
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
         );
-        if (fromScore == CommentReplySentimentEnum.GOOD || fromScore == CommentReplySentimentEnum.BAD) {
-            return fromScore.name();
-        }
-        return CommentReplySentimentEnum.NEUTRAL.name();
     }
 
     private int normalizePageNum(Integer pageNum) {

@@ -15,6 +15,7 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentImFollowUpFailedStageEnum;
 import com.gogoga.backend.enums.CommentImFollowUpStatusEnum;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentImFollowUpMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
@@ -119,6 +120,16 @@ public class MtCommentImFollowUpServiceImpl implements MtCommentImFollowUpServic
     }
 
     private boolean isExecutionContextValid(MtShop shop, MtComment comment, MtCommentImFollowUp record, long startNanos) {
+        if (!Integer.valueOf(1).equals(comment.getValid())) {
+            markTerminal(comment, record, CommentImFollowUpStatusEnum.SKIPPED, null,
+                    "COMMENT_IM_INVALID", "评价已失效", startNanos);
+            return false;
+        }
+        if (!MtCommentSensitiveTypeEnum.isProcessable(comment.getCommentType())) {
+            markTerminal(comment, record, CommentImFollowUpStatusEnum.SKIPPED, null,
+                    "COMMENT_IM_TYPE_UNSUPPORTED", "评论敏感类型不处理", startNanos);
+            return false;
+        }
         if (!shopOperationSettingsService.isAutoReplyEnabled(shop.getId())
                 || !shopOperationSettingsService.isNegativeCommentAppealEnabled(shop.getId())) {
             markTerminal(comment, record, CommentImFollowUpStatusEnum.SKIPPED, null,
@@ -131,8 +142,11 @@ public class MtCommentImFollowUpServiceImpl implements MtCommentImFollowUpServic
                     "COMMENT_IM_AUTO_REPLY_NOT_SUCCESS", "评价自动回复尚未成功", startNanos);
             return false;
         }
-        if (CommentReplySentimentEnum.fromProductAndPackingScore(
-                comment.getProductScore(), comment.getPackingScore()) != CommentReplySentimentEnum.BAD) {
+        if (CommentReplySentimentEnum.fromScores(
+                comment.getProductScore(),
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()) != CommentReplySentimentEnum.BAD) {
             markTerminal(comment, record, CommentImFollowUpStatusEnum.SKIPPED, null,
                     "COMMENT_IM_NOT_BAD", "当前评价不是差评", startNanos);
             return false;

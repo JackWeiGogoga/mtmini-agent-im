@@ -88,16 +88,19 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         if (shop == null || comment == null || comment.getCommentId() == null) {
             throw new BusinessException(400, "评价回复上下文不能为空");
         }
-        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromScores(
                 comment.getProductScore(),
-                comment.getPackingScore()
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
         );
         if (sentiment == CommentReplySentimentEnum.UNKNOWN) {
-            log.warn("评价自动回复跳过，原因=商品/包装评分异常，shopId={}, commentId={}, productScore={}, packingScore={}",
-                    shop.getId(), comment.getCommentId(), comment.getProductScore(), comment.getPackingScore());
+            log.warn("评价自动回复跳过，原因=商品/包装/配送/商家评分均无有效值，shopId={}, commentId={}, productScore={}, packingScore={}, deliveryCommentScore={}, foodCommentScore={}",
+                    shop.getId(), comment.getCommentId(), comment.getProductScore(), comment.getPackingScore(),
+                    comment.getDeliveryCommentScore(), comment.getFoodCommentScore());
             CommentReplyContentResultDTO result = new CommentReplyContentResultDTO();
             result.setShouldReply(false);
-            result.setSkipReason("PRODUCT_PACKING_SCORE_INVALID");
+            result.setSkipReason("COMMENT_SCORE_INVALID");
             result.setSentiment(CommentReplySentimentEnum.UNKNOWN.name());
             return finishResult(result, startNanos, shop, comment, "SCORE_INVALID");
         }

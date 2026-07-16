@@ -3,25 +3,29 @@
 <mapper namespace="com.gogoga.backend.mapper.CommentProcessingLogMapper">
 
     <sql id="SentimentExpression">
-        COALESCE(c.auto_reply_sentiment,
-            CASE
-                WHEN c.product_score BETWEEN 0 AND 5 AND c.packing_score BETWEEN 0 AND 5
-                    THEN CASE WHEN LEAST(c.product_score, c.packing_score) BETWEEN 0 AND 2 THEN 'BAD'
-                              WHEN LEAST(c.product_score, c.packing_score) = 3 THEN 'NEUTRAL'
-                              WHEN LEAST(c.product_score, c.packing_score) BETWEEN 4 AND 5 THEN 'GOOD' ELSE 'UNKNOWN' END
-                WHEN c.product_score BETWEEN 0 AND 2 OR c.packing_score BETWEEN 0 AND 2 THEN 'BAD'
-                WHEN c.product_score = 3 OR c.packing_score = 3 THEN 'NEUTRAL'
-                WHEN c.product_score BETWEEN 4 AND 5 OR c.packing_score BETWEEN 4 AND 5 THEN 'GOOD'
-                ELSE 'UNKNOWN'
-            END)
+        CASE LEAST(
+            CASE WHEN c.product_score BETWEEN 1 AND 5 THEN c.product_score ELSE 6 END,
+            CASE WHEN c.packing_score BETWEEN 1 AND 5 THEN c.packing_score ELSE 6 END,
+            CASE WHEN c.delivery_comment_score BETWEEN 1 AND 5 THEN c.delivery_comment_score ELSE 6 END,
+            CASE WHEN c.food_comment_score BETWEEN 1 AND 5 THEN c.food_comment_score ELSE 6 END
+        )
+            WHEN 1 THEN 'BAD'
+            WHEN 2 THEN 'BAD'
+            WHEN 3 THEN 'NEUTRAL'
+            WHEN 4 THEN 'GOOD'
+            WHEN 5 THEN 'GOOD'
+            ELSE 'UNKNOWN'
+        END
     </sql>
 
     <sql id="SelectColumns">
         c.id, c.shop_id AS shopId, COALESCE(s.poi_name, s.name) AS shopName,
         c.epoi_id AS epoiId, c.poi_id AS poiId, c.comment_id AS commentId,
+        c.biz_code AS bizCode, c.valid AS valid, c.comment_type AS commentType,
         c.comment_time AS commentTime, c.comment_content AS commentContent,
         c.add_comment AS addComment, c.add_comment_time AS addCommentTime,
-        c.order_comment_score AS orderCommentScore, c.delivery_comment_score AS deliveryCommentScore,
+        c.order_comment_score AS orderCommentScore, c.food_comment_score AS foodCommentScore,
+        c.delivery_comment_score AS deliveryCommentScore,
         c.product_score AS productScore, c.packing_score AS packingScore,
         <include refid="SentimentExpression"/> AS sentiment,
         c.auto_reply_status AS autoReplyStatus, c.auto_reply_content AS autoReplyContent,

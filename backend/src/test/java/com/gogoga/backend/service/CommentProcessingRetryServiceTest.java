@@ -153,11 +153,43 @@ class CommentProcessingRetryServiceTest {
         verify(asyncTaskService, never()).enqueueOrResetForManualRetry(any(), any(), any(), any(), any(Integer.class));
     }
 
+    @Test
+    void rejectsRetryForInvalidComment() {
+        when(logService.getDetail(1L)).thenReturn(log("FAILED", null, null));
+        MtComment comment = comment();
+        comment.setValid(0);
+        when(commentMapper.selectById(1L)).thenReturn(comment);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.retryAutoReply(1L));
+
+        assertEquals(409, exception.getCode());
+        assertEquals("无效评价不能重试", exception.getMessage());
+        verify(commentMapper, never()).resetAutoReplyForManualRetry(any(), any());
+        verify(asyncTaskService, never()).enqueueOrResetForManualRetry(any(), any(), any(), any(), any(Integer.class));
+    }
+
+    @Test
+    void rejectsRetryForUnsupportedSensitiveType() {
+        when(logService.getDetail(1L)).thenReturn(log("FAILED", null, null));
+        MtComment comment = comment();
+        comment.setCommentType(3);
+        when(commentMapper.selectById(1L)).thenReturn(comment);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.retryAutoReply(1L));
+
+        assertEquals(409, exception.getCode());
+        assertEquals("当前评论敏感类型不支持处理", exception.getMessage());
+        verify(commentMapper, never()).resetAutoReplyForManualRetry(any(), any());
+        verify(asyncTaskService, never()).enqueueOrResetForManualRetry(any(), any(), any(), any(), any(Integer.class));
+    }
+
     private MtComment comment() {
         MtComment comment = new MtComment();
         comment.setId(1L);
         comment.setShopId(100L);
         comment.setCommentId(9001L);
+        comment.setValid(1);
+        comment.setCommentType(4);
         return comment;
     }
 

@@ -196,12 +196,11 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
     }
 
     private String resolveSentiment(MtComment comment) {
-        if (StringUtils.isNotBlank(comment.getAutoReplySentiment())) {
-            return comment.getAutoReplySentiment();
-        }
-        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromScores(
                 comment.getProductScore(),
-                comment.getPackingScore()
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
         );
         return sentiment == null ? CommentReplySentimentEnum.UNKNOWN.name() : sentiment.name();
     }

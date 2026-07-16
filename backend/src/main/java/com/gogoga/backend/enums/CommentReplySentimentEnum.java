@@ -19,27 +19,38 @@ public enum CommentReplySentimentEnum {
         this.desc = desc;
     }
 
-    public static CommentReplySentimentEnum fromProductAndPackingScore(Integer productScore, Integer packingScore) {
-        return fromScore(resolveProductPackingScore(productScore, packingScore));
+    public static CommentReplySentimentEnum fromScores(Integer productScore,
+                                                       Integer packingScore,
+                                                       Integer deliveryCommentScore,
+                                                       Integer foodCommentScore) {
+        return fromScore(resolveMinimumScore(
+                productScore,
+                packingScore,
+                deliveryCommentScore,
+                foodCommentScore
+        ));
     }
 
-    public static Integer resolveProductPackingScore(Integer productScore, Integer packingScore) {
-        Integer validProductScore = isValidScore(productScore) ? productScore : null;
-        Integer validPackingScore = isValidScore(packingScore) ? packingScore : null;
-        if (validProductScore == null) {
-            return validPackingScore;
+    public static Integer resolveMinimumScore(Integer productScore,
+                                              Integer packingScore,
+                                              Integer deliveryCommentScore,
+                                              Integer foodCommentScore) {
+        Integer minimumScore = null;
+        Integer[] scores = {productScore, packingScore, deliveryCommentScore, foodCommentScore};
+        for (Integer score : scores) {
+            if (!isValidScore(score)) {
+                continue;
+            }
+            minimumScore = minimumScore == null ? score : Math.min(minimumScore, score);
         }
-        if (validPackingScore == null) {
-            return validProductScore;
-        }
-        return Math.min(validProductScore, validPackingScore);
+        return minimumScore;
     }
 
     private static CommentReplySentimentEnum fromScore(Integer score) {
         if (score == null) {
             return UNKNOWN;
         }
-        if (score >= 0 && score <= 2) {
+        if (score >= 1 && score <= 2) {
             return BAD;
         }
         if (score == 3) {
@@ -52,6 +63,6 @@ public enum CommentReplySentimentEnum {
     }
 
     private static boolean isValidScore(Integer score) {
-        return score != null && score >= 0 && score <= 5;
+        return score != null && score >= 1 && score <= 5;
     }
 }

@@ -256,7 +256,7 @@ import {
 const sentimentOptions = [
   { label: '好评（4-5星）', value: 'GOOD' },
   { label: '中评（3星）', value: 'NEUTRAL' },
-  { label: '差评（0-2星）', value: 'BAD' },
+  { label: '差评（1-2星）', value: 'BAD' },
 ]
 
 const qaItems = ref([])

@@ -7,6 +7,7 @@ import com.gogoga.backend.entity.mt.MtCommentImFollowUp;
 import com.gogoga.backend.enums.CommentComplaintStatusEnum;
 import com.gogoga.backend.enums.CommentImFollowUpStatusEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtCommentComplaintMapper;
 import com.gogoga.backend.mapper.MtCommentImFollowUpMapper;
@@ -42,6 +43,8 @@ public class CommentProcessingRetryService {
         CommentProcessingLogVO log = requireLog(id);
         requireFailed(log.getAutoReplyStatus(), "只有自动回复失败的评价才能重试");
         MtComment comment = requireComment(id);
+        requireValid(comment);
+        requireProcessableType(comment);
         LocalDateTime now = LocalDateTime.now();
         if (mtCommentMapper.resetAutoReplyForManualRetry(id, now) != 1) {
             throw new BusinessException(409, "自动回复状态已变化，请刷新后重试");
@@ -63,6 +66,8 @@ public class CommentProcessingRetryService {
         CommentProcessingLogVO log = requireLog(id);
         requireFailed(log.getComplaintStatus(), "只有差评申诉失败的评价才能重试");
         MtComment comment = requireComment(id);
+        requireValid(comment);
+        requireProcessableType(comment);
         MtCommentComplaint record = mtCommentComplaintMapper.selectByShopIdAndCommentId(
                 comment.getShopId(), comment.getCommentId());
         String resumeStatus = canReuseComplaint(record)
@@ -93,6 +98,8 @@ public class CommentProcessingRetryService {
         CommentProcessingLogVO log = requireLog(id);
         requireFailed(log.getImFollowUpStatus(), "只有群聊跟进失败的评价才能重试");
         MtComment comment = requireComment(id);
+        requireValid(comment);
+        requireProcessableType(comment);
         MtCommentImFollowUp record = mtCommentImFollowUpMapper.selectByShopIdAndCommentId(
                 comment.getShopId(), comment.getCommentId());
         String resumeStatus = resolveImResumeStatus(record);
@@ -135,6 +142,18 @@ public class CommentProcessingRetryService {
     private void requireFailed(String status, String message) {
         if (!StringUtils.equals(status, "FAILED")) {
             throw new BusinessException(409, message);
+        }
+    }
+
+    private void requireValid(MtComment comment) {
+        if (!Integer.valueOf(1).equals(comment.getValid())) {
+            throw new BusinessException(409, "无效评价不能重试");
+        }
+    }
+
+    private void requireProcessableType(MtComment comment) {
+        if (!MtCommentSensitiveTypeEnum.isProcessable(comment.getCommentType())) {
+            throw new BusinessException(409, "当前评论敏感类型不支持处理");
         }
     }
 

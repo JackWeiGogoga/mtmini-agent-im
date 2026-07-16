@@ -6,6 +6,7 @@ import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
@@ -221,6 +222,16 @@ public class MtCommentAutoReplyService {
                     payload.getShopId(), payload.getCommentId());
             return;
         }
+        if (!Integer.valueOf(1).equals(comment.getValid())) {
+            log.info("评价自动回复任务跳过，原因=评价已失效，shopId={}, commentId={}, valid={}",
+                    payload.getShopId(), payload.getCommentId(), comment.getValid());
+            return;
+        }
+        if (!MtCommentSensitiveTypeEnum.isProcessable(comment.getCommentType())) {
+            log.info("评价自动回复任务跳过，原因=评论敏感类型不处理，shopId={}, commentId={}, commentType={}",
+                    payload.getShopId(), payload.getCommentId(), comment.getCommentType());
+            return;
+        }
         MtShop shop = mtShopMapper.selectById(payload.getShopId());
         if (shop == null || StringUtils.isBlank(shop.getEpoiId())) {
             throw new IllegalStateException("COMMENT_AUTO_REPLY_SHOP_INVALID");
@@ -347,12 +358,20 @@ public class MtCommentAutoReplyService {
         if (shop == null || shop.getId() == null || comment == null || comment.getCommentId() == null) {
             return;
         }
+        if (!Integer.valueOf(1).equals(comment.getValid())) {
+            return;
+        }
+        if (!MtCommentSensitiveTypeEnum.isProcessable(comment.getCommentType())) {
+            return;
+        }
         if (!shopOperationSettingsService.isNegativeCommentAppealEnabled(shop.getId())) {
             return;
         }
-        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromProductAndPackingScore(
+        CommentReplySentimentEnum sentiment = CommentReplySentimentEnum.fromScores(
                 comment.getProductScore(),
-                comment.getPackingScore()
+                comment.getPackingScore(),
+                comment.getDeliveryCommentScore(),
+                comment.getFoodCommentScore()
         );
         if (sentiment != CommentReplySentimentEnum.BAD) {
             return;

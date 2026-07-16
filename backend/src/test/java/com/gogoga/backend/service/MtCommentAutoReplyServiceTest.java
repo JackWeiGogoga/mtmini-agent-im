@@ -97,6 +97,8 @@ class MtCommentAutoReplyServiceTest {
         comment.setCommentId(542543250001L);
         comment.setCommentContent("味道不错");
         comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
         MeituanResponse<List<QueryCommentListResponse>> queryResponse = new MeituanResponse<>();
         queryResponse.setCode("OP_SUCCESS");
         queryResponse.setData(List.of(comment));
@@ -120,6 +122,7 @@ class MtCommentAutoReplyServiceTest {
         assertEquals(100L, saved.getShopId());
         assertEquals("4211", saved.getEpoiId());
         assertEquals(542543250001L, saved.getCommentId());
+        assertEquals(1, saved.getValid());
         assertEquals("20260612", saved.getQueryStartTime());
         assertEquals("20260619", saved.getQueryEndTime());
         assertEquals("PENDING", saved.getAutoReplyStatus());
@@ -275,6 +278,8 @@ class MtCommentAutoReplyServiceTest {
         comment.setId(9L);
         comment.setCommentId(542543250001L);
         comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
         when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
 
         MtShop shop = new MtShop();
@@ -345,6 +350,8 @@ class MtCommentAutoReplyServiceTest {
         comment.setShopId(100L);
         comment.setCommentId(542543250001L);
         comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
         comment.setProductScore(2);
         comment.setPackingScore(5);
         when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
@@ -426,6 +433,8 @@ class MtCommentAutoReplyServiceTest {
         comment.setId(9L);
         comment.setCommentId(542543250001L);
         comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
         when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
 
         MtShop shop = new MtShop();
@@ -440,7 +449,7 @@ class MtCommentAutoReplyServiceTest {
 
         CommentReplyContentResultDTO replyResult = new CommentReplyContentResultDTO();
         replyResult.setShouldReply(false);
-        replyResult.setSkipReason("PRODUCT_PACKING_SCORE_INVALID");
+        replyResult.setSkipReason("COMMENT_SCORE_INVALID");
         when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
 
         MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
@@ -450,6 +459,48 @@ class MtCommentAutoReplyServiceTest {
         service.executeCommentAutoReplyTask(payload);
 
         verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
-        verify(mtCommentMapper).markAutoReplySkipped(eq(9L), eq("PRODUCT_PACKING_SCORE_INVALID"), any(LocalDateTime.class));
+        verify(mtCommentMapper).markAutoReplySkipped(eq(9L), eq("COMMENT_SCORE_INVALID"), any(LocalDateTime.class));
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskSkipsInvalidCommentBeforeGeneration() throws MtSdkException {
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setShopId(100L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setValid(0);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        service.executeCommentAutoReplyTask(payload);
+
+        verify(mtCommentReplyContentService, never()).generateReply(any(), any());
+        verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), anyString());
+        verify(mtAsyncTaskService, never()).enqueueTask(any(), anyString(), anyString(), any(), any(), any(Integer.class));
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskSkipsUnsupportedSensitiveTypeBeforeGeneration() throws MtSdkException {
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setShopId(100L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(3);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        service.executeCommentAutoReplyTask(payload);
+
+        verify(mtCommentReplyContentService, never()).generateReply(any(), any());
+        verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), anyString());
     }
 }

@@ -15,7 +15,7 @@
         </view>
         <view class="legend-item">
           <view class="legend-dot legend-dot-gray"></view>
-          <text class="legend-text">灰色中评</text>
+          <text class="legend-text">灰色中评/未评级</text>
         </view>
       </view>
     </view>
@@ -220,17 +220,20 @@ export default {
     },
     normalizedSentiment(item) {
       const sentiment = String(item?.sentiment || "").toUpperCase();
-      if (sentiment === "GOOD" || sentiment === "BAD" || sentiment === "NEUTRAL") {
+      if (sentiment === "GOOD" || sentiment === "BAD" || sentiment === "NEUTRAL" || sentiment === "UNKNOWN") {
         return sentiment;
       }
       const score = Number(item?.score);
-      if (score >= 0 && score <= 2) {
+      if (score >= 1 && score <= 2) {
         return "BAD";
+      }
+      if (score === 3) {
+        return "NEUTRAL";
       }
       if (score >= 4 && score <= 5) {
         return "GOOD";
       }
-      return "NEUTRAL";
+      return "UNKNOWN";
     },
     sentimentText(item) {
       const sentiment = this.normalizedSentiment(item);
@@ -240,11 +243,15 @@ export default {
       if (sentiment === "GOOD") {
         return "好评";
       }
-      return "中评";
+      if (sentiment === "NEUTRAL") {
+        return "中评";
+      }
+      return "未评级";
     },
     scoreText(item) {
+      const rawScore = item?.score;
       const score = Number(item?.score);
-      if (!Number.isFinite(score) || score < 0 || score > 5) {
+      if (rawScore === null || rawScore === undefined || !Number.isFinite(score) || score < 1 || score > 5) {
         return "--星";
       }
       return `${"★".repeat(score)}${"☆".repeat(5 - score)}`;
@@ -253,14 +260,14 @@ export default {
       return {
         "log-marker-bad": this.normalizedSentiment(item) === "BAD",
         "log-marker-good": this.normalizedSentiment(item) === "GOOD",
-        "log-marker-neutral": this.normalizedSentiment(item) === "NEUTRAL",
+        "log-marker-neutral": ["NEUTRAL", "UNKNOWN"].includes(this.normalizedSentiment(item)),
       };
     },
     statusClass(item) {
       return {
         "log-status-bad": this.normalizedSentiment(item) === "BAD",
         "log-status-good": this.normalizedSentiment(item) === "GOOD",
-        "log-status-neutral": this.normalizedSentiment(item) === "NEUTRAL",
+        "log-status-neutral": ["NEUTRAL", "UNKNOWN"].includes(this.normalizedSentiment(item)),
       };
     },
     customerMessageText(item) {

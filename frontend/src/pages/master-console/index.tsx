@@ -196,17 +196,20 @@ function buildUserLabel(user?: VisibleUserOption) {
 
 function normalizeSentiment(record: CommentReplyLogRecord) {
   const sentiment = String(record.sentiment || "").toUpperCase();
-  if (sentiment === "GOOD" || sentiment === "BAD" || sentiment === "NEUTRAL") {
+  if (sentiment === "GOOD" || sentiment === "BAD" || sentiment === "NEUTRAL" || sentiment === "UNKNOWN") {
     return sentiment;
   }
   const score = Number(record.score);
-  if (score >= 0 && score <= 2) {
+  if (score >= 1 && score <= 2) {
     return "BAD";
+  }
+  if (score === 3) {
+    return "NEUTRAL";
   }
   if (score >= 4 && score <= 5) {
     return "GOOD";
   }
-  return "NEUTRAL";
+  return "UNKNOWN";
 }
 
 function renderSentimentTag(record: CommentReplyLogRecord) {
@@ -217,7 +220,10 @@ function renderSentimentTag(record: CommentReplyLogRecord) {
   if (sentiment === "GOOD") {
     return <Tag color="green">好评</Tag>;
   }
-  return <Tag color="default">中评</Tag>;
+  if (sentiment === "NEUTRAL") {
+    return <Tag color="default">中评</Tag>;
+  }
+  return <Tag>未评级</Tag>;
 }
 
 function renderReplyStatus(status?: string) {
@@ -485,9 +491,10 @@ const MasterConsole: React.FC = () => {
         key: "score",
         width: 120,
         render: (_, record) => {
+          const rawScore = record.score;
           const score = Number(record.score);
           const scoreText =
-            Number.isFinite(score) && score >= 0 && score <= 5
+            rawScore !== null && rawScore !== undefined && Number.isFinite(score) && score >= 1 && score <= 5
               ? `${"★".repeat(score)}${"☆".repeat(5 - score)}`
               : "--星";
           return (

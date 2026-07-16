@@ -20,7 +20,7 @@ import type {
 const sentimentOptions = [
   { label: "好评回复（4-5星）", value: "GOOD" },
   { label: "中评回复（3星）", value: "NEUTRAL" },
-  { label: "差评回复（0-2星）", value: "BAD" },
+  { label: "差评回复（1-2星）", value: "BAD" },
 ];
 
 const sentimentText: Record<string, string> = {
