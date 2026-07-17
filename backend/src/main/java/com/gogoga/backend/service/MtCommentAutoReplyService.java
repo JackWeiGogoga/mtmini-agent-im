@@ -8,6 +8,7 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
 import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
@@ -248,6 +249,9 @@ public class MtCommentAutoReplyService {
         CommentReplyContentResultDTO replyResult = mtCommentReplyContentService.generateReply(shop, comment);
         if (replyResult == null || !replyResult.isShouldReply()) {
             String reason = replyResult == null ? "COMMENT_REPLY_GENERATION_SKIPPED" : replyResult.getSkipReason();
+            if (StringUtils.equals(reason, PowerInsufficientException.REASON_CODE)) {
+                shopOperationSettingsService.disableCommentProcessingForInsufficientPower(shop.getId());
+            }
             mtCommentMapper.markAutoReplySkipped(comment.getId(), StringUtils.left(reason, 1000), LocalDateTime.now());
             log.warn("评价自动回复任务跳过，原因=回复内容生成跳过, shopId={}, commentId={}, reason={}",
                     shop.getId(), comment.getCommentId(), reason);

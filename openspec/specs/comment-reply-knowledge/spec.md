@@ -178,15 +178,20 @@ TBD - created by archiving change add-comment-reply-knowledge-rag. Update Purpos
 - **THEN** 系统 SHALL 使用配置限制单次候选召回数量，避免无界内存排序
 
 ### Requirement: RAG 算力门槛与消费
-系统 SHALL 将商户 RAG 回复纳入算力计费，且只有当前门店算力余额大于 100000 时才允许进入 RAG 回复生成链路。
+系统 SHALL 将商户 RAG 回复纳入算力计费，且只有当前门店算力余额大于 10000 时才允许进入 RAG 回复生成链路。
 
 #### Scenario: 算力余额满足门槛
-- **WHEN** 当前商户有自有知识，且门店算力余额大于 100000
+- **WHEN** 当前商户有自有知识，且门店算力余额大于 10000
 - **THEN** 系统 SHALL 允许进入 RAG 检索和大模型生成链路
 
 #### Scenario: 算力余额不足门槛
-- **WHEN** 当前商户有自有知识，但门店算力余额小于或等于 100000
-- **THEN** 系统 MUST 不调用 embedding 或 chat 模型，并 SHALL 记录算力不足原因后回退到官方回复文案
+- **WHEN** 当前商户有自有知识，但门店算力余额小于或等于 10000
+- **THEN** 系统 MUST 不调用 embedding 或 chat 模型、MUST 不发送官方或默认兜底回复，并 SHALL 将当前评价标记为算力不足跳过
+- **AND** 系统 MUST 以系统变更来源关闭当前门店的 AI 回复主开关和差评处理/申诉开关，使后续评价回复、差评申诉及 IM 跟进停止处理
+
+#### Scenario: 生成阶段实际扣费不足
+- **WHEN** 门店通过余额门槛预检，但图片识别或回复生成的实际算力扣费失败且原因为余额不足
+- **THEN** 系统 MUST 不发送本次评价回复，并 MUST 关闭当前门店的 AI 回复主开关和差评处理/申诉开关
 
 #### Scenario: RAG 生成后记录算力消费
 - **WHEN** 系统完成一次 RAG 回复生成

@@ -79,10 +79,15 @@ TBD - created by archiving change add-comment-image-vision-summary. Update Purpo
 - **WHEN** 评价包含图片但图片识别失败
 - **THEN** 回复上下文 SHALL 包含“顾客上传了 N 张图片，但系统未能识别图片内容”的降级描述
 
-#### Scenario: 官方随机回退保持可用
+#### Scenario: 模型异常时官方随机回退保持可用
 
-- **WHEN** RAG 因余额不足、无命中或模型异常回退官方随机文案
+- **WHEN** RAG 因无命中或模型异常回退官方随机文案
 - **THEN** 系统 SHALL 继续生成官方回复且 MUST NOT 因图片识别失败阻塞回复
+
+#### Scenario: 图片识别扣费时算力不足
+
+- **WHEN** 图片识别完成模型调用但实际扣费因余额不足而失败
+- **THEN** 系统 MUST 终止本次评价回复，且 MUST 关闭当前门店的 AI 回复主开关和差评处理/申诉开关
 
 ### Requirement: 多模态模型不直接生成最终回复
 
@@ -111,4 +116,3 @@ TBD - created by archiving change add-comment-image-vision-summary. Update Purpo
 
 - **WHEN** 图片识别启用但 API key 为空
 - **THEN** 系统 SHALL 记录可观测日志并按图片识别失败降级处理
-

@@ -235,7 +235,7 @@ mt:
       max-search-candidates: ${MT_COMMENT_KNOWLEDGE_MAX_SEARCH_CANDIDATES:1000}
       top-k: ${MT_COMMENT_KNOWLEDGE_TOP_K:5}
       min-context-cosine-score: ${MT_COMMENT_KNOWLEDGE_MIN_CONTEXT_COSINE_SCORE:0.75}
-      rag-balance-threshold: ${MT_COMMENT_KNOWLEDGE_RAG_BALANCE_THRESHOLD:100000}
+      rag-balance-threshold: ${MT_COMMENT_KNOWLEDGE_RAG_BALANCE_THRESHOLD:10000}
       auth-grant-power-amount: ${MT_COMMENT_KNOWLEDGE_AUTH_GRANT_POWER_AMOUNT:${POWER_NEW_AUTHORIZED_SHOP_GRANT_AMOUNT:800000}}
       model-base-url: ${MT_COMMENT_KNOWLEDGE_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
       model-api-key: ${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}

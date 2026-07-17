@@ -13,6 +13,7 @@ import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.entity.mt.MtReplyKnowledgeChunk;
 import com.gogoga.backend.entity.mt.MtReplyKnowledgeItem;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtCommentReplyGenerationMapper;
 import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -135,19 +137,37 @@ class MtCommentReplyContentServiceImplTest {
     }
 
     @Test
-    void insufficientBalanceFallsBackToOfficialWithoutModelCall() {
+    void insufficientBalanceSkipsReplyWithoutModelOrOfficialFallback() {
         MtPowerAccount account = new MtPowerAccount();
-        account.setBalance(100000);
+        account.setBalance(10000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(officialTemplateService.selectRandomEnabledTemplate(any())).thenReturn(official("官方差评回复"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(1));
 
-        assertTrue(result.isShouldReply());
-        assertEquals("官方差评回复", result.getReplyContent());
-        assertEquals("FALLBACK_OFFICIAL", result.getReplySource());
+        assertFalse(result.isShouldReply());
+        assertEquals(PowerInsufficientException.REASON_CODE, result.getSkipReason());
         verify(commentReplyEmbeddingService, never()).embed(any());
         verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(officialTemplateService, never()).selectRandomEnabledTemplate(any());
+        verify(mtCommentReplyGenerationMapper, never()).insert(any());
+    }
+
+    @Test
+    void consumeRaceWithInsufficientPowerSkipsReplyWithoutOfficialFallback() {
+        when(knowledgeVectorStore.hasShopKnowledge(100L)).thenReturn(false);
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(200000);
+        when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+                .thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
+        doThrow(new PowerInsufficientException()).when(mtPowerConsumeService).consume(any());
+
+        CommentReplyContentResultDTO result = service.generateReply(shop(), comment(5));
+
+        assertFalse(result.isShouldReply());
+        assertEquals(PowerInsufficientException.REASON_CODE, result.getSkipReason());
+        verify(officialTemplateService, never()).selectRandomEnabledTemplate(any());
+        verify(mtCommentReplyGenerationMapper, never()).insert(any());
     }
 
     @Test

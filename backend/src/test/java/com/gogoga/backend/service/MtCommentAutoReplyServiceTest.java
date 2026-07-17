@@ -6,6 +6,7 @@ import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
@@ -460,6 +461,55 @@ class MtCommentAutoReplyServiceTest {
 
         verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
         verify(mtCommentMapper).markAutoReplySkipped(eq(9L), eq("COMMENT_SCORE_INVALID"), any(LocalDateTime.class));
+        verify(shopOperationSettingsService, never()).disableCommentProcessingForInsufficientPower(any());
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskDisablesBothSwitchesWhenPowerIsInsufficient() throws MtSdkException {
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token");
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        CommentReplyContentResultDTO replyResult = new CommentReplyContentResultDTO();
+        replyResult.setShouldReply(false);
+        replyResult.setSkipReason(PowerInsufficientException.REASON_CODE);
+        when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        service.executeCommentAutoReplyTask(payload);
+
+        verify(shopOperationSettingsService).disableCommentProcessingForInsufficientPower(100L);
+        verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token"));
+        verify(mtCommentMapper).markAutoReplySkipped(
+                eq(9L),
+                eq(PowerInsufficientException.REASON_CODE),
+                any(LocalDateTime.class)
+        );
+        verify(mtAsyncTaskService, never()).enqueueTask(
+                eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT),
+                anyString(),
+                anyString(),
+                any(),
+                any(),
+                any(Integer.class)
+        );
     }
 
     @Test

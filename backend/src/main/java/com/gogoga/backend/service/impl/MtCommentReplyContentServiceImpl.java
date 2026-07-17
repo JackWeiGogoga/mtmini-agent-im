@@ -17,6 +17,7 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
 import com.gogoga.backend.enums.CommentReplySourceEnum;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtCommentReplyGenerationMapper;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
 import com.gogoga.backend.service.CommentReplyOfficialTemplateService;
@@ -108,7 +109,13 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
         MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
         MtPowerAccount account = mtPowerAccountService.getAccount(shop.getId());
         if (account == null || account.getBalance() == null || account.getBalance() <= knowledge.getRagBalanceThreshold()) {
-            return finishResult(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "POWER_BALANCE_NOT_ENOUGH", null, persistGeneration, durationMs(startNanos)), startNanos, shop, comment, "POWER_BALANCE_NOT_ENOUGH");
+            return finishResult(
+                    buildSkippedResult(sentiment, PowerInsufficientException.REASON_CODE),
+                    startNanos,
+                    shop,
+                    comment,
+                    PowerInsufficientException.REASON_CODE
+            );
         }
 
         CommentImageSummaryResultDTO imageSummary = null;
@@ -152,10 +159,27 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 mtCommentReplyGenerationMapper.insert(generation);
             }
             return finishResult(attachImageSummary(toResult(generation, true, null), imageSummary), startNanos, shop, comment, generation.getReplySource());
+        } catch (PowerInsufficientException e) {
+            log.warn("评价自动回复因算力不足跳过，shopId={}, commentId={}", shop.getId(), comment.getCommentId());
+            return finishResult(
+                    attachImageSummary(buildSkippedResult(sentiment, PowerInsufficientException.REASON_CODE), imageSummary),
+                    startNanos,
+                    shop,
+                    comment,
+                    PowerInsufficientException.REASON_CODE
+            );
         } catch (Exception e) {
             log.error("大模型评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
             return finishResult(attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_ERROR", e.getMessage(), persistGeneration, durationMs(startNanos)), imageSummary), startNanos, shop, comment, "LLM_ERROR");
         }
+    }
+
+    private CommentReplyContentResultDTO buildSkippedResult(CommentReplySentimentEnum sentiment, String reason) {
+        CommentReplyContentResultDTO result = new CommentReplyContentResultDTO();
+        result.setShouldReply(false);
+        result.setSkipReason(reason);
+        result.setSentiment(sentiment == null ? null : sentiment.name());
+        return result;
     }
 
     private SensitiveReplyResult resolveSensitiveReply(MtShop shop,

@@ -11,6 +11,7 @@ import com.gogoga.backend.entity.mt.MtCommentImageSummary;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentImageSummaryStatusEnum;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtCommentImageSummaryMapper;
 import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.MtPowerConsumeService;
@@ -87,6 +88,8 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
             MtCommentImageSummary success = buildSuccessRecord(record, response, urls, knowledge, powerAmount);
             mtCommentImageSummaryMapper.updateResultById(success);
             return toResult(success, urls);
+        } catch (PowerInsufficientException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("评价图片识别失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
             return markFailure(record, urls, StringUtils.defaultIfBlank(e.getMessage(), "VISION_ERROR"));

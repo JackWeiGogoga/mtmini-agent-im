@@ -6,6 +6,7 @@ import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.entity.mt.MtPowerConsume;
 import com.gogoga.backend.entity.mt.MtPowerConsumeDetail;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtPowerAccountMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeDetailMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
@@ -36,6 +37,7 @@ public class MtPowerConsumeService {
     private final MtPowerAccountMapper mtPowerAccountMapper;
     private final MtPowerConsumeMapper mtPowerConsumeMapper;
     private final MtPowerConsumeDetailMapper mtPowerConsumeDetailMapper;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     /**
      * 执行算力消费
@@ -65,7 +67,12 @@ public class MtPowerConsumeService {
             return buildDuplicateResult(existing);
         }
         if (defaultInt(account.getBalance()) < request.getPowerAmount()) {
-            throw new BusinessException(400, "当前算力余额不足");
+            try {
+                shopOperationSettingsService.disableCommentProcessingForInsufficientPower(request.getShopId());
+            } catch (RuntimeException e) {
+                throw new PowerInsufficientException("当前算力余额不足，自动关闭评价处理开关失败", e);
+            }
+            throw new PowerInsufficientException();
         }
 
         DeductionSplit split = DeductionSplit.of(account, request.getPowerAmount());

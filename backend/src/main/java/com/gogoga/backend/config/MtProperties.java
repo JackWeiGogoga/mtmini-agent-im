@@ -113,7 +113,7 @@ public class MtProperties {
         /**
          * 小应用 appId
          */
-        private Integer appId = 138;
+        private Integer appId = 154;
 
         /**
          * 分页大小
@@ -451,7 +451,7 @@ public class MtProperties {
         /**
          * 进入 RAG 前要求门店余额大于该值。
          */
-        private int ragBalanceThreshold = 100000;
+        private int ragBalanceThreshold = 10000;
 
         /**
          * 授权成功赠送算力。

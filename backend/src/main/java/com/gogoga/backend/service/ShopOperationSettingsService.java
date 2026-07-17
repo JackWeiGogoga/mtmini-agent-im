@@ -13,6 +13,7 @@ import com.gogoga.backend.util.UserContext;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class ShopOperationSettingsService {
     public static final String CHANGE_SOURCE_H5 = "H5";
     public static final String CHANGE_SOURCE_ADMIN = "ADMIN";
     public static final String CHANGE_SOURCE_SYSTEM = "SYSTEM";
+    public static final String CHANGE_REASON_POWER_BALANCE_NOT_ENOUGH = "POWER_BALANCE_NOT_ENOUGH";
     private static final boolean DEFAULT_AUTO_REPLY_ENABLED = true;
     private static final boolean DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED = true;
 
@@ -59,6 +61,29 @@ public class ShopOperationSettingsService {
     public boolean isNegativeCommentAppealEnabled(Long shopId) {
         MtCommentReplySetting setting = resolveSetting(shopId);
         return setting != null && Boolean.TRUE.equals(setting.getNegativeCommentAppealEnabled());
+    }
+
+    /**
+     * 算力不足时关闭评价自动回复和差评处理开关。
+     *
+     * <p>使用独立事务，确保调用方的算力消费事务回滚时，关停结果仍能保留。</p>
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public ShopOperationSettingsVO disableCommentProcessingForInsufficientPower(Long shopId) {
+        MtCommentReplySetting current = resolveSetting(shopId);
+        if (!isAutoReplyEnabled(current)
+                && !Boolean.TRUE.equals(current.getNegativeCommentAppealEnabled())) {
+            return toVO(current);
+        }
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(false);
+        param.setNegativeCommentAppealEnabled(false);
+        return updateSettings(
+                shopId,
+                param,
+                CHANGE_SOURCE_SYSTEM,
+                CHANGE_REASON_POWER_BALANCE_NOT_ENOUGH
+        );
     }
 
     @Transactional(rollbackFor = Exception.class)
