@@ -103,8 +103,10 @@ public class MtCommentAutoReplyService {
             int lookbackDays,
             String scene
     ) {
-        LocalDate endDate = currentDate == null ? LocalDate.now() : currentDate;
-        LocalDate startDate = endDate.minusDays(Math.max(lookbackDays, 1));
+        LocalDate referenceDate = currentDate == null ? LocalDate.now() : currentDate;
+        int safeLookbackDays = Math.max(lookbackDays, 1);
+        LocalDate endDate = referenceDate.minusDays(1);
+        LocalDate startDate = endDate.minusDays(safeLookbackDays - 1L);
         syncAndReplyShop(token, startDate, endDate, scene);
     }
 

@@ -125,7 +125,7 @@ class MtCommentAutoReplyServiceTest {
         assertEquals(542543250001L, saved.getCommentId());
         assertEquals(1, saved.getValid());
         assertEquals("20260612", saved.getQueryStartTime());
-        assertEquals("20260619", saved.getQueryEndTime());
+        assertEquals("20260618", saved.getQueryEndTime());
         assertEquals("PENDING", saved.getAutoReplyStatus());
         assertNotNull(saved.getRawPayloadJson());
 
@@ -258,7 +258,7 @@ class MtCommentAutoReplyServiceTest {
         LocalDate today = LocalDate.now();
         assertEquals(today.minusDays(7).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
                 requestCaptor.getValue().getStartTime());
-        assertEquals(today.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
+        assertEquals(today.minusDays(1).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE),
                 requestCaptor.getValue().getEndTime());
     }
 
