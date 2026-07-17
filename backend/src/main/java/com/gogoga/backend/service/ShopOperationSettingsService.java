@@ -27,6 +27,8 @@ public class ShopOperationSettingsService {
     public static final String CHANGE_SOURCE_H5 = "H5";
     public static final String CHANGE_SOURCE_ADMIN = "ADMIN";
     public static final String CHANGE_SOURCE_SYSTEM = "SYSTEM";
+    private static final boolean DEFAULT_AUTO_REPLY_ENABLED = true;
+    private static final boolean DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED = true;
 
     private final MtShopMapper mtShopMapper;
     private final MtCommentReplySettingMapper mtCommentReplySettingMapper;
@@ -109,16 +111,16 @@ public class ShopOperationSettingsService {
         }
         MtCommentReplySetting defaults = new MtCommentReplySetting();
         defaults.setShopId(shopId);
-        defaults.setAutoReplyEnabled(true);
-        defaults.setNegativeCommentAppealEnabled(false);
+        defaults.setAutoReplyEnabled(DEFAULT_AUTO_REPLY_ENABLED);
+        defaults.setNegativeCommentAppealEnabled(DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED);
         return defaults;
     }
 
     private MtCommentReplySetting copySetting(MtCommentReplySetting source) {
         MtCommentReplySetting copy = new MtCommentReplySetting();
         if (source == null) {
-            copy.setAutoReplyEnabled(true);
-            copy.setNegativeCommentAppealEnabled(false);
+            copy.setAutoReplyEnabled(DEFAULT_AUTO_REPLY_ENABLED);
+            copy.setNegativeCommentAppealEnabled(DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED);
             return copy;
         }
         copy.setId(source.getId());

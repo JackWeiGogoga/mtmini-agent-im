@@ -26,6 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import MarkdownLogPreview from "@/components/MarkdownLogPreview";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
 import { message } from "@/components/AppMessageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -113,10 +114,6 @@ const useMasterConsoleStyles = createStyles(() => ({
     display: "flex",
     flexDirection: "column",
     gap: 4,
-  },
-  logText: {
-    marginBottom: 0,
-    whiteSpace: "pre-wrap",
   },
   logImageStrip: {
     display: "flex",
@@ -509,25 +506,15 @@ const MasterConsole: React.FC = () => {
         title: "顾客消息",
         key: "customerMessage",
         width: 280,
-        render: (_, record) => (
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            <Typography.Paragraph
-              className={masterConsoleStyles.logText}
-              ellipsis={{ rows: 3, expandable: true }}
-            >
-              {record.customerMessage || "暂无顾客消息"}
-            </Typography.Paragraph>
-            {record.addComment ? (
-              <Typography.Paragraph
-                className={masterConsoleStyles.logText}
-                type="secondary"
-                ellipsis={{ rows: 2, expandable: true }}
-              >
-                追评：{record.addComment}
-              </Typography.Paragraph>
-            ) : null}
-          </Space>
-        ),
+        render: (_, record) => {
+          const detail = [
+            record.customerMessage || "暂无顾客消息",
+            record.addComment ? `追评：${record.addComment}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+          return <MarkdownLogPreview fallbackText={detail} />;
+        },
       },
       {
         title: "图片",
@@ -567,12 +554,9 @@ const MasterConsole: React.FC = () => {
         render: (_, record) => (
           <Space direction="vertical" size={6} style={{ width: "100%" }}>
             {renderReplyStatus(record.autoReplyStatus)}
-            <Typography.Paragraph
-              className={masterConsoleStyles.logText}
-              ellipsis={{ rows: 3, expandable: true }}
-            >
-              {record.aiReplyText || "暂无 AI 回复"}
-            </Typography.Paragraph>
+            <MarkdownLogPreview
+              fallbackText={record.aiReplyText || "暂无 AI 回复"}
+            />
           </Space>
         ),
       },
@@ -582,19 +566,13 @@ const MasterConsole: React.FC = () => {
         key: "analysisText",
         width: 220,
         render: (value?: string) => (
-          <Typography.Paragraph
-            className={masterConsoleStyles.logText}
-            ellipsis={{ rows: 3, expandable: true }}
-          >
-            {value || "AI 分析结果"}
-          </Typography.Paragraph>
+          <MarkdownLogPreview fallbackText={value || "AI 分析结果"} />
         ),
       },
     ],
     [
       masterConsoleStyles.logImageStrip,
       masterConsoleStyles.logScore,
-      masterConsoleStyles.logText,
     ],
   );
 
