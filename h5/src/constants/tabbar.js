@@ -21,6 +21,14 @@ const TABBAR_ITEMS = [
     activeIcon: "/static/tabbar/power-fill.svg",
   },
   {
+    key: "more",
+    label: "更多",
+    externalUrl:
+      "https://waimaieapp.meituan.com/ad/mycraft/activity?MYCRAFT_PAGE_ID=2486&appId=138",
+    icon: "/static/tabbar/more.svg",
+    activeIcon: "/static/tabbar/more-fill.svg",
+  },
+  {
     key: "support",
     label: "客服",
     path: "/pages/support/index",

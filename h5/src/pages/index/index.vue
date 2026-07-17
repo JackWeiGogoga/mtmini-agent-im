@@ -3,7 +3,9 @@
     <view class="page-shell">
       <view class="header">
         <app-top-notice
-          message="AI自动回复顾客评价，让门店服务更省心！"
+          message="登录 PC 端: https://aibadmin.waimaidashi.com"
+          copy-text="https://aibadmin.waimaidashi.com"
+          :show-icon="false"
           safe-top
         />
 
@@ -45,7 +47,11 @@
             >
               <image
                 class="feature-head-status-icon"
-                :src="reauthRequired ? '/static/icons/close.svg' : '/static/icons/open.svg'"
+                :src="
+                  reauthRequired
+                    ? '/static/icons/close.svg'
+                    : '/static/icons/open.svg'
+                "
                 mode="aspectFit"
               ></image>
               <text>{{ reauthRequired ? "需授权" : "已授权" }}</text>
@@ -90,17 +96,25 @@
               class="power-balance-fill"
               :style="{ width: powerBalanceBarWidth }"
             >
-              <text class="power-balance-text">{{ powerBalanceStatusText }}</text>
+              <text class="power-balance-text">{{
+                powerBalanceStatusText
+              }}</text>
             </view>
           </view>
 
           <view class="current-bid-main ai-current-bid-main">
             <view class="current-bid-title-wrap">
-              <text class="current-bid-title">差评处理/申诉</text>
-              <text class="current-bid-subtitle">（已回复{{ repliedBadCommentCount }}条）</text>
+              <text class="current-bid-title">差评群聊/申诉</text>
+              <text class="current-bid-subtitle"
+                >（已申诉{{ repliedBadCommentCount }}条）</text
+              >
             </view>
             <view class="current-bid-value-wrap">
-              <text class="current-bid-value" :class="{ 'current-bid-value-failed': reauthRequired }">{{ serviceStatusText }}</text>
+              <text
+                class="current-bid-value"
+                :class="{ 'current-bid-value-failed': reauthRequired }"
+                >{{ serviceStatusText }}</text
+              >
               <view
                 class="appeal-toggle"
                 :class="{
@@ -114,7 +128,9 @@
             </view>
           </view>
           <view v-if="reauthRequired" class="promotion-warning">
-            <text class="promotion-warning-text">门店授权已失效，请重新授权后继续自动回复。</text>
+            <text class="promotion-warning-text"
+              >门店授权已失效，请重新授权后继续自动回复。</text
+            >
           </view>
         </view>
 
@@ -134,9 +150,13 @@
               <view class="feature-row">
                 <view>
                   <text class="feature-name">让AI学习知识库</text>
-                  <text class="feature-desc feature-desc-inline">让AI根据知识库内容回复</text>
+                  <text class="feature-desc feature-desc-inline"
+                    >让AI根据知识库内容回复</text
+                  >
                 </view>
-                <view class="outline-button" @tap="goToKnowledgePage">配置</view>
+                <view class="outline-button" @tap="goToKnowledgePage"
+                  >配置</view
+                >
               </view>
             </view>
           </view>
@@ -156,7 +176,9 @@
               <view class="feature-row">
                 <view>
                   <text class="feature-name">查看AI回复记录</text>
-                  <text class="feature-desc log-entry-desc">实时查看AI回复内容</text>
+                  <text class="feature-desc log-entry-desc"
+                    >实时查看AI回复内容</text
+                  >
                 </view>
                 <view class="outline-button" @tap="goToLogPage">查看</view>
               </view>
@@ -185,13 +207,17 @@
               >
                 <text
                   class="stats-text-switch-item"
-                  :class="{ 'stats-text-switch-active': statsMode === 'comments' }"
-                >效果统计</text>
+                  :class="{
+                    'stats-text-switch-active': statsMode === 'comments',
+                  }"
+                  >效果统计</text
+                >
                 <text class="stats-text-switch-divider">|</text>
                 <text
                   class="stats-text-switch-item"
                   :class="{ 'stats-text-switch-active': statsMode === 'power' }"
-                >算力统计</text>
+                  >算力统计</text
+                >
               </view>
             </view>
             <view class="stats-grid">
@@ -202,13 +228,18 @@
                 :class="item.cardClass"
               >
                 <text class="stat-label">{{ item.label }}</text>
-                <text class="stat-value" :class="item.valueClass">{{ item.value }}</text>
+                <text class="stat-value" :class="item.valueClass">{{
+                  item.value
+                }}</text>
                 <view class="stat-foot">
                   <text
                     v-if="item.showCompare !== false"
                     class="stat-foot-label"
-                  >{{ item.compareLabel || statsCompareLabel }}</text>
-                  <text class="stat-foot-value" :class="item.trendClass">{{ item.trend }}</text>
+                    >{{ item.compareLabel || statsCompareLabel }}</text
+                  >
+                  <text class="stat-foot-value" :class="item.trendClass">{{
+                    item.trend
+                  }}</text>
                 </view>
               </view>
             </view>
@@ -220,6 +251,25 @@
     </view>
 
     <app-tabbar active-tab="home" />
+
+    <view
+      v-if="activityPopupVisible"
+      class="activity-popup-mask"
+      @tap.stop="closeActivityPopup"
+      @touchmove.stop.prevent="noop"
+    >
+      <view class="activity-popup-dialog" @tap.stop="openActivityPage">
+        <image
+          class="activity-popup-image"
+          src="/static/images/home_302.png"
+          mode="widthFix"
+        ></image>
+        <view
+          class="activity-popup-close-zone"
+          @tap.stop="closeActivityPopup"
+        ></view>
+      </view>
+    </view>
 
     <view
       v-if="supportPromptVisible"
@@ -255,13 +305,14 @@ import {
   getShopInfo,
   updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
-import { showToast } from "../../utils/ui";
+import { openMtExternalPage } from "../../utils/ui";
 
 const POWER_BALANCE_BAR_MAX = 10000000;
 const POWER_BALANCE_SUFFICIENT_THRESHOLD = 6000000;
 const POWER_BALANCE_TIGHT_THRESHOLD = 1000000;
 const RENEWAL_PAGE_URL =
   "https://waimaieapp.meituan.com/ad/mycraft/activity?MYCRAFT_PAGE_ID=2486&appId=138";
+let activityPopupShownInCurrentApp = false;
 
 function toNumber(value, fallback = 0) {
   const result = Number(value);
@@ -354,6 +405,7 @@ export default {
       statsMode: "comments",
       hasPowerStats: true,
       supportPromptVisible: false,
+      activityPopupVisible: false,
       statsRange: "TODAY",
       statsRangeOptions: [
         { label: "今日", value: "TODAY", compareLabel: "较昨日" },
@@ -538,9 +590,25 @@ export default {
     },
   },
   onShow() {
+    this.showActivityPopupOnce();
     this.loadDashboard();
   },
   methods: {
+    showActivityPopupOnce() {
+      if (activityPopupShownInCurrentApp) {
+        return;
+      }
+      activityPopupShownInCurrentApp = true;
+      this.activityPopupVisible = true;
+    },
+    closeActivityPopup() {
+      this.activityPopupVisible = false;
+    },
+    openActivityPage() {
+      this.closeActivityPopup();
+      openMtExternalPage(RENEWAL_PAGE_URL);
+    },
+    noop() {},
     async loadDashboard() {
       try {
         const dashboard = await getMtH5HomeDashboard(this.statsRange);
@@ -619,7 +687,8 @@ export default {
         negativeCommentAppealEnabled: this.negativeCommentAppealEnabled,
       };
       this.autoReplyEnabled = nextSettings.autoReplyEnabled;
-      this.negativeCommentAppealEnabled = nextSettings.negativeCommentAppealEnabled;
+      this.negativeCommentAppealEnabled =
+        nextSettings.negativeCommentAppealEnabled;
       this.operationSettingsSubmitting = true;
       try {
         const savedSettings = await updateMtH5OperationSettings(nextSettings);
@@ -657,20 +726,7 @@ export default {
       this.supportPromptVisible = false;
     },
     openRenewalPage() {
-      if (typeof window === "undefined") {
-        showToast("请在美团商家端打开续费页面");
-        return;
-      }
-
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
-          { action: "isvJumpToSalePage", url: RENEWAL_PAGE_URL },
-          "*",
-        );
-        return;
-      }
-
-      showToast("请在美团商家端打开续费页面");
+      openMtExternalPage(RENEWAL_PAGE_URL);
     },
   },
 };
@@ -1363,6 +1419,46 @@ export default {
   padding: 40rpx;
   background: rgba(0, 0, 0, 0.45);
   box-sizing: border-box;
+}
+
+.activity-popup-mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 20rpx) 24rpx
+    calc(env(safe-area-inset-bottom) + 20rpx);
+  background: rgba(0, 0, 0, 0.56);
+  box-sizing: border-box;
+}
+
+.activity-popup-dialog {
+  position: relative;
+  width: calc(56.25vh - 48rpx);
+  max-width: calc(100vw - 48rpx);
+  max-height: calc(
+    100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 40rpx
+  );
+}
+
+.activity-popup-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.activity-popup-close-zone {
+  position: absolute;
+  top: 72rpx;
+  right: 18rpx;
+  width: 110rpx;
+  height: 110rpx;
+  z-index: 1;
 }
 
 .support-modal {

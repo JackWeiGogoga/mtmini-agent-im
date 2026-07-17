@@ -3,13 +3,22 @@
     v-if="noticeMessage"
     class="top-notice"
     :class="{ 'top-notice-safe': safeTop }"
+    @tap="handleNoticeTap"
   >
     <image
+      v-if="showIcon"
       class="top-notice-icon"
       :src="iconSrc"
       mode="aspectFit"
     ></image>
     <text class="top-notice-text">{{ noticeMessage }}</text>
+    <image
+      v-if="copyText"
+      class="top-notice-copy"
+      src="/static/icons/copy.svg"
+      mode="aspectFit"
+      @tap.stop="copyNoticeText"
+    ></image>
   </view>
   <view v-else-if="safeTop" class="top-notice-safe-placeholder"></view>
 </template>
@@ -31,6 +40,14 @@ export default {
     safeTop: {
       type: Boolean,
       default: false,
+    },
+    copyText: {
+      type: String,
+      default: "",
+    },
+    showIcon: {
+      type: Boolean,
+      default: true,
     },
   },
   data() {
@@ -97,6 +114,23 @@ export default {
       clearInterval(this.countdownTimer);
       this.countdownTimer = null;
     },
+    copyNoticeText() {
+      const content = String(this.copyText || "").trim();
+      if (!content) {
+        return;
+      }
+      uni.setClipboardData({
+        data: content,
+        success: () => {
+          uni.showToast({ title: "已复制", icon: "none" });
+        },
+      });
+    },
+    handleNoticeTap() {
+      if (this.copyText) {
+        this.copyNoticeText();
+      }
+    },
     formatRemainingTime(totalSeconds) {
       const safeSeconds = Math.max(Number(totalSeconds || 0), 0);
       const days = Math.floor(safeSeconds / 86400);
@@ -129,6 +163,13 @@ export default {
 }
 
 .top-notice-icon {
+  width: 30rpx;
+  height: 30rpx;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+}
+
+.top-notice-copy {
   width: 30rpx;
   height: 30rpx;
   flex-shrink: 0;

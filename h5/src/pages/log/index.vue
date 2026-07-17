@@ -40,41 +40,67 @@
                 <text class="log-score">{{ scoreText(item) }}</text>
               </view>
               <view class="log-body">
-                <view class="log-section">
-                  <text class="section-label">顾客消息</text>
-                  <text class="section-text">{{ customerMessageText(item) }}</text>
-                </view>
-
-                <view v-if="addCommentText(item)" class="log-section add-comment-section">
-                  <text class="section-label">顾客追评</text>
-                  <text class="section-text">{{ addCommentText(item) }}</text>
-                </view>
-
-                <scroll-view
-                  v-if="item.imageUrls && item.imageUrls.length"
-                  class="image-scroll"
-                  scroll-x
-                >
-                  <view class="image-list">
-                    <image
-                      v-for="(imageUrl, imageIndex) in item.imageUrls"
-                      :key="`${item.id || item.commentId}-${imageIndex}`"
-                      class="comment-image"
-                      :src="imageUrl"
-                      mode="aspectFill"
-                      @tap="previewImages(item.imageUrls, imageIndex)"
-                    ></image>
+                <view v-if="isLogExpanded(item)" class="log-detail">
+                  <view class="log-section">
+                    <text class="section-label">顾客消息</text>
+                    <text class="section-text">{{ customerMessageText(item) }}</text>
                   </view>
-                </scroll-view>
 
-                <view class="log-section reply-section">
-                  <text class="section-label">AI 回复</text>
-                  <text class="section-text">{{ aiReplyText(item) }}</text>
+                  <view
+                    v-if="addCommentText(item)"
+                    class="log-section add-comment-section"
+                  >
+                    <text class="section-label">顾客追评</text>
+                    <text class="section-text">{{ addCommentText(item) }}</text>
+                  </view>
+
+                  <scroll-view
+                    v-if="item.imageUrls && item.imageUrls.length"
+                    class="image-scroll"
+                    scroll-x
+                  >
+                    <view class="image-list">
+                      <image
+                        v-for="(imageUrl, imageIndex) in item.imageUrls"
+                        :key="`${item.id || item.commentId}-${imageIndex}`"
+                        class="comment-image"
+                        :src="imageUrl"
+                        mode="aspectFill"
+                        @tap.stop="previewImages(item.imageUrls, imageIndex)"
+                      ></image>
+                    </view>
+                  </scroll-view>
+
+                  <view class="log-section reply-section">
+                    <text class="section-label">AI 回复</text>
+                    <text class="section-text">{{ aiReplyText(item) }}</text>
+                  </view>
+
+                  <view class="log-section analysis-section">
+                    <text class="section-label">AI 分析</text>
+                    <text class="section-text">{{ analysisText(item) }}</text>
+                  </view>
+                </view>
+                <view v-else class="log-preview">
+                  <text class="log-preview-text">{{
+                    customerMessageText(item)
+                  }}</text>
                 </view>
 
-                <view class="log-section analysis-section">
-                  <text class="section-label">AI 分析</text>
-                  <text class="section-text">{{ analysisText(item) }}</text>
+                <view
+                  class="log-detail-toggle"
+                  @tap.stop="toggleLogExpanded(item)"
+                >
+                  <text>{{
+                    isLogExpanded(item) ? "收起详情" : "展开详情"
+                  }}</text>
+                  <text
+                    class="log-detail-toggle-arrow"
+                    :class="{
+                      'log-detail-toggle-arrow-expanded': isLogExpanded(item),
+                    }"
+                    >⌄</text
+                  >
                 </view>
               </view>
             </view>
@@ -113,6 +139,7 @@ export default {
       pageNum: 1,
       pageSize: 20,
       hasNextPage: true,
+      expandedLogKeys: {},
     };
   },
   computed: {
@@ -179,6 +206,9 @@ export default {
       try {
         const page = await getMtH5CommentReplyLogs(nextPageNum, this.pageSize);
         const nextList = Array.isArray(page?.list) ? page.list : [];
+        if (reset) {
+          this.expandedLogKeys = {};
+        }
         this.logItems = reset ? nextList : [...this.logItems, ...nextList];
         this.pageNum = Number(page?.pageNum || nextPageNum) + 1;
         this.hasNextPage = Boolean(page?.hasNextPage);
@@ -191,6 +221,23 @@ export default {
     },
     handleScrollToLower() {
       this.loadLogs(false);
+    },
+    logItemKey(item) {
+      return String(
+        item?.id ||
+          item?.commentId ||
+          `${this.resolveTimeText(item)}-${item?.customerMessage || ""}`,
+      );
+    },
+    isLogExpanded(item) {
+      return Boolean(this.expandedLogKeys[this.logItemKey(item)]);
+    },
+    toggleLogExpanded(item) {
+      const key = this.logItemKey(item);
+      this.expandedLogKeys = {
+        ...this.expandedLogKeys,
+        [key]: !this.expandedLogKeys[key],
+      };
     },
     previewImages(imageUrls, imageIndex) {
       if (!Array.isArray(imageUrls) || !imageUrls.length) {
@@ -482,6 +529,48 @@ page {
 .log-body {
   flex: 1;
   min-width: 0;
+}
+
+.log-preview {
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: #f8f9fb;
+  box-sizing: border-box;
+}
+
+.log-preview-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #4a4d57;
+  font-size: 27rpx;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  white-space: pre-wrap;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.log-detail-toggle {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  gap: 6rpx;
+  margin-top: 14rpx;
+  color: #1270ff;
+  font-size: 24rpx;
+  line-height: 1.4;
+}
+
+.log-detail-toggle-arrow {
+  display: inline-block;
+  font-size: 26rpx;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.log-detail-toggle-arrow-expanded {
+  transform: rotate(180deg);
 }
 
 .log-section {

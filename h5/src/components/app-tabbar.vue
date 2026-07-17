@@ -24,6 +24,7 @@ import {
   getMtH5TabStatus,
   reportMtH5BehaviorEvent,
 } from "../utils/mt-auth";
+import { openMtExternalPage } from "../utils/ui";
 
 const TAB_BEHAVIOR_EVENTS = {
   power: "H5_POWER_TAB_CLICK",
@@ -83,6 +84,10 @@ export default {
       const eventType = TAB_BEHAVIOR_EVENTS[item.key];
       if (eventType) {
         reportMtH5BehaviorEvent(eventType);
+      }
+      if (item.externalUrl) {
+        openMtExternalPage(item.externalUrl);
+        return;
       }
       if (!item.path || item.active) {
         return;
