@@ -70,6 +70,9 @@ class UserBehaviorAnalyticsServiceTest {
 
         UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
         param.setEventType("H5_APP_OPEN");
+        param.setClientEventId("h5-event-1");
+        param.setSessionId("h5-session-1");
+        param.setContextJson("{\"entrySource\":\"APP\"}");
         userBehaviorAnalyticsService.reportH5Event(param);
 
         ArgumentCaptor<UserBehaviorEvent> captor = ArgumentCaptor.forClass(UserBehaviorEvent.class);
@@ -77,6 +80,9 @@ class UserBehaviorAnalyticsServiceTest {
         UserBehaviorEvent event = captor.getValue();
         assertEquals("H5", event.getEventSource());
         assertEquals("H5_APP_OPEN", event.getEventType());
+        assertEquals("h5-event-1", event.getClientEventId());
+        assertEquals("h5-session-1", event.getSessionId());
+        assertEquals("{\"entrySource\":\"APP\"}", event.getContextJson());
         assertEquals(1L, event.getShopId());
         assertEquals("门店名称", event.getShopNameSnapshot());
         assertEquals("13800000000", event.getShopPhoneSnapshot());
@@ -87,6 +93,8 @@ class UserBehaviorAnalyticsServiceTest {
     void reportAdminEventShouldRejectMismatchedEventSource() {
         UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
         param.setEventType("H5_APP_OPEN");
+        param.setClientEventId("admin-event-1");
+        param.setSessionId("admin-session-1");
         param.setShopId(1L);
 
         assertThrows(BusinessException.class, () -> userBehaviorAnalyticsService.reportAdminEvent(param));
@@ -106,7 +114,10 @@ class UserBehaviorAnalyticsServiceTest {
         when(userShopBindingService.requireCurrentUserVisibleShop(8L, null)).thenReturn(shop);
 
         UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
-        param.setEventType("ADMIN_PROMOTION_LOG_VIEW");
+        param.setEventType("PC_COMMENT_LOG_VIEW");
+        param.setClientEventId("admin-event-2");
+        param.setSessionId("admin-session-1");
+        param.setContextJson("{\"portalType\":\"ADMIN\"}");
         param.setShopId(8L);
         userBehaviorAnalyticsService.reportAdminEvent(param);
 
@@ -114,9 +125,34 @@ class UserBehaviorAnalyticsServiceTest {
         verify(userBehaviorEventMapper).insert(captor.capture());
         UserBehaviorEvent event = captor.getValue();
         assertEquals("ADMIN_BACKEND", event.getEventSource());
-        assertEquals("ADMIN_PROMOTION_LOG_VIEW", event.getEventType());
+        assertEquals("PC_COMMENT_LOG_VIEW", event.getEventType());
         assertEquals("admin-1", event.getBackendUserId());
         assertEquals("400", event.getShopPhoneSnapshot());
+    }
+
+    @Test
+    void reportH5EventShouldRejectLegacyPromotionEvent() {
+        UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
+        param.setEventType("H5_CONFIG_BUTTON_CLICK");
+        param.setClientEventId("legacy-event");
+        param.setSessionId("h5-session-1");
+
+        assertThrows(BusinessException.class, () -> userBehaviorAnalyticsService.reportH5Event(param));
+    }
+
+    @Test
+    void reportH5EventShouldRejectNonObjectContext() {
+        MtShop shop = new MtShop();
+        shop.setId(1L);
+        when(mtH5ShopService.getCurrentShop()).thenReturn(shop);
+
+        UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
+        param.setEventType("H5_PAGE_VIEW");
+        param.setClientEventId("h5-event-2");
+        param.setSessionId("h5-session-1");
+        param.setContextJson("[\"HOME\"]");
+
+        assertThrows(BusinessException.class, () -> userBehaviorAnalyticsService.reportH5Event(param));
     }
 
     @Test

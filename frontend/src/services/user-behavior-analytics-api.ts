@@ -6,6 +6,15 @@ import type {
   UserBehaviorAnalyticsQuery,
 } from "@/types";
 
+let behaviorEventSequence = 0;
+const behaviorSessionId = createBehaviorId("pc-session");
+
+function createBehaviorId(prefix: string): string {
+  behaviorEventSequence += 1;
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now().toString(36)}-${behaviorEventSequence.toString(36)}-${randomPart}`;
+}
+
 export async function getUserBehaviorAnalytics(
   params: UserBehaviorAnalyticsQuery,
 ): Promise<UserBehaviorAnalyticsPage> {
@@ -26,6 +35,8 @@ export function reportAdminBehaviorEvent(
   const body: Record<string, unknown> = {
     eventType,
     shopId,
+    clientEventId: createBehaviorId("pc-event"),
+    sessionId: behaviorSessionId,
   };
   if (context !== undefined) {
     body.contextJson =

@@ -3,6 +3,20 @@ const SHOP_INFO_KEY = 'shopInfo'
 const VERSION_KEY = 'version'
 const HOME_GUIDE_STEP_KEY_PREFIX = 'mt_h5_home_guide_step:'
 const HOME_GUIDE_DISMISSED_KEY_PREFIX = 'mt_h5_home_guide_dismissed:'
+let behaviorEventSequence = 0
+let behaviorSessionId = createBehaviorId('h5-session')
+let appOpenReported = false
+
+function createBehaviorId(prefix) {
+  behaviorEventSequence += 1
+  const randomPart = Math.random().toString(36).slice(2, 10)
+  return `${prefix}-${Date.now().toString(36)}-${behaviorEventSequence.toString(36)}-${randomPart}`
+}
+
+function resetBehaviorSession() {
+  behaviorSessionId = createBehaviorId('h5-session')
+  appOpenReported = false
+}
 
 function request(url, method = 'GET', data, withAuth = true) {
   const header = {
@@ -49,6 +63,7 @@ export function clearAuthPayload() {
   uni.removeStorageSync(TOKEN_KEY)
   uni.removeStorageSync(SHOP_INFO_KEY)
   uni.removeStorageSync(VERSION_KEY)
+  resetBehaviorSession()
 }
 
 export function getMtH5HomeInfo() {
@@ -151,6 +166,8 @@ function uploadCommentReplyKnowledgeFile(url, filePath, name, defaultErrorMessag
 export function reportMtH5BehaviorEvent(eventType, context = undefined) {
   const payload = {
     eventType,
+    clientEventId: createBehaviorId('h5-event'),
+    sessionId: behaviorSessionId,
   }
   if (context !== undefined) {
     payload.contextJson =
@@ -158,6 +175,20 @@ export function reportMtH5BehaviorEvent(eventType, context = undefined) {
   }
   request('/api/h5/behavior-events', 'POST', payload).catch(() => {
     // 埋点失败不能影响 H5 主流程。
+  })
+}
+
+export function reportMtH5PageView(pageCode, entrySource = 'DIRECT') {
+  const normalizedEntrySource = String(entrySource || 'DIRECT').toUpperCase()
+  if (!appOpenReported) {
+    appOpenReported = true
+    reportMtH5BehaviorEvent('H5_APP_OPEN', {
+      entrySource: normalizedEntrySource,
+    })
+  }
+  reportMtH5BehaviorEvent('H5_PAGE_VIEW', {
+    pageCode: String(pageCode || 'UNKNOWN').toUpperCase(),
+    entrySource: normalizedEntrySource,
   })
 }
 

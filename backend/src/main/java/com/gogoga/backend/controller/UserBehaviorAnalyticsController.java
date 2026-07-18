@@ -30,7 +30,6 @@ public class UserBehaviorAnalyticsController {
     }
 
     @PostMapping("/api/system/behavior-events")
-    @RequiresPermission("analytics:user-behavior:list")
     public ResultVO<Boolean> reportAdminEvent(@Valid @RequestBody UserBehaviorEventReportParam param) {
         userBehaviorAnalyticsService.reportAdminEvent(param);
         return ResultVO.success(Boolean.TRUE);

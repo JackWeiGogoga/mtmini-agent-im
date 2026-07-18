@@ -26,11 +26,6 @@ import {
 } from "../utils/mt-auth";
 import { openMtExternalPage } from "../utils/ui";
 
-const TAB_BEHAVIOR_EVENTS = {
-  power: "H5_POWER_TAB_CLICK",
-  support: "H5_SUPPORT_TAB_CLICK",
-};
-
 export default {
   props: {
     activeTab: {
@@ -81,19 +76,25 @@ export default {
       }
     },
     async handleTabClick(item) {
-      const eventType = TAB_BEHAVIOR_EVENTS[item.key];
-      if (eventType) {
-        reportMtH5BehaviorEvent(eventType);
+      if (item.key === "support") {
+        reportMtH5BehaviorEvent("H5_SUPPORT_ENTRY_CLICK", {
+          entrySource: "TAB",
+        });
       }
       if (item.externalUrl) {
+        reportMtH5BehaviorEvent("H5_EXTERNAL_LINK_CLICK", {
+          targetCode: "MORE_ACTIVITY",
+          entrySource: "TAB",
+        });
         openMtExternalPage(item.externalUrl);
         return;
       }
       if (!item.path || item.active) {
         return;
       }
+      const joiner = item.path.includes("?") ? "&" : "?";
       uni.redirectTo({
-        url: item.path,
+        url: `${item.path}${joiner}entrySource=TAB`,
       });
     },
   },

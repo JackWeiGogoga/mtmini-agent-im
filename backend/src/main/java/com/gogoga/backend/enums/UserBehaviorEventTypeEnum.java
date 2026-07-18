@@ -8,24 +8,16 @@ import org.apache.commons.lang3.StringUtils;
 public enum UserBehaviorEventTypeEnum {
 
     H5_APP_OPEN("H5_APP_OPEN", UserBehaviorEventSourceEnum.H5),
-    H5_PROMOTION_SWITCH_CLICK("H5_PROMOTION_SWITCH_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_CONFIG_BUTTON_CLICK("H5_CONFIG_BUTTON_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_UNLOCK_AI_PEAK_CLICK("H5_UNLOCK_AI_PEAK_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_CONFIG_MODAL_CONFIRM_CLICK("H5_CONFIG_MODAL_CONFIRM_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_CONFIG_MODAL_CANCEL_CLICK("H5_CONFIG_MODAL_CANCEL_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_MANUAL_BID_EDIT_OPEN("H5_MANUAL_BID_EDIT_OPEN", UserBehaviorEventSourceEnum.H5),
-    H5_MANUAL_BID_SUBMIT_CLICK("H5_MANUAL_BID_SUBMIT_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_POWER_TAB_CLICK("H5_POWER_TAB_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_LOG_TAB_CLICK("H5_LOG_TAB_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_SUPPORT_TAB_CLICK("H5_SUPPORT_TAB_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_RECHARGE_GIF_CLICK("H5_RECHARGE_GIF_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_POWER_PAY_CLICK("H5_POWER_PAY_CLICK", UserBehaviorEventSourceEnum.H5),
-    H5_REDEMPTION_CODE_CLICK("H5_REDEMPTION_CODE_CLICK", UserBehaviorEventSourceEnum.H5),
+    H5_PAGE_VIEW("H5_PAGE_VIEW", UserBehaviorEventSourceEnum.H5),
+    H5_SUPPORT_ENTRY_CLICK("H5_SUPPORT_ENTRY_CLICK", UserBehaviorEventSourceEnum.H5),
+    H5_EXTERNAL_LINK_CLICK("H5_EXTERNAL_LINK_CLICK", UserBehaviorEventSourceEnum.H5),
+    H5_RECHARGE_SUBMIT_CLICK("H5_RECHARGE_SUBMIT_CLICK", UserBehaviorEventSourceEnum.H5),
+    H5_REDEMPTION_APPLY_RESULT("H5_REDEMPTION_APPLY_RESULT", UserBehaviorEventSourceEnum.H5),
+    H5_LOG_DETAIL_EXPAND("H5_LOG_DETAIL_EXPAND", UserBehaviorEventSourceEnum.H5),
+    H5_KNOWLEDGE_ACTION("H5_KNOWLEDGE_ACTION", UserBehaviorEventSourceEnum.H5),
 
-    ADMIN_PROMOTION_SWITCH_UPDATE("ADMIN_PROMOTION_SWITCH_UPDATE", UserBehaviorEventSourceEnum.ADMIN_BACKEND),
-    ADMIN_PROMOTION_CONFIG_SAVE("ADMIN_PROMOTION_CONFIG_SAVE", UserBehaviorEventSourceEnum.ADMIN_BACKEND),
-    ADMIN_PROMOTION_CONFIG_CANCEL("ADMIN_PROMOTION_CONFIG_CANCEL", UserBehaviorEventSourceEnum.ADMIN_BACKEND),
-    ADMIN_PROMOTION_LOG_VIEW("ADMIN_PROMOTION_LOG_VIEW", UserBehaviorEventSourceEnum.ADMIN_BACKEND);
+    PC_COMMENT_LOG_VIEW("PC_COMMENT_LOG_VIEW", UserBehaviorEventSourceEnum.ADMIN_BACKEND),
+    PC_KNOWLEDGE_VIEW("PC_KNOWLEDGE_VIEW", UserBehaviorEventSourceEnum.ADMIN_BACKEND);
 
     private final String value;
     private final UserBehaviorEventSourceEnum source;

@@ -18,7 +18,7 @@
             ></image>
             <text class="shop-name">{{ shopDisplayName }}</text>
           </view>
-          <text class="shop-link" @tap="openSupportPrompt">使用指导 ></text>
+          <text class="shop-link" @tap="openSupportPrompt('USE_GUIDE')">使用指导 ></text>
         </view>
 
         <view class="vip-card">
@@ -247,7 +247,7 @@
           </view>
         </view>
 
-        <view class="feedback-link" @tap="openSupportPrompt">建议与反馈</view>
+        <view class="feedback-link" @tap="openSupportPrompt('FEEDBACK')">建议与反馈</view>
       </view>
     </view>
 
@@ -310,6 +310,8 @@ import AppTopNotice from "../../components/app-top-notice.vue";
 import {
   getMtH5HomeDashboard,
   getShopInfo,
+  reportMtH5BehaviorEvent,
+  reportMtH5PageView,
   updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
 import { openMtExternalPage } from "../../utils/ui";
@@ -411,6 +413,7 @@ export default {
       autoReplyEnabled: true,
       negativeCommentAppealEnabled: false,
       operationSettingsSubmitting: false,
+      pageEntrySource: "APP",
       statsMode: "comments",
       hasPowerStats: true,
       supportPromptVisible: false,
@@ -592,7 +595,11 @@ export default {
       return "power-balance-bar-insufficient";
     },
   },
+  onLoad(options) {
+    this.pageEntrySource = options?.entrySource || "APP";
+  },
   onShow() {
+    reportMtH5PageView("HOME", this.pageEntrySource);
     this.showActivityPopupOnce();
     this.loadDashboard();
   },
@@ -609,6 +616,10 @@ export default {
     },
     openActivityPage() {
       this.closeActivityPopup();
+      reportMtH5BehaviorEvent("H5_EXTERNAL_LINK_CLICK", {
+        targetCode: "RENEWAL_ACTIVITY",
+        entrySource: "ACTIVITY_POPUP",
+      });
       openMtExternalPage(RENEWAL_PAGE_URL);
     },
     noop() {},
@@ -724,21 +735,28 @@ export default {
     },
     goToLogPage() {
       uni.redirectTo({
-        url: "/pages/log/index",
+        url: "/pages/log/index?entrySource=HOME_CARD",
       });
     },
     goToKnowledgePage() {
       uni.navigateTo({
-        url: "/pages/knowledge/index",
+        url: "/pages/knowledge/index?entrySource=HOME_CARD",
       });
     },
-    openSupportPrompt() {
+    openSupportPrompt(entrySource = "HOME") {
+      reportMtH5BehaviorEvent("H5_SUPPORT_ENTRY_CLICK", {
+        entrySource,
+      });
       this.supportPromptVisible = true;
     },
     closeSupportPrompt() {
       this.supportPromptVisible = false;
     },
     openRenewalPage() {
+      reportMtH5BehaviorEvent("H5_EXTERNAL_LINK_CLICK", {
+        targetCode: "RENEWAL",
+        entrySource: "VIP_CARD",
+      });
       openMtExternalPage(RENEWAL_PAGE_URL);
     },
   },
@@ -1038,11 +1056,11 @@ export default {
 
 .appeal-recommend-corner {
   position: absolute;
-  top: -18rpx;
-  right: -18rpx;
+  top: -22rpx;
+  right: -28rpx;
   z-index: 1;
-  width: 44rpx;
-  height: 44rpx;
+  width: 52rpx;
+  height: 52rpx;
   pointer-events: none;
 }
 

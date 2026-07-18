@@ -1,5 +1,6 @@
 package com.gogoga.backend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.gogoga.backend.entity.UserBehaviorEvent;
@@ -15,6 +16,7 @@ import com.gogoga.backend.mapper.UserBehaviorEventMapper;
 import com.gogoga.backend.param.UserBehaviorAnalyticsQueryParam;
 import com.gogoga.backend.param.UserBehaviorEventReportParam;
 import com.gogoga.backend.util.UserContext;
+import com.gogoga.backend.util.JsonUtil;
 import com.gogoga.backend.vo.UserBehaviorAnalyticsRowVO;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -49,7 +51,8 @@ public class UserBehaviorAnalyticsService {
                 UserBehaviorEventSourceEnum.H5
         );
         MtShop shop = mtH5ShopService.getCurrentShop();
-        insertEvent(UserBehaviorEventSourceEnum.H5, eventType, shop, null, UserContext.getLoginUser() == null ? null : UserContext.getLoginUser().getEpoiId(), param.getContextJson());
+        insertEvent(UserBehaviorEventSourceEnum.H5, eventType, shop, null,
+                UserContext.getLoginUser() == null ? null : UserContext.getLoginUser().getEpoiId(), param);
     }
 
     @Transactional
@@ -66,7 +69,7 @@ public class UserBehaviorAnalyticsService {
             throw new BusinessException("门店ID不能为空");
         }
         MtShop shop = userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
-        insertEvent(UserBehaviorEventSourceEnum.ADMIN_BACKEND, eventType, shop, UserContext.getUserId(), null, param.getContextJson());
+        insertEvent(UserBehaviorEventSourceEnum.ADMIN_BACKEND, eventType, shop, UserContext.getUserId(), null, param);
     }
 
     public PageInfo<UserBehaviorAnalyticsRowVO> listAnalyticsRows(UserBehaviorAnalyticsQueryParam param) {
@@ -102,14 +105,17 @@ public class UserBehaviorAnalyticsService {
                              MtShop shop,
                              String backendUserId,
                              String h5EpoiId,
-                             String contextJson) {
+                             UserBehaviorEventReportParam param) {
         if (shop == null || shop.getId() == null) {
             throw new BusinessException("门店不存在");
         }
+        String contextJson = validateContextJson(param.getContextJson());
         LocalDateTime now = LocalDateTime.now();
         UserBehaviorEvent event = new UserBehaviorEvent();
         event.setEventSource(source.getValue());
         event.setEventType(eventType.getValue());
+        event.setClientEventId(StringUtils.trim(param.getClientEventId()));
+        event.setSessionId(StringUtils.trim(param.getSessionId()));
         event.setShopId(shop.getId());
         event.setShopNameSnapshot(StringUtils.firstNonBlank(shop.getPoiName(), shop.getName()));
         event.setShopPhoneSnapshot(StringUtils.firstNonBlank(shop.getContactPhone(), shop.getPhone()));
@@ -119,6 +125,18 @@ public class UserBehaviorAnalyticsService {
         event.setContextJson(StringUtils.trimToNull(contextJson));
         event.setCreateTime(now);
         userBehaviorEventMapper.insert(event);
+    }
+
+    private String validateContextJson(String rawContextJson) {
+        String contextJson = StringUtils.trimToNull(rawContextJson);
+        if (contextJson == null) {
+            return null;
+        }
+        JsonNode context = JsonUtil.readTree(contextJson);
+        if (context == null || !context.isObject()) {
+            throw new BusinessException("事件上下文必须是JSON对象");
+        }
+        return contextJson;
     }
 
     private VisibilityScope resolveVisibilityScope() {

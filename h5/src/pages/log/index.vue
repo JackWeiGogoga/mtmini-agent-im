@@ -123,7 +123,11 @@
 <script>
 import AppSubpageHeader from "../../components/app-subpage-header.vue";
 import AppTabbar from "../../components/app-tabbar.vue";
-import { getMtH5CommentReplyLogs } from "../../utils/mt-auth";
+import {
+  getMtH5CommentReplyLogs,
+  reportMtH5BehaviorEvent,
+  reportMtH5PageView,
+} from "../../utils/mt-auth";
 import { showErrorToast } from "../../utils/ui";
 
 export default {
@@ -140,6 +144,7 @@ export default {
       pageSize: 20,
       hasNextPage: true,
       expandedLogKeys: {},
+      pageEntrySource: "DIRECT",
     };
   },
   computed: {
@@ -179,7 +184,11 @@ export default {
       return "已展示全部评价记录";
     },
   },
+  onLoad(options) {
+    this.pageEntrySource = options?.entrySource || "DIRECT";
+  },
   onShow() {
+    reportMtH5PageView("LOG", this.pageEntrySource);
     this.loadLogs(true);
   },
   onPullDownRefresh() {
@@ -234,10 +243,17 @@ export default {
     },
     toggleLogExpanded(item) {
       const key = this.logItemKey(item);
+      const willExpand = !this.expandedLogKeys[key];
       this.expandedLogKeys = {
         ...this.expandedLogKeys,
-        [key]: !this.expandedLogKeys[key],
+        [key]: willExpand,
       };
+      if (willExpand) {
+        reportMtH5BehaviorEvent("H5_LOG_DETAIL_EXPAND", {
+          sentiment: this.normalizedSentiment(item),
+          hasImages: Boolean(item?.imageUrls?.length),
+        });
+      }
     },
     previewImages(imageUrls, imageIndex) {
       if (!Array.isArray(imageUrls) || !imageUrls.length) {

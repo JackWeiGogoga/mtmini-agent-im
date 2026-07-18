@@ -247,6 +247,8 @@ import {
   getCommentReplyDocuments,
   getCommentReplyQaItems,
   previewCommentReplyDocument,
+  reportMtH5BehaviorEvent,
+  reportMtH5PageView,
   updateCommentReplyChunkEnabled,
   updateCommentReplyChunkSentiment,
   updateCommentReplyQaItem,
@@ -311,6 +313,7 @@ const uploadPreviewSummaryText = computed(() => {
 })
 
 onMounted(() => {
+  reportMtH5PageView('KNOWLEDGE', 'HOME_CARD')
   refresh()
 })
 
@@ -328,6 +331,9 @@ async function refresh() {
 }
 
 function chooseDocument() {
+  reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+    actionCode: 'DOCUMENT_SELECT_OPEN',
+  })
   uni.chooseFile({
     count: 1,
     extension: ['.txt', '.docx', '.xlsx'],
@@ -349,10 +355,21 @@ async function openUploadPreview(file) {
   previewingUpload.value = true
   try {
     uploadPreviewResult.value = await previewCommentReplyDocument(file.path)
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'DOCUMENT_PREVIEW_RESULT',
+      result: 'SUCCESS',
+      fileType: pendingUploadFile.value.type,
+      chunkCount: Number(uploadPreviewResult.value?.chunkCount || 0),
+    })
     pendingPreviewHint.value = uploadPreviewChunks.value.length > 0
       ? ''
       : '没有解析出可用知识片段，建议取消上传并调整文档内容。'
   } catch (error) {
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'DOCUMENT_PREVIEW_RESULT',
+      result: 'FAILED',
+      fileType: pendingUploadFile.value?.type || 'UNKNOWN',
+    })
     pendingPreviewHint.value = error.message || '解析预览失败，请调整文档后重试。'
   } finally {
     previewingUpload.value = false
@@ -375,6 +392,11 @@ async function confirmUploadDocument() {
     uni.showToast({ title: '请先完成解析预览', icon: 'none' })
     return
   }
+  reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+    actionCode: 'DOCUMENT_UPLOAD_SUBMIT',
+    fileType: pendingUploadFile.value.type,
+    chunkCount: uploadPreviewChunks.value.length,
+  })
   uploading.value = true
   try {
     const uploaded = await uploadCommentReplyDocument(pendingUploadFile.value.path)
@@ -580,6 +602,10 @@ function removeChunk(chunk) {
 }
 
 function openQaForm(item) {
+  reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+    actionCode: 'QA_FORM_OPEN',
+    mode: item?.id ? 'EDIT' : 'CREATE',
+  })
   editingQaId.value = item?.id || null
   qaForm.title = item?.title || ''
   qaForm.sentiment = item?.sentiment || 'GOOD'

@@ -943,6 +943,8 @@ CREATE TABLE `user_behavior_event` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `event_source` varchar(32) NOT NULL COMMENT '事件来源 H5/ADMIN_BACKEND',
   `event_type` varchar(64) NOT NULL COMMENT '事件类型',
+  `client_event_id` varchar(96) DEFAULT NULL COMMENT '客户端事件唯一ID',
+  `session_id` varchar(96) DEFAULT NULL COMMENT '客户端应用会话ID',
   `shop_id` bigint NOT NULL COMMENT '门店ID',
   `shop_name_snapshot` varchar(255) DEFAULT NULL COMMENT '商家名称快照',
   `shop_phone_snapshot` varchar(64) DEFAULT NULL COMMENT '门店商家手机号快照',
@@ -952,9 +954,11 @@ CREATE TABLE `user_behavior_event` (
   `context_json` text COMMENT '事件上下文JSON',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_behavior_event_client_event_id` (`client_event_id`),
   KEY `idx_user_behavior_event_time_shop` (`event_time`,`shop_id`),
   KEY `idx_user_behavior_event_shop_time` (`shop_id`,`event_time`),
   KEY `idx_user_behavior_event_source_type_time` (`event_source`,`event_type`,`event_time`),
+  KEY `idx_user_behavior_event_session_time` (`session_id`,`event_time`),
   KEY `idx_user_behavior_event_backend_user` (`backend_user_id`,`event_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户核心行为埋点事件明细';
 /*!40101 SET character_set_client = @saved_cs_client */;

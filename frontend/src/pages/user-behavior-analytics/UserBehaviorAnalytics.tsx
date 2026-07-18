@@ -26,41 +26,25 @@ const STAT_COLUMNS: {
   dataIndex: keyof UserBehaviorAnalyticsRow;
   width?: number;
 }[] = [
-  { title: "app 应用打开数", dataIndex: "h5AppOpenCount" },
-  {
-    title: "pc 总控台操作数",
-    dataIndex: "pcMasterConsoleOperationCount",
-    width: 160,
-  },
-  { title: "配置按钮点击数", dataIndex: "h5ConfigButtonClickCount" },
-  {
-    title: "配置弹窗确认数",
-    dataIndex: "h5ConfigModalConfirmClickCount",
-    width: 150,
-  },
-  {
-    title: "配置弹窗取消数",
-    dataIndex: "h5ConfigModalCancelClickCount",
-    width: 150,
-  },
-  { title: "算力tab点击数", dataIndex: "h5PowerTabClickCount" },
-  { title: "日志tab点击数", dataIndex: "h5LogTabClickCount" },
-  { title: "客服tab点击数", dataIndex: "h5SupportTabClickCount" },
-  {
-    title: "首充GIF广告点击数",
-    dataIndex: "h5RechargeGifClickCount",
-    width: 160,
-  },
-  {
-    title: "算力立即支付点击数",
-    dataIndex: "h5PowerPayClickCount",
-    width: 170,
-  },
-  {
-    title: "兑换码点击数",
-    dataIndex: "h5RedemptionCodeClickCount",
-    width: 140,
-  },
+  { title: "H5 应用打开数", dataIndex: "h5AppOpenCount" },
+  { title: "H5 首页访问数", dataIndex: "h5HomePageViewCount" },
+  { title: "H5 日志页访问数", dataIndex: "h5LogPageViewCount" },
+  { title: "H5 算力页访问数", dataIndex: "h5PowerPageViewCount" },
+  { title: "H5 知识库访问数", dataIndex: "h5KnowledgePageViewCount", width: 160 },
+  { title: "H5 客服页访问数", dataIndex: "h5SupportPageViewCount" },
+  { title: "客服入口点击数", dataIndex: "h5SupportEntryClickCount" },
+  { title: "续费/活动点击数", dataIndex: "h5ExternalLinkClickCount" },
+  { title: "有效充值提交数", dataIndex: "h5RechargeSubmitClickCount" },
+  { title: "兑换码应用成功数", dataIndex: "h5RedemptionApplySuccessCount", width: 170 },
+  { title: "日志详情展开数", dataIndex: "h5LogDetailExpandCount" },
+  { title: "知识库关键操作数", dataIndex: "h5KnowledgeActionCount", width: 170 },
+  { title: "PC 回复日志查看数", dataIndex: "pcCommentLogViewCount", width: 170 },
+  { title: "PC 知识库查看数", dataIndex: "pcKnowledgeViewCount" },
+  { title: "H5 自动回复成功变更数", dataIndex: "h5AutoReplyChangeCount", width: 190 },
+  { title: "H5 差评处理成功变更数", dataIndex: "h5NegativeAppealChangeCount", width: 190 },
+  { title: "PC 自动回复成功变更数", dataIndex: "pcAutoReplyChangeCount", width: 190 },
+  { title: "PC 差评处理成功变更数", dataIndex: "pcNegativeAppealChangeCount", width: 190 },
+  { title: "系统自动关停数", dataIndex: "systemAutoDisableCount" },
 ];
 
 const UserBehaviorAnalytics: React.FC = () => {
@@ -209,7 +193,7 @@ const UserBehaviorAnalytics: React.FC = () => {
         columns={columns}
         dataSource={records}
         size={isCompact ? "small" : "middle"}
-        scroll={{ x: 2640 }}
+        scroll={{ x: 3880 }}
         pagination={{
           current,
           pageSize,

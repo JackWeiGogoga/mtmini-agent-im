@@ -13,6 +13,10 @@ public class UserBehaviorEvent {
 
     private String eventType;
 
+    private String clientEventId;
+
+    private String sessionId;
+
     private Long shopId;
 
     private String shopNameSnapshot;

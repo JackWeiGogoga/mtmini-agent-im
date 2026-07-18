@@ -22,11 +22,23 @@
 <script>
 import AppTabbar from "../../components/app-tabbar.vue";
 import AppSubpageHeader from "../../components/app-subpage-header.vue";
+import { reportMtH5PageView } from "../../utils/mt-auth";
 
 export default {
   components: {
     AppTabbar,
     AppSubpageHeader,
+  },
+  data() {
+    return {
+      pageEntrySource: "DIRECT",
+    };
+  },
+  onLoad(options) {
+    this.pageEntrySource = options?.entrySource || "DIRECT";
+  },
+  onShow() {
+    reportMtH5PageView("SUPPORT", this.pageEntrySource);
   },
 };
 </script>

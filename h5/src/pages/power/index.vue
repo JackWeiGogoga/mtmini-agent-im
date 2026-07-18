@@ -161,6 +161,7 @@ import {
   getMtH5PowerSummary,
   mockSuccessMtH5PowerRecharge,
   reportMtH5BehaviorEvent,
+  reportMtH5PageView,
 } from "../../utils/mt-auth";
 import { showErrorToast, showToast } from "../../utils/ui";
 
@@ -215,9 +216,11 @@ export default {
       paymentMessage: "",
       defaultPowerAmount: null,
       defaultPowerApplied: false,
+      pageEntrySource: "DIRECT",
     };
   },
   onLoad(options) {
+    this.pageEntrySource = options?.entrySource || "DIRECT";
     if (options?.rechargeNo) {
       this.activeRechargeNo = options.rechargeNo;
       this.paymentMessage = "支付结果确认中，请稍候...";
@@ -225,6 +228,7 @@ export default {
     this.defaultPowerAmount = normalizePowerAmountParam(options?.powerAmount);
   },
   onShow() {
+    reportMtH5PageView("POWER", this.pageEntrySource);
     this.loadSummary(this.appliedRedemptionCode);
     if (this.activeRechargeNo) {
       this.startPollingResult(this.activeRechargeNo, { silentPending: true });
@@ -408,7 +412,6 @@ export default {
       }
     },
     toggleRedemptionPanel() {
-      reportMtH5BehaviorEvent("H5_REDEMPTION_CODE_CLICK");
       this.showRedemptionPanel = !this.showRedemptionPanel;
     },
     handleRedemptionInput(event) {
@@ -482,6 +485,9 @@ export default {
         this.applyPowerSummary(summary);
         this.appliedRedemptionCode = code;
         this.redemptionStatusText = `兑换码 ${code} 已生效，本次充值按当前优惠口径结算`;
+        reportMtH5BehaviorEvent("H5_REDEMPTION_APPLY_RESULT", {
+          result: "SUCCESS",
+        });
         showToast("兑换码已自动应用");
       } catch (error) {
         if (
@@ -492,6 +498,9 @@ export default {
         }
         this.appliedRedemptionCode = "";
         this.redemptionStatusText = "兑换码无效，请核对后重新输入";
+        reportMtH5BehaviorEvent("H5_REDEMPTION_APPLY_RESULT", {
+          result: "FAILED",
+        });
         shouldRestoreDefaultSummary = true;
       } finally {
         this.isLoading = false;
@@ -549,11 +558,16 @@ export default {
       this.defaultPowerApplied = true;
     },
     async handlePay() {
-      reportMtH5BehaviorEvent("H5_POWER_PAY_CLICK");
       if (this.isPayDisabled) {
         showToast(this.validationMessage);
         return;
       }
+
+      reportMtH5BehaviorEvent("H5_RECHARGE_SUBMIT_CLICK", {
+        powerAmount: this.currentPowerAmount,
+        selectedPackage: Boolean(this.selectedPackageAmount),
+        hasRedemptionCode: Boolean(this.appliedRedemptionCode),
+      });
 
       this.isSubmitting = true;
       try {

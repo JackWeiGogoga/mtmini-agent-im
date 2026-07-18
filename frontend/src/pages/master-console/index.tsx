@@ -38,6 +38,7 @@ import {
   getMasterConsoleVisibleUsers,
   updateMasterConsoleShopOperationSettings,
 } from "@/services/master-console-api";
+import { reportAdminBehaviorEvent } from "@/services/user-behavior-analytics-api";
 import type {
   CommentReplyLogRecord,
   DashboardStatsRange,
@@ -448,6 +449,10 @@ const MasterConsole: React.FC = () => {
 
   const openLogDrawer = useCallback(
     async (record: MasterConsoleShopRow) => {
+      reportAdminBehaviorEvent("PC_COMMENT_LOG_VIEW", record.shopId, {
+        portalType: currentUser?.activePortal,
+        entrySource: "MASTER_CONSOLE",
+      });
       setLogShop(record);
       setLogDrawerOpen(true);
       setLogPageNum(1);
@@ -456,7 +461,7 @@ const MasterConsole: React.FC = () => {
       setLogTotal(0);
       await loadCommentReplyLogs(record, 1, 20);
     },
-    [loadCommentReplyLogs],
+    [currentUser?.activePortal, loadCommentReplyLogs],
   );
 
   const closeLogDrawer = useCallback(() => {
@@ -764,7 +769,13 @@ const MasterConsole: React.FC = () => {
             <Button
               type="link"
               icon={<DatabaseOutlined />}
-              onClick={() => navigate(`/merchant-knowledge?shopId=${record.shopId}`)}
+              onClick={() => {
+                reportAdminBehaviorEvent("PC_KNOWLEDGE_VIEW", record.shopId, {
+                  portalType: currentUser?.activePortal,
+                  entrySource: "MASTER_CONSOLE",
+                });
+                navigate(`/merchant-knowledge?shopId=${record.shopId}`);
+              }}
             >
               知识库
             </Button>
@@ -775,6 +786,7 @@ const MasterConsole: React.FC = () => {
     [
       activeRange.compareLabel,
       handleOperationSettingsChange,
+      currentUser?.activePortal,
       isCompact,
       navigate,
       openLogDrawer,
