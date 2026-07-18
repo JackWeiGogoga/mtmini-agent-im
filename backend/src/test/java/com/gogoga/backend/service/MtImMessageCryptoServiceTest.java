@@ -3,12 +3,6 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.config.MtProperties;
 import org.junit.jupiter.api.Test;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,8 +19,16 @@ class MtImMessageCryptoServiceTest {
             String encrypted = service.encrypt(plaintext);
 
             assertFalse(encrypted.contains(plaintext));
-            assertEquals(plaintext, decrypt(encrypted, TEST_SECRET));
+            assertEquals(plaintext, service.decrypt(encrypted));
         }
+    }
+
+    @Test
+    void decryptsFixedAesCbcBase64Vector() {
+        MtImMessageCryptoService service = service(TEST_SECRET);
+
+        assertEquals("用户回调消息",
+                service.decrypt("KPN5uYzYbqeazrLxJMECZh8Dk20HStEoXTfAN4Uj09A="));
     }
 
     @Test
@@ -40,6 +42,8 @@ class MtImMessageCryptoServiceTest {
         MtImMessageCryptoService service = service(TEST_SECRET);
 
         assertThrows(IllegalArgumentException.class, () -> service.encrypt(" "));
+        assertThrows(IllegalArgumentException.class, () -> service.decrypt(" "));
+        assertThrows(IllegalStateException.class, () -> service.decrypt("not-base64"));
         assertEquals(service.sha256("消息🙏"), service.sha256("消息🙏"));
         assertEquals(64, service.sha256("消息🙏").length());
     }
@@ -48,12 +52,5 @@ class MtImMessageCryptoServiceTest {
         MtProperties properties = new MtProperties();
         properties.getComment().getImFollowUp().setImSecret(secret);
         return new MtImMessageCryptoService(properties);
-    }
-
-    private String decrypt(String encrypted, String secret) throws Exception {
-        byte[] key = secret.getBytes(StandardCharsets.UTF_8);
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(key));
-        return new String(cipher.doFinal(Base64.getDecoder().decode(encrypted)), StandardCharsets.UTF_8);
     }
 }

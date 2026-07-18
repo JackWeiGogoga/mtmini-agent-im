@@ -38,6 +38,21 @@ public class MtImMessageCryptoService {
         }
     }
 
+    public String decrypt(String ciphertext) {
+        if (StringUtils.isBlank(ciphertext)) {
+            throw new IllegalArgumentException("IM_MESSAGE_CIPHERTEXT_EMPTY");
+        }
+        byte[] secret = resolveSecretBytes();
+        try {
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(secret, "AES"), new IvParameterSpec(secret));
+            byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(ciphertext));
+            return new String(decrypted, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new IllegalStateException("IM_MESSAGE_DECRYPT_FAILED", e);
+        }
+    }
+
     public String sha256(String content) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
