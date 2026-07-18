@@ -104,7 +104,7 @@
 
           <view class="current-bid-main ai-current-bid-main">
             <view class="current-bid-title-wrap">
-              <text class="current-bid-title">差评群聊/申诉</text>
+              <text class="current-bid-title">差评群聊+申诉</text>
               <text class="current-bid-subtitle"
                 >（已申诉{{ repliedBadCommentCount }}条）</text
               >
