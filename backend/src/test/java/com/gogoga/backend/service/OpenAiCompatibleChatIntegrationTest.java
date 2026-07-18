@@ -3,6 +3,8 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.client.OpenAiCompatibleClientFactory;
 import com.gogoga.backend.config.OpenAiCompatibleProperties;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.service.llm.LlmClusterRateLimiter;
+import com.gogoga.backend.service.llm.LlmRateLimitRetryAfterParser;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import okhttp3.mockwebserver.MockResponse;
@@ -14,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 class OpenAiCompatibleChatIntegrationTest {
 
@@ -46,7 +49,7 @@ class OpenAiCompatibleChatIntegrationTest {
                             """));
 
             OpenAiCompatibleProperties properties = new OpenAiCompatibleProperties();
-            OpenAiCompatibleChatService service = new OpenAiCompatibleChatService(properties, new OpenAiCompatibleClientFactory());
+            OpenAiCompatibleChatService service = service(properties);
             String baseUrl = server.url("/").toString();
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model("gpt-4o-mini")
@@ -73,7 +76,7 @@ class OpenAiCompatibleChatIntegrationTest {
                     .setBody("not-json"));
 
             OpenAiCompatibleProperties properties = new OpenAiCompatibleProperties();
-            OpenAiCompatibleChatService service = new OpenAiCompatibleChatService(properties, new OpenAiCompatibleClientFactory());
+            OpenAiCompatibleChatService service = service(properties);
             String baseUrl = server.url("/").toString();
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model("gpt-4o-mini")
@@ -85,5 +88,14 @@ class OpenAiCompatibleChatIntegrationTest {
 
             assertEquals(502, exception.getCode());
         }
+    }
+
+    private OpenAiCompatibleChatService service(OpenAiCompatibleProperties properties) {
+        return new OpenAiCompatibleChatService(
+                properties,
+                new OpenAiCompatibleClientFactory(),
+                mock(LlmClusterRateLimiter.class),
+                new LlmRateLimitRetryAfterParser()
+        );
     }
 }

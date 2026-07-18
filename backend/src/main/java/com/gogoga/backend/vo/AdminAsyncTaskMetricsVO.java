@@ -37,6 +37,8 @@ public class AdminAsyncTaskMetricsVO implements Serializable {
 
         private Long pendingCount;
 
+        private LocalDateTime oldestPendingAt;
+
         private Long readyCount;
 
         private Long processingCount;

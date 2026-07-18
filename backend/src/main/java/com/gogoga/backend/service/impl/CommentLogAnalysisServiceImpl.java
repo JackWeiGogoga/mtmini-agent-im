@@ -10,10 +10,14 @@ import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
 import com.gogoga.backend.mapper.MtCommentMapper;
+import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.CommentLogAnalysisService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitContext;
+import com.gogoga.backend.service.async.MtCommentLogAnalysisTaskPayload;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.completions.CompletionUsage;
@@ -43,6 +47,32 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
     private final OpenAiCompatibleChatService openAiCompatibleChatService;
     private final MtPowerConsumeService mtPowerConsumeService;
     private final MtCommentMapper mtCommentMapper;
+    private final MtShopMapper mtShopMapper;
+
+    @Override
+    public void executeCommentLogAnalysisTask(MtCommentLogAnalysisTaskPayload payload) {
+        if (payload == null || payload.getShopId() == null || payload.getCommentId() == null) {
+            throw new IllegalArgumentException("COMMENT_LOG_ANALYSIS_PAYLOAD_INVALID");
+        }
+        MtComment comment = mtCommentMapper.selectByCommentId(payload.getCommentId());
+        if (comment == null) {
+            return;
+        }
+        if (!payload.getShopId().equals(comment.getShopId())) {
+            throw new IllegalStateException("COMMENT_LOG_ANALYSIS_SHOP_MISMATCH");
+        }
+        if (!StringUtils.equals(comment.getAutoReplyStatus(), "SUCCESS")) {
+            throw new IllegalStateException("COMMENT_LOG_ANALYSIS_AUTO_REPLY_NOT_SUCCESS");
+        }
+        if (StringUtils.equals(comment.getAnalysisStatus(), "SUCCESS")) {
+            return;
+        }
+        MtShop shop = mtShopMapper.selectById(payload.getShopId());
+        if (shop == null) {
+            throw new IllegalStateException("COMMENT_LOG_ANALYSIS_SHOP_MISSING");
+        }
+        generateAfterAutoReply(shop, comment);
+    }
 
     @Override
     public void generateAfterAutoReply(MtShop shop, MtComment comment) {
@@ -76,10 +106,13 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
             );
             log.info("评论日志 AI 分析生成完成，shopId={}, commentId={}, durationMs={}",
                     shop.getId(), comment.getCommentId(), durationMs(startNanos));
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             String error = StringUtils.left(StringUtils.defaultIfBlank(e.getMessage(), "COMMENT_LOG_ANALYSIS_FAILED"), 1000);
             mtCommentMapper.markAnalysisFailed(comment.getId(), error, LocalDateTime.now());
             log.warn("评论日志 AI 分析生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+            throw new IllegalStateException(error, e);
         }
     }
 
@@ -88,7 +121,7 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
         long startNanos = System.nanoTime();
         CommentLogAnalysisPreviewDTO preview = new CommentLogAnalysisPreviewDTO();
         try {
-            AnalysisResponse response = callModel(comment);
+            AnalysisResponse response = LlmRateLimitContext.interactive(() -> callModel(comment));
             preview.setAnalysisText(StringUtils.left(StringUtils.trim(response.content), MAX_ANALYSIS_TEXT_LENGTH));
             preview.setModel(response.model);
             preview.setPromptTokens(response.promptTokens);
@@ -98,6 +131,11 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
             preview.setDurationMs(durationMs(startNanos));
             log.info("评论日志 AI 分析预览生成完成，commentId={}, durationMs={}",
                     comment == null ? null : comment.getCommentId(), preview.getDurationMs());
+        } catch (LlmCapacityDeferredException e) {
+            preview.setErrorMessage("模型繁忙，请稍后重试");
+            preview.setDurationMs(durationMs(startNanos));
+            log.info("评论日志 AI 分析预览等待模型容量，commentId={}",
+                    comment == null ? null : comment.getCommentId());
         } catch (Exception e) {
             preview.setErrorMessage(StringUtils.left(StringUtils.defaultIfBlank(e.getMessage(), "COMMENT_LOG_ANALYSIS_PREVIEW_FAILED"), 1000));
             preview.setDurationMs(durationMs(startNanos));
@@ -118,6 +156,7 @@ public class CommentLogAnalysisServiceImpl implements CommentLogAnalysisService 
                 .addUserMessage(prompt.getContent())
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
+                knowledge.getModelProvider(),
                 knowledge.getModelBaseUrl(),
                 knowledge.getModelApiKey(),
                 params

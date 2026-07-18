@@ -23,6 +23,7 @@
     <resultMap id="BacklogSummaryResultMap" type="com.gogoga.backend.entity.mt.MtAsyncTaskBacklogSummary">
         <result column="task_type" property="taskType"/>
         <result column="pending_count" property="pendingCount"/>
+        <result column="oldest_pending_at" property="oldestPendingAt"/>
         <result column="ready_count" property="readyCount"/>
         <result column="processing_count" property="processingCount"/>
         <result column="success_count" property="successCount"/>
@@ -66,6 +67,29 @@
           AND status = 'PENDING'
           AND available_at &lt;= #{availableAt}
         ORDER BY available_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectExecutableFairIds" resultType="java.lang.Long">
+        SELECT id
+        FROM (
+            SELECT id,
+                   available_at,
+                   COALESCE(NULLIF(scope_key, ''), CONCAT('__task__', id)) AS fair_scope_key,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY COALESCE(NULLIF(scope_key, ''), CONCAT('__task__', id))
+                       ORDER BY available_at ASC, id ASC
+                   ) AS scope_rank
+            FROM mt_async_task
+            WHERE task_type = #{taskType}
+              AND status = 'PENDING'
+              AND available_at &lt;= #{availableAt}
+        ) ranked
+        ORDER BY scope_rank ASC,
+                 CASE WHEN fair_scope_key &gt; #{afterScopeKey} THEN 0 ELSE 1 END ASC,
+                 fair_scope_key ASC,
+                 available_at ASC,
+                 id ASC
         LIMIT #{limit}
     </select>
 
@@ -148,6 +172,7 @@
     <select id="selectBacklogSummary" resultMap="BacklogSummaryResultMap">
         SELECT task_type,
                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+               MIN(CASE WHEN status = 'PENDING' THEN create_time END) AS oldest_pending_at,
                SUM(CASE WHEN status = 'PENDING' AND available_at &lt;= #{currentTime} THEN 1 ELSE 0 END) AS ready_count,
                SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END) AS processing_count,
                SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS success_count,

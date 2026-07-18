@@ -16,6 +16,10 @@ public final class MtCommentAsyncTaskKeys {
         return "comment-complaint:" + commentId;
     }
 
+    public static String logAnalysis(Long commentId) {
+        return "comment-log-analysis:" + commentId;
+    }
+
     public static String imFollowUp(Long commentId) {
         return "comment-im-follow-up:" + commentId;
     }

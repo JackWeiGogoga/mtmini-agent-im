@@ -13,6 +13,11 @@ import org.springframework.stereotype.Component;
 public class OpenAiCompatibleProperties {
 
     /**
+     * 默认模型供应商标识。
+     */
+    private String defaultProvider = "OPENAI";
+
+    /**
      * 默认兼容服务根地址，支持不带 /v1 的根地址
      */
     private String defaultBaseUrl = "https://api.openai.com";

@@ -8,6 +8,7 @@ import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.service.CommentImMessageComplianceService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionMessage;
@@ -55,7 +56,7 @@ class CommentImMessageGenerationServiceImplTest {
     @Test
     void returnsCleanModelMessageWhenOutputIsValid() {
         when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
-        when(chatService.createChatCompletion(any(), any(), any()))
+        when(chatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(completion("您好，看到您反馈配送较慢，很抱歉影响了体验🙏麻烦提供对应订单信息和方便联系的手机号码，我们尽快核实。"));
 
         CommentImMessageGenerationResultDTO result = service.generate(comment());
@@ -68,7 +69,7 @@ class CommentImMessageGenerationServiceImplTest {
     @Test
     void acceptsModelMessageWithCompensationConditionedOnVerification() {
         when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
-        when(chatService.createChatCompletion(any(), any(), any()))
+        when(chatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(completion("亲，很抱歉给您带来不好的体验🙏请提供订单号和联系号码，方便我们核实后给您补偿处理。"));
 
         CommentImMessageGenerationResultDTO result = service.generate(comment());
@@ -80,7 +81,7 @@ class CommentImMessageGenerationServiceImplTest {
     @Test
     void usesConfiguredStaticFallbackOnceWhenModelFailsOrOutputIsForbidden() {
         when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
-        when(chatService.createChatCompletion(any(), any(), any()))
+        when(chatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(completion("可以给您补偿优惠券🙏"));
 
         CommentImMessageGenerationResultDTO result = service.generate(comment());
@@ -88,6 +89,15 @@ class CommentImMessageGenerationServiceImplTest {
         assertEquals("FALLBACK_STATIC", result.getMessageSource());
         assertEquals("我是售后处理专员：亲~收到了您的一条差评[配送太慢了]，抱歉给您带来不好的体验，能提供一下订单号和联系号码吗？方便我核实后给您补偿处理☺️", result.getMessageContent());
         assertEquals(1000, result.getPowerAmount());
+    }
+
+    @Test
+    void doesNotConvertCapacityWaitToStaticFallback() {
+        when(systemPromptService.render(anyString(), anyMap(), anyString())).thenReturn(prompt());
+        when(chatService.createChatCompletion(any(), any(), any(), any()))
+                .thenThrow(new LlmCapacityDeferredException(1200L));
+
+        assertThrows(LlmCapacityDeferredException.class, () -> service.generate(comment()));
     }
 
     @Test

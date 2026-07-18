@@ -18,6 +18,7 @@ import com.gogoga.backend.service.async.MtCommentAsyncTaskKeys;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtCommentLogAnalysisTaskPayload;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -55,7 +56,6 @@ public class MtCommentAutoReplyService {
     private final MtAsyncTaskService mtAsyncTaskService;
     private final ShopOperationSettingsService shopOperationSettingsService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
-    private final CommentLogAnalysisService commentLogAnalysisService;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -304,7 +304,7 @@ public class MtCommentAutoReplyService {
             comment.setAutoReplyPowerAmount(replyResult.getPowerAmount());
             comment.setAutoReplyDurationMs(replyResult.getReplyDurationMs());
             comment.setImageSummaryText(replyResult.getImageSummaryText());
-            commentLogAnalysisService.generateAfterAutoReply(shop, comment);
+            enqueueCommentLogAnalysisTask(shop, comment);
             enqueueNegativeCommentPostTasksIfNeeded(shop, comment);
         } catch (MtSdkException e) {
             mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(e.getMessage(), 1000), LocalDateTime.now());
@@ -411,6 +411,28 @@ public class MtCommentAutoReplyService {
             );
         } catch (Exception e) {
             log.error("差评IM跟进任务入队失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
+        }
+    }
+
+    private void enqueueCommentLogAnalysisTask(MtShop shop, MtComment comment) {
+        if (shop == null || shop.getId() == null || comment == null || comment.getCommentId() == null) {
+            return;
+        }
+        try {
+            MtCommentLogAnalysisTaskPayload payload = new MtCommentLogAnalysisTaskPayload();
+            payload.setShopId(shop.getId());
+            payload.setCommentId(comment.getCommentId());
+            mtAsyncTaskService.enqueueTask(
+                    MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS,
+                    MtCommentAsyncTaskKeys.logAnalysis(comment.getCommentId()),
+                    String.valueOf(shop.getId()),
+                    payload,
+                    LocalDateTime.now(),
+                    mtProperties.getAsyncTask().getCommentLogAnalysis().getMaxRetryCount()
+            );
+        } catch (Exception e) {
+            log.error("评论日志AI分析任务入队失败，shopId={}, commentId={}",
+                    shop.getId(), comment.getCommentId(), e);
         }
     }
 

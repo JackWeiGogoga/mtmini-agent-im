@@ -8,8 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-
 /**
  * 美团订阅订单拉取任务
  *
@@ -22,8 +20,6 @@ import java.time.Duration;
 @ConditionalOnProperty(name = "scheduled.enabled", havingValue = "true", matchIfMissing = true)
 public class MtAppOrderPullTask {
 
-    private static final Duration LOCK_LEASE_DURATION = Duration.ofHours(1);
-
     private final MtAppOrderService mtAppOrderService;
     private final RedisDistributedLockService redisDistributedLockService;
 
@@ -32,16 +28,22 @@ public class MtAppOrderPullTask {
      */
     @Scheduled(cron = "${mt.app-order.pull-cron:0 0/30 * * * ?}")
     public void pullRecentOrders() {
-        redisDistributedLockService.tryRun("MtAppOrderPullTask", LOCK_LEASE_DURATION, () -> {
-            long startTime = System.currentTimeMillis();
-            log.info("定时任务开始执行，task=MtAppOrderPullTask");
-            try {
-                mtAppOrderService.pullRecentOrders();
-                log.info("定时任务执行完成，task=MtAppOrderPullTask, durationMs={}", System.currentTimeMillis() - startTime);
-            } catch (RuntimeException e) {
-                log.error("定时任务执行失败，task=MtAppOrderPullTask, durationMs={}", System.currentTimeMillis() - startTime, e);
-                throw e;
-            }
-        });
+        redisDistributedLockService.tryRun(
+                MtAppOrderService.PULL_LOCK_NAME,
+                MtAppOrderService.PULL_LOCK_LEASE_DURATION,
+                () -> {
+                    long startTime = System.currentTimeMillis();
+                    log.info("定时任务开始执行，task=MtAppOrderPullTask");
+                    try {
+                        mtAppOrderService.pullRecentOrders();
+                        log.info("定时任务执行完成，task=MtAppOrderPullTask, durationMs={}",
+                                System.currentTimeMillis() - startTime);
+                    } catch (RuntimeException e) {
+                        log.error("定时任务执行失败，task=MtAppOrderPullTask, durationMs={}",
+                                System.currentTimeMillis() - startTime, e);
+                        throw e;
+                    }
+                }
+        );
     }
 }

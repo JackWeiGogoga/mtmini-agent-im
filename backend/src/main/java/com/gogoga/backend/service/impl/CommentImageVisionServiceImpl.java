@@ -16,6 +16,10 @@ import com.gogoga.backend.mapper.MtCommentImageSummaryMapper;
 import com.gogoga.backend.service.CommentImageVisionService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitContext;
+import com.gogoga.backend.service.llm.LlmRateLimitDescriptor;
+import com.gogoga.backend.service.llm.LlmRateLimitedRestExecutor;
 import com.gogoga.backend.util.CommentImageUrlUtil;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +53,7 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
     private final MtCommentImageSummaryMapper mtCommentImageSummaryMapper;
     private final MtPowerConsumeService mtPowerConsumeService;
     private final SystemPromptService systemPromptService;
+    private final LlmRateLimitedRestExecutor rateLimitedRestExecutor;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -90,6 +95,8 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
             return toResult(success, urls);
         } catch (PowerInsufficientException e) {
             throw e;
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("评价图片识别失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
             return markFailure(record, urls, StringUtils.defaultIfBlank(e.getMessage(), "VISION_ERROR"));
@@ -118,16 +125,23 @@ public class CommentImageVisionServiceImpl implements CommentImageVisionService 
         int timeoutMillis = (int) Math.max(1000L, knowledge.getVisionTimeoutSeconds() * 1000L);
         requestFactory.setConnectTimeout(timeoutMillis);
         requestFactory.setReadTimeout(timeoutMillis);
-        String response = RestClient.builder()
+        RestClient restClient = RestClient.builder()
                 .requestFactory(requestFactory)
-                .build()
-                .post()
+                .build();
+        LlmRateLimitDescriptor descriptor = new LlmRateLimitDescriptor(
+                knowledge.getVisionProvider(),
+                knowledge.getVisionModelApiKey(),
+                knowledge.getVisionModel(),
+                "vision-chat-completion",
+                LlmRateLimitContext.isInteractive()
+        );
+        String response = rateLimitedRestExecutor.execute(descriptor, () -> restClient.post()
                 .uri(endpoint)
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + knowledge.getVisionModelApiKey())
                 .body(requestBody)
                 .retrieve()
-                .body(String.class);
+                .body(String.class));
         return parseVisionResponse(response);
     }
 

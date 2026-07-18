@@ -5,6 +5,10 @@ import com.gogoga.backend.client.OpenAiCompatibleClientFactory;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.service.CommentReplyEmbeddingService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitContext;
+import com.gogoga.backend.service.llm.LlmRateLimitDescriptor;
+import com.gogoga.backend.service.llm.LlmRateLimitedRestExecutor;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +30,7 @@ public class OpenAiCompatibleEmbeddingServiceImpl implements CommentReplyEmbeddi
 
     private final MtProperties mtProperties;
     private final OpenAiCompatibleClientFactory clientFactory;
+    private final LlmRateLimitedRestExecutor rateLimitedRestExecutor;
 
     @Override
     public float[] embed(String text) {
@@ -54,15 +59,24 @@ public class OpenAiCompatibleEmbeddingServiceImpl implements CommentReplyEmbeddi
                 "encoding_format", "float"
         );
         try {
-            String response = RestClient.create()
-                    .post()
+            RestClient restClient = RestClient.create();
+            LlmRateLimitDescriptor descriptor = new LlmRateLimitDescriptor(
+                    knowledge.getEmbeddingProvider(),
+                    apiKeyConfig,
+                    knowledge.getEmbeddingModel(),
+                    "embedding",
+                    LlmRateLimitContext.isInteractive()
+            );
+            String response = rateLimitedRestExecutor.execute(descriptor, () -> restClient.post()
                     .uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + apiKeyConfig)
                     .body(requestBody)
                     .retrieve()
-                    .body(String.class);
+                    .body(String.class));
             return parseEmbedding(response, knowledge.getEmbeddingDim());
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (BusinessException e) {
             throw e;
         } catch (RuntimeException e) {

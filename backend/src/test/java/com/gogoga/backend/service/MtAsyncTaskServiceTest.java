@@ -15,6 +15,7 @@ import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -198,6 +199,23 @@ class MtAsyncTaskServiceTest {
         verify(mtAsyncTaskMapper).insert(taskCaptor.capture());
         assertEquals("PENDING", taskCaptor.getValue().getStatus());
         assertEquals("record#1", taskCaptor.getValue().getBizKey());
+    }
+
+    @Test
+    void shouldPassScopeCursorToFairSelection() {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 18, 10, 0);
+        when(mtAsyncTaskMapper.selectExecutableFairIds(
+                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY.name(), now, "shop-100", 2
+        )).thenReturn(List.of(11L, 12L));
+
+        List<Long> taskIds = mtAsyncTaskService.selectExecutableFairTaskIds(
+                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+                "shop-100",
+                2,
+                now
+        );
+
+        assertEquals(List.of(11L, 12L), taskIds);
     }
 
     @Test

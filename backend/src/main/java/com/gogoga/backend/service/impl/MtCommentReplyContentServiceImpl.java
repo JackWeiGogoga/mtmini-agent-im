@@ -29,6 +29,8 @@ import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.MtPowerAccountService;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitContext;
 import com.gogoga.backend.util.JsonUtil;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
@@ -81,7 +83,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
 
     @Override
     public CommentReplyContentResultDTO previewReply(MtShop shop, MtComment comment) {
-        return generateReplyInternal(shop, comment, false);
+        return LlmRateLimitContext.interactive(() -> generateReplyInternal(shop, comment, false));
     }
 
     private CommentReplyContentResultDTO generateReplyInternal(MtShop shop, MtComment comment, boolean persistGeneration) {
@@ -168,6 +170,8 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                     comment,
                     PowerInsufficientException.REASON_CODE
             );
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             log.error("大模型评论回复生成失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
             return finishResult(attachImageSummary(buildOfficialResult(shop, comment, sentiment, CommentReplySourceEnum.FALLBACK_OFFICIAL, "LLM_ERROR", e.getMessage(), persistGeneration, durationMs(startNanos)), imageSummary), startNanos, shop, comment, "LLM_ERROR");
@@ -308,6 +312,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 .addUserMessage(buildSensitiveRewritePrompt(comment, imageSummary, hits, initialReply, hit))
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
+                knowledge.getModelProvider(),
                 knowledge.getModelBaseUrl(),
                 knowledge.getModelApiKey(),
                 params
@@ -368,6 +373,7 @@ public class MtCommentReplyContentServiceImpl implements MtCommentReplyContentSe
                 .addUserMessage(buildUserPrompt(comment, imageSummary, hits))
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
+                knowledge.getModelProvider(),
                 knowledge.getModelBaseUrl(),
                 knowledge.getModelApiKey(),
                 params

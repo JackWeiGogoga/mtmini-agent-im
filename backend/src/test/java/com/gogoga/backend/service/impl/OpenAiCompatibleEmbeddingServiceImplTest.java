@@ -3,6 +3,10 @@ package com.gogoga.backend.service.impl;
 import com.gogoga.backend.client.OpenAiCompatibleClientFactory;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.service.llm.LlmClusterRateLimiter;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitRetryAfterParser;
+import com.gogoga.backend.service.llm.LlmRateLimitedRestExecutor;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -12,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 class OpenAiCompatibleEmbeddingServiceImplTest {
 
@@ -40,7 +47,8 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
             properties.getComment().getKnowledge().setEmbeddingDim(3);
             OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
                     properties,
-                    new OpenAiCompatibleClientFactory()
+                    new OpenAiCompatibleClientFactory(),
+                    rateLimitedRestExecutor()
             );
 
             float[] embedding = service.embed("衣服的质量杠杠的");
@@ -65,12 +73,36 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
         properties.getComment().getKnowledge().setEmbeddingDim(1024);
         OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
                 properties,
-                new OpenAiCompatibleClientFactory()
+                new OpenAiCompatibleClientFactory(),
+                rateLimitedRestExecutor()
         );
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> service.embed(" "));
 
         assertEquals(400, exception.getCode());
+    }
+
+    @Test
+    void preservesCapacityDeferredException() {
+        MtProperties properties = new MtProperties();
+        properties.getComment().getKnowledge().setEmbeddingBaseUrl("https://example.com/compatible-mode/v1");
+        properties.getComment().getKnowledge().setEmbeddingApiKey("dashscope-key");
+        LlmRateLimitedRestExecutor executor = mock(LlmRateLimitedRestExecutor.class);
+        when(executor.execute(any(), any())).thenThrow(new LlmCapacityDeferredException(1200L));
+        OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
+                properties,
+                new OpenAiCompatibleClientFactory(),
+                executor
+        );
+
+        assertThrows(LlmCapacityDeferredException.class, () -> service.embed("评价知识"));
+    }
+
+    private LlmRateLimitedRestExecutor rateLimitedRestExecutor() {
+        return new LlmRateLimitedRestExecutor(
+                mock(LlmClusterRateLimiter.class),
+                new LlmRateLimitRetryAfterParser()
+        );
     }
 }

@@ -175,6 +175,16 @@ public class MtProperties {
         private int executorQueueCapacity = 200;
 
         /**
+         * 每节点 LLM 任务执行并发；待执行任务保留在数据库。
+         */
+        private int llmExecutorConcurrency = 2;
+
+        /**
+         * LLM 任务类型调度权重。
+         */
+        private LlmTaskWeights llmTaskWeights = new LlmTaskWeights();
+
+        /**
          * 授权后同步权益任务策略
          */
         private TaskPolicy authSyncRights = new TaskPolicy();
@@ -193,6 +203,11 @@ public class MtProperties {
          * 评价自动回复任务策略
          */
         private TaskPolicy commentAutoReply = new TaskPolicy();
+
+        /**
+         * 评论日志 AI 分析任务策略。
+         */
+        private TaskPolicy commentLogAnalysis = new TaskPolicy();
 
         /**
          * 差评自动投诉任务策略
@@ -219,6 +234,15 @@ public class MtProperties {
             policy.setMaxRetryCount(0);
             return policy;
         }
+    }
+
+    @Data
+    public static class LlmTaskWeights {
+        private int commentAutoReply = 5;
+        private int commentAutoImFollowUp = 2;
+        private int commentAutoComplaint = 2;
+        private int commentLogAnalysis = 1;
+        private int knowledgeDocumentParse = 1;
     }
 
     @Data
@@ -459,6 +483,11 @@ public class MtProperties {
         private int authGrantPowerAmount = 800000;
 
         /**
+         * Chat 模型供应商。
+         */
+        private String modelProvider = "TOKENHUB";
+
+        /**
          * Chat OpenAI-compatible base URL。
          */
         private String modelBaseUrl = "https://tokenhub.tencentmaas.com/v1";
@@ -507,6 +536,11 @@ public class MtProperties {
          * 是否启用评价图片多模态识别。
          */
         private boolean visionEnabled = true;
+
+        /**
+         * 图片识别模型供应商。
+         */
+        private String visionProvider = "TOKENHUB";
 
         /**
          * 图片识别 OpenAI-compatible base URL。

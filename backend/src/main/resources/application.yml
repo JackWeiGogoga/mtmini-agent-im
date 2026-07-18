@@ -93,6 +93,28 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
 
+llm:
+  openai-compatible:
+    default-provider: ${LLM_OPENAI_COMPATIBLE_DEFAULT_PROVIDER:OPENAI}
+    default-base-url: ${LLM_OPENAI_COMPATIBLE_DEFAULT_BASE_URL:https://api.lkeap.cloud.tencent.com/v1}
+    default-api-key: ${LLM_OPENAI_COMPATIBLE_DEFAULT_API_KEY:}
+  rate-limit:
+    enabled: ${LLM_RATE_LIMIT_ENABLED:true}
+    observe-only: ${LLM_RATE_LIMIT_OBSERVE_ONLY:false}
+    default-effective-rpm: ${LLM_RATE_LIMIT_DEFAULT_EFFECTIVE_RPM:30}
+    default-burst: ${LLM_RATE_LIMIT_DEFAULT_BURST:1}
+    short-wait-millis: ${LLM_RATE_LIMIT_SHORT_WAIT_MILLIS:5000}
+    max-wait-millis: ${LLM_RATE_LIMIT_MAX_WAIT_MILLIS:120000}
+    interactive-max-wait-millis: ${LLM_RATE_LIMIT_INTERACTIVE_MAX_WAIT_MILLIS:2000}
+    default-cooldown-seconds: ${LLM_RATE_LIMIT_DEFAULT_COOLDOWN_SECONDS:60}
+    state-ttl-seconds: ${LLM_RATE_LIMIT_STATE_TTL_SECONDS:180}
+    reschedule-jitter-millis: ${LLM_RATE_LIMIT_RESCHEDULE_JITTER_MILLIS:3000}
+    rules:
+      - provider: TOKENHUB
+        model: deepseek-v4-flash
+        effective-rpm: ${LLM_RATE_LIMIT_TOKENHUB_DEEPSEEK_V4_FLASH_RPM:50}
+        burst: ${LLM_RATE_LIMIT_TOKENHUB_DEEPSEEK_V4_FLASH_BURST:1}
+
 oauth:
   success-url: ${OAUTH_SUCCESS_URL:http://localhost:5173}
   google:
@@ -152,7 +174,7 @@ mt:
       fingerprint-key: ${MT_TOKEN_HISTORY_FINGERPRINT_KEY:}
   app-order:
     pull-cron: ${MT_APP_ORDER_PULL_CRON:0 0/30 * * * ?}
-    app-id: ${MT_APP_ORDER_APP_ID:111}
+    app-id: ${MT_APP_ORDER_APP_ID:154}
     page-size: ${MT_APP_ORDER_PAGE_SIZE:100}
     lookback-seconds: ${MT_APP_ORDER_LOOKBACK_SECONDS:172800}
   async-task:
@@ -165,6 +187,13 @@ mt:
     executor-core-pool-size: ${MT_ASYNC_TASK_EXECUTOR_CORE_POOL_SIZE:4}
     executor-max-pool-size: ${MT_ASYNC_TASK_EXECUTOR_MAX_POOL_SIZE:8}
     executor-queue-capacity: ${MT_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
+    llm-executor-concurrency: ${MT_ASYNC_TASK_LLM_EXECUTOR_CONCURRENCY:2}
+    llm-task-weights:
+      comment-auto-reply: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_REPLY:5}
+      comment-auto-im-follow-up: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_IM_FOLLOW_UP:2}
+      comment-auto-complaint: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_COMPLAINT:2}
+      comment-log-analysis: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_LOG_ANALYSIS:1}
+      knowledge-document-parse: ${MT_ASYNC_TASK_LLM_WEIGHT_KNOWLEDGE_DOCUMENT_PARSE:1}
     cleanup:
       enabled: ${MT_ASYNC_TASK_CLEANUP_ENABLED:false}
       delay-ms: ${MT_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
@@ -192,6 +221,11 @@ mt:
       timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_TIMEOUT_SECONDS:180}
       initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_BACKOFF_SECONDS:900}
+    comment-log-analysis:
+      max-retry-count: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_MAX_BACKOFF_SECONDS:900}
     comment-auto-complaint:
       max-retry-count: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_MAX_RETRY_COUNT:3}
       timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_TIMEOUT_SECONDS:180}
@@ -237,6 +271,7 @@ mt:
       min-context-cosine-score: ${MT_COMMENT_KNOWLEDGE_MIN_CONTEXT_COSINE_SCORE:0.75}
       rag-balance-threshold: ${MT_COMMENT_KNOWLEDGE_RAG_BALANCE_THRESHOLD:10000}
       auth-grant-power-amount: ${MT_COMMENT_KNOWLEDGE_AUTH_GRANT_POWER_AMOUNT:${POWER_NEW_AUTHORIZED_SHOP_GRANT_AMOUNT:800000}}
+      model-provider: ${MT_COMMENT_KNOWLEDGE_MODEL_PROVIDER:TOKENHUB}
       model-base-url: ${MT_COMMENT_KNOWLEDGE_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
       model-api-key: ${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}
       chat-model: ${MT_COMMENT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}
@@ -247,6 +282,7 @@ mt:
       embedding-dim: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_DIM:1024}
       document-key-prefix: ${MT_COMMENT_KNOWLEDGE_DOCUMENT_KEY_PREFIX:comment-knowledge/documents}
       vision-enabled: ${MT_COMMENT_KNOWLEDGE_VISION_ENABLED:true}
+      vision-provider: ${MT_COMMENT_KNOWLEDGE_VISION_PROVIDER:TOKENHUB}
       vision-model-base-url: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
       vision-model-api-key: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_API_KEY:${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}}
       vision-model: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL:qwen3.5-flash}
@@ -326,8 +362,3 @@ power:
     notify-url: ${POWER_WECHAT_PAY_NOTIFY_URL:http://localhost:8080/api/callbacks/wechat/pay}
     wap-name: ${POWER_WECHAT_PAY_WAP_NAME:算力充值}
     wap-url: ${POWER_WECHAT_PAY_WAP_URL:http://localhost:5173/#/pages/power/index}
-
-llm:
-  openai-compatible:
-    default-base-url: ${LLM_OPENAI_COMPATIBLE_DEFAULT_BASE_URL:https://api.lkeap.cloud.tencent.com/v1}
-    default-api-key: ${LLM_OPENAI_COMPATIBLE_DEFAULT_API_KEY:}

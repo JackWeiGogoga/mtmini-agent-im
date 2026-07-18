@@ -9,6 +9,9 @@ import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.mapper.MtCommentImageSummaryMapper;
 import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmRateLimitedRestExecutor;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +36,8 @@ class CommentImageVisionServiceImplTest {
     private MtPowerConsumeService mtPowerConsumeService;
     @Mock
     private SystemPromptService systemPromptService;
+    @Mock
+    private LlmRateLimitedRestExecutor rateLimitedRestExecutor;
 
     private MtProperties mtProperties;
     private CommentImageVisionServiceImpl service;
@@ -45,7 +51,8 @@ class CommentImageVisionServiceImplTest {
                 new PowerProperties(),
                 mtCommentImageSummaryMapper,
                 mtPowerConsumeService,
-                systemPromptService
+                systemPromptService,
+                rateLimitedRestExecutor
         );
     }
 
@@ -97,6 +104,22 @@ class CommentImageVisionServiceImplTest {
         assertEquals("VISION_MODEL_API_KEY_EMPTY", result.getErrorMessage());
         assertTrue(result.getSummaryText().contains("系统未能识别图片内容"));
         verify(mtCommentImageSummaryMapper).updateFailureById(eq(9L), eq("FAILED"), eq("VISION_MODEL_API_KEY_EMPTY"), any());
+        verify(mtPowerConsumeService, never()).consume(any());
+    }
+
+    @Test
+    void capacityWaitDoesNotPersistVisionFailure() {
+        mtProperties.getComment().getKnowledge().setVisionModelApiKey("tokenhub-key");
+        ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
+        prompt.setContent("vision prompt");
+        when(systemPromptService.render(any(), any(), any())).thenReturn(prompt);
+        when(rateLimitedRestExecutor.execute(any(), any()))
+                .thenThrow(new LlmCapacityDeferredException(1200L));
+
+        assertThrows(LlmCapacityDeferredException.class,
+                () -> service.resolveForReply(shop(), comment(), true));
+
+        verify(mtCommentImageSummaryMapper, never()).updateFailureById(any(), any(), any(), any());
         verify(mtPowerConsumeService, never()).consume(any());
     }
 

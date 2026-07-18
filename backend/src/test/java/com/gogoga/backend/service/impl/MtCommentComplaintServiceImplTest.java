@@ -100,7 +100,7 @@ class MtCommentComplaintServiceImplTest {
         stubBaseContext();
         when(systemPromptService.render(anyString(), anyMap(), anyString()))
                 .thenAnswer(invocation -> resolved(invocation.getArgument(0), invocation.getArgument(2)));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("{\"reportTypeCode\":31,\"reason\":\"配送超时\"}"))
                 .thenReturn(chatCompletion("顾客评价主要受配送超时影响，商家餐品和包装无明显问题，请平台核实配送履约情况。"));
         MeituanResponse<String> response = new MeituanResponse<>();
@@ -124,7 +124,7 @@ class MtCommentComplaintServiceImplTest {
         stubBaseContext();
         when(systemPromptService.render(anyString(), anyMap(), anyString()))
                 .thenAnswer(invocation -> resolved(invocation.getArgument(0), invocation.getArgument(2)));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("{\"reportTypeCode\":999,\"reason\":\"不确定\"}"))
                 .thenReturn(chatCompletion("顾客评价内容缺少明确事实依据，请平台按无意义评价核实处理。"));
         MeituanResponse<String> response = new MeituanResponse<>();
@@ -143,7 +143,7 @@ class MtCommentComplaintServiceImplTest {
         stubBaseContext();
         when(systemPromptService.render(anyString(), anyMap(), anyString()))
                 .thenAnswer(invocation -> resolved(invocation.getArgument(0), invocation.getArgument(2)));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("无法判断"))
                 .thenReturn(chatCompletion("顾客评价内容缺少明确事实依据，请平台按无意义评价核实处理。"));
         MeituanResponse<String> response = new MeituanResponse<>();
@@ -163,7 +163,7 @@ class MtCommentComplaintServiceImplTest {
         stubBaseContext();
         when(systemPromptService.render(anyString(), anyMap(), anyString()))
                 .thenAnswer(invocation -> resolved(invocation.getArgument(0), invocation.getArgument(2)));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("{\"reportTypeCode\":47,\"reason\":\"内容无意义\"}"))
                 .thenReturn(chatCompletion("顾客评价内容较少，缺少明确问题指向，请平台核实是否属于无意义评价。"));
 
@@ -185,7 +185,7 @@ class MtCommentComplaintServiceImplTest {
 
         service.executeCommentAutoComplaintTask(payload());
 
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
         verify(meituanClient, never()).invokeApi(any(CommentComplainReportRequest.class), anyString());
     }
 
@@ -203,7 +203,7 @@ class MtCommentComplaintServiceImplTest {
                 eq(9L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_INVALID"), any(), any());
         verify(mtCommentMapper).markComplaintFailed(
                 eq(1L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_INVALID"), any());
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
         verify(meituanClient, never()).invokeApi(any(CommentComplainReportRequest.class), anyString());
     }
 
@@ -219,7 +219,7 @@ class MtCommentComplaintServiceImplTest {
 
         verify(mtCommentComplaintMapper).markFailed(
                 eq(9L), eq("SKIPPED"), eq("COMMENT_AUTO_COMPLAINT_TYPE_UNSUPPORTED"), any(), any());
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
         verify(meituanClient, never()).invokeApi(any(CommentComplainReportRequest.class), anyString());
     }
 
@@ -246,7 +246,7 @@ class MtCommentComplaintServiceImplTest {
 
         service.executeCommentAutoComplaintTask(payload());
 
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
         verify(mtPowerConsumeService, never()).consume(any());
         ArgumentCaptor<CommentComplainReportRequest> requestCaptor = ArgumentCaptor.forClass(CommentComplainReportRequest.class);
         verify(meituanClient).invokeApi(requestCaptor.capture(), eq("token"));

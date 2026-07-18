@@ -28,6 +28,8 @@ import com.gogoga.backend.service.MtPowerConsumeService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitContext;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
@@ -156,6 +158,8 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
             throw e;
         } catch (MtAsyncTaskTerminalFailureException e) {
             throw e;
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             String error = StringUtils.left(StringUtils.defaultIfBlank(e.getMessage(), "COMMENT_AUTO_COMPLAINT_FAILED"), 1000);
             markFailed(comment, record, error, durationMs(startNanos));
@@ -169,6 +173,10 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
 
     @Override
     public CommentComplaintPreviewDTO previewComplaint(MtShop shop, MtComment comment) {
+        return LlmRateLimitContext.interactive(() -> previewComplaintInternal(shop, comment));
+    }
+
+    private CommentComplaintPreviewDTO previewComplaintInternal(MtShop shop, MtComment comment) {
         long startNanos = System.nanoTime();
         if (shop == null || comment == null || comment.getCommentId() == null) {
             throw new IllegalArgumentException("COMMENT_COMPLAINT_PREVIEW_CONTEXT_INVALID");
@@ -367,6 +375,7 @@ public class MtCommentComplaintServiceImpl implements MtCommentComplaintService 
                 .addUserMessage(prompt)
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
+                knowledge.getModelProvider(),
                 knowledge.getModelBaseUrl(),
                 knowledge.getModelApiKey(),
                 params

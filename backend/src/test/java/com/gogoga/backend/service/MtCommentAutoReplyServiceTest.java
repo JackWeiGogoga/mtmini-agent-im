@@ -37,7 +37,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,8 +57,6 @@ class MtCommentAutoReplyServiceTest {
     private ShopOperationSettingsService shopOperationSettingsService;
     @Mock
     private MtCommentReplyContentService mtCommentReplyContentService;
-    @Mock
-    private CommentLogAnalysisService commentLogAnalysisService;
 
     private final MtProperties mtProperties = new MtProperties();
 
@@ -81,8 +78,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -157,8 +153,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -198,8 +193,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -229,8 +223,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
@@ -272,8 +265,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);
@@ -343,8 +335,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);
@@ -383,7 +374,7 @@ class MtCommentAutoReplyServiceTest {
         MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
         payload.setShopId(100L);
         payload.setCommentId(542543250001L);
-        doThrow(new IllegalStateException("complaint enqueue failed"))
+        lenient().doThrow(new IllegalStateException("complaint enqueue failed"))
                 .when(mtAsyncTaskService).enqueueTask(
                         eq(MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT),
                         eq("comment-complaint:542543250001"),
@@ -427,8 +418,7 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService,
-                commentLogAnalysisService
+                mtCommentReplyContentService
         );
         MtComment comment = new MtComment();
         comment.setId(9L);

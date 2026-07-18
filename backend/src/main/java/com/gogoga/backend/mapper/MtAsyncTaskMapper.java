@@ -29,6 +29,13 @@ public interface MtAsyncTaskMapper {
             @Param("limit") int limit
     );
 
+    List<Long> selectExecutableFairIds(
+            @Param("taskType") String taskType,
+            @Param("availableAt") LocalDateTime availableAt,
+            @Param("afterScopeKey") String afterScopeKey,
+            @Param("limit") int limit
+    );
+
     int claimPendingById(
             @Param("id") Long id,
             @Param("taskType") String taskType,

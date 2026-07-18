@@ -147,7 +147,7 @@ class MtCommentReplyContentServiceImplTest {
         assertFalse(result.isShouldReply());
         assertEquals(PowerInsufficientException.REASON_CODE, result.getSkipReason());
         verify(commentReplyEmbeddingService, never()).embed(any());
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
         verify(officialTemplateService, never()).selectRandomEnabledTemplate(any());
         verify(mtCommentReplyGenerationMapper, never()).insert(any());
     }
@@ -158,7 +158,7 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
         doThrow(new PowerInsufficientException()).when(mtPowerConsumeService).consume(any());
 
@@ -176,7 +176,7 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(5));
 
@@ -194,12 +194,12 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢认可，我们会继续保持。"));
 
         service.generateReply(shop(), comment(5));
 
         ArgumentCaptor<ChatCompletionCreateParams> paramsCaptor = ArgumentCaptor.forClass(ChatCompletionCreateParams.class);
-        verify(openAiCompatibleChatService).createChatCompletion(any(), any(), paramsCaptor.capture());
+        verify(openAiCompatibleChatService).createChatCompletion(any(), any(), any(), paramsCaptor.capture());
         String paramsText = paramsCaptor.getValue().toString();
         assertTrue(paramsText.contains("美团平台商家回复规范"));
         assertTrue(paramsText.contains("不引导用户添加微信"));
@@ -214,7 +214,7 @@ class MtCommentReplyContentServiceImplTest {
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
         when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
         when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(hit()));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会继续改进餐品和服务。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会继续改进餐品和服务。"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
 
@@ -234,7 +234,7 @@ class MtCommentReplyContentServiceImplTest {
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
         when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
         when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(lowSimilarityHit()));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
 
@@ -259,7 +259,7 @@ class MtCommentReplyContentServiceImplTest {
         when(commentImageVisionService.resolveForReply(any(), any(), eq(true))).thenReturn(imageSummary);
         when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
         when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(hit()));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会改进包装。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会改进包装。"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
 
@@ -277,7 +277,7 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("请加微信处理。"))
                 .thenReturn(chatCompletion("非常抱歉给您带来不好的体验，我们会认真改进服务。"));
 
@@ -291,7 +291,7 @@ class MtCommentReplyContentServiceImplTest {
         assertEquals(false, generationCaptor.getValue().getSensitiveFallbackUsed());
         assertTrue(generationCaptor.getValue().getSensitiveHitJson().contains("站外导流违规词"));
         ArgumentCaptor<ChatCompletionCreateParams> paramsCaptor = ArgumentCaptor.forClass(ChatCompletionCreateParams.class);
-        verify(openAiCompatibleChatService, times(2)).createChatCompletion(any(), any(), paramsCaptor.capture());
+        verify(openAiCompatibleChatService, times(2)).createChatCompletion(any(), any(), any(), paramsCaptor.capture());
         String rewriteParamsText = paramsCaptor.getAllValues().get(1).toString();
         assertTrue(rewriteParamsText.contains("美团平台商家回复规范"));
         assertTrue(rewriteParamsText.contains("不要解释敏感词规则"));
@@ -304,7 +304,7 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("请加微信处理。"))
                 .thenReturn(chatCompletion("还是加微信处理。"));
         when(officialTemplateService.listEnabledTemplates(any())).thenReturn(List.of(official("感谢反馈，我们会认真改进。")));
@@ -326,7 +326,7 @@ class MtCommentReplyContentServiceImplTest {
         MtPowerAccount account = new MtPowerAccount();
         account.setBalance(200000);
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any()))
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any()))
                 .thenReturn(chatCompletion("请加微信处理。"))
                 .thenReturn(chatCompletion("还是加微信处理。"));
         when(officialTemplateService.listEnabledTemplates(any())).thenReturn(List.of());
@@ -345,7 +345,7 @@ class MtCommentReplyContentServiceImplTest {
         when(mtPowerAccountService.getAccount(100L)).thenReturn(account);
         when(commentReplyEmbeddingService.embed(any())).thenReturn(new float[]{1F, 0F});
         when(knowledgeVectorStore.searchTopK(eq(100L), any(), any())).thenReturn(List.of(sensitiveHit()));
-        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
+        when(openAiCompatibleChatService.createChatCompletion(any(), any(), any(), any())).thenReturn(chatCompletion("感谢反馈，我们会认真改进。"));
 
         CommentReplyContentResultDTO result = service.generateReply(shop(), comment(3));
 
@@ -369,7 +369,7 @@ class MtCommentReplyContentServiceImplTest {
 
         assertEquals("FALLBACK_OFFICIAL", result.getReplySource());
         assertEquals("官方兜底", result.getReplyContent());
-        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any());
+        verify(openAiCompatibleChatService, never()).createChatCompletion(any(), any(), any(), any());
     }
 
     private MtShop shop() {

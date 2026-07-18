@@ -3,6 +3,9 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.client.OpenAiCompatibleClientFactory;
 import com.gogoga.backend.config.OpenAiCompatibleProperties;
 import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.service.llm.LlmClusterRateLimiter;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.llm.LlmRateLimitRetryAfterParser;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
@@ -20,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class OpenAiCompatibleChatServiceTest {
@@ -29,6 +33,12 @@ class OpenAiCompatibleChatServiceTest {
 
     @Mock
     private OpenAiCompatibleClientFactory clientFactory;
+
+    @Mock
+    private LlmClusterRateLimiter rateLimiter;
+
+    @Mock
+    private LlmRateLimitRetryAfterParser retryAfterParser;
 
     @Mock
     private OpenAIClient client;
@@ -114,5 +124,23 @@ class OpenAiCompatibleChatServiceTest {
 
         assertEquals(502, exception.getCode());
         assertEquals("调用 OpenAI 兼容聊天补全失败", exception.getMessage());
+    }
+
+    @Test
+    void shouldPreserveCapacityDeferredException() {
+        properties.setDefaultBaseUrl("https://default.example.com");
+        properties.setDefaultApiKey("default-key");
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                .model("gpt-4o-mini")
+                .addUserMessage("hello")
+                .build();
+        doThrow(new LlmCapacityDeferredException(1200L)).when(rateLimiter).acquire(any());
+
+        LlmCapacityDeferredException exception = assertThrows(
+                LlmCapacityDeferredException.class,
+                () -> service.createChatCompletion(params)
+        );
+
+        assertEquals(1200L, exception.getRetryAfterMillis());
     }
 }

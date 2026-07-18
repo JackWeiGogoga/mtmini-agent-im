@@ -80,6 +80,23 @@ public class MtAsyncTaskService {
         return mtAsyncTaskMapper.selectExecutableIds(taskType.name(), now == null ? LocalDateTime.now() : now, limit);
     }
 
+    public List<Long> selectExecutableFairTaskIds(
+            MtAsyncTaskTypeEnum taskType,
+            String afterScopeKey,
+            int limit,
+            LocalDateTime now
+    ) {
+        if (taskType == null || limit <= 0) {
+            return Collections.emptyList();
+        }
+        return mtAsyncTaskMapper.selectExecutableFairIds(
+                taskType.name(),
+                now == null ? LocalDateTime.now() : now,
+                StringUtils.defaultString(afterScopeKey),
+                limit
+        );
+    }
+
     public MtAsyncTask selectByTaskTypeAndBizKey(MtAsyncTaskTypeEnum taskType, String bizKey) {
         if (taskType == null || StringUtils.isBlank(bizKey)) {
             return null;

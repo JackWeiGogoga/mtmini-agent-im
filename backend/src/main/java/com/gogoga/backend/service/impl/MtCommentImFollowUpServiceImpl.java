@@ -29,6 +29,7 @@ import com.gogoga.backend.service.ShopOperationSettingsService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -185,6 +186,8 @@ public class MtCommentImFollowUpServiceImpl implements MtCommentImFollowUpServic
             mtCommentMapper.markImFollowUpStatus(comment.getId(), CommentImFollowUpStatusEnum.GENERATED.name(),
                     null, null, null, now);
             return true;
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             CommentImFollowUpFailedStageEnum stage = isPowerError(e)
                     ? CommentImFollowUpFailedStageEnum.POWER

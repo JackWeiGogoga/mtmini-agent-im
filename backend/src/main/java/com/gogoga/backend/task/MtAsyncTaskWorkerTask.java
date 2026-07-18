@@ -1,6 +1,7 @@
 package com.gogoga.backend.task;
 
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.config.LlmRateLimitProperties;
 import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
@@ -9,6 +10,7 @@ import com.gogoga.backend.service.MtCommentAutoReplyService;
 import com.gogoga.backend.service.MtCommentComplaintService;
 import com.gogoga.backend.service.MtCommentImFollowUpService;
 import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
+import com.gogoga.backend.service.CommentLogAnalysisService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
@@ -17,19 +19,28 @@ import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtCommentLogAnalysisTaskPayload;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 数据库异步任务 worker。
@@ -39,12 +50,20 @@ import java.util.concurrent.Executor;
 @ConditionalOnProperty(name = {"mt.async-task.enabled", "mt.async-task.worker-enabled"}, havingValue = "true")
 public class MtAsyncTaskWorkerTask {
 
+    private static final List<MtAsyncTaskTypeEnum> ORDINARY_TASK_TYPES = List.of(
+            MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
+            MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
+            MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
+            MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL
+    );
+
     private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
             MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
             MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL,
             MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+            MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS,
             MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
             MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP,
             MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE
@@ -55,12 +74,18 @@ public class MtAsyncTaskWorkerTask {
     private final MtCommentAutoReplyService mtCommentAutoReplyService;
     private final MtCommentComplaintService mtCommentComplaintService;
     private final MtCommentImFollowUpService mtCommentImFollowUpService;
+    private final CommentLogAnalysisService commentLogAnalysisService;
     private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
+    private final LlmRateLimitProperties llmRateLimitProperties;
 
     @Qualifier("mtAsyncTaskExecutor")
     private final Executor mtAsyncTaskExecutor;
+
+    private final ThreadPoolTaskExecutor mtLlmTaskExecutor;
+    private final AtomicInteger llmScheduleCursor = new AtomicInteger();
+    private final Map<MtAsyncTaskTypeEnum, String> llmScopeCursors = new ConcurrentHashMap<>();
 
     private final String workerInstanceId = "mt-async-" + UUID.randomUUID();
 
@@ -70,25 +95,32 @@ public class MtAsyncTaskWorkerTask {
             MtCommentAutoReplyService mtCommentAutoReplyService,
             MtCommentComplaintService mtCommentComplaintService,
             MtCommentImFollowUpService mtCommentImFollowUpService,
+            CommentLogAnalysisService commentLogAnalysisService,
             CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
-            @Qualifier("mtAsyncTaskExecutor") Executor mtAsyncTaskExecutor
+            LlmRateLimitProperties llmRateLimitProperties,
+            @Qualifier("mtAsyncTaskExecutor") Executor mtAsyncTaskExecutor,
+            @Qualifier("mtLlmTaskExecutor") ThreadPoolTaskExecutor mtLlmTaskExecutor
     ) {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
         this.mtCommentAutoReplyService = mtCommentAutoReplyService;
         this.mtCommentComplaintService = mtCommentComplaintService;
         this.mtCommentImFollowUpService = mtCommentImFollowUpService;
+        this.commentLogAnalysisService = commentLogAnalysisService;
         this.commentReplyKnowledgeDocumentService = commentReplyKnowledgeDocumentService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
+        this.llmRateLimitProperties = llmRateLimitProperties;
         this.mtAsyncTaskExecutor = mtAsyncTaskExecutor;
+        this.mtLlmTaskExecutor = mtLlmTaskExecutor;
     }
 
     @Scheduled(fixedDelayString = "${mt.async-task.poll-delay-ms:1000}")
     public void pollAsyncTasks() {
-        POLL_TASK_TYPES.forEach(this::submitExecutableTasks);
+        ORDINARY_TASK_TYPES.forEach(this::submitExecutableTasks);
+        submitAvailableLlmTasks();
     }
 
     @Scheduled(fixedDelayString = "${mt.async-task.recovery-delay-ms:30000}")
@@ -135,16 +167,95 @@ public class MtAsyncTaskWorkerTask {
         MtProperties.AsyncTask asyncTask = mtProperties.getAsyncTask();
         List<Long> taskIds = mtAsyncTaskService.selectExecutableTaskIds(taskType, asyncTask.getPollSize(), LocalDateTime.now());
         for (Long taskId : taskIds) {
-            mtAsyncTaskExecutor.execute(() -> executeClaimedTask(taskType, taskId));
+            mtAsyncTaskExecutor.execute(() -> claimAndExecuteTask(taskType, taskId));
         }
     }
 
-    private void executeClaimedTask(MtAsyncTaskTypeEnum taskType, Long taskId) {
+    private void submitAvailableLlmTasks() {
+        int concurrency = Math.max(mtProperties.getAsyncTask().getLlmExecutorConcurrency(), 1);
+        int availableSlots = Math.max(concurrency - mtLlmTaskExecutor.getActiveCount(), 0);
+        for (int i = 0; i < availableSlots; i++) {
+            ClaimedTask claimedTask = claimNextWeightedLlmTask();
+            if (claimedTask == null) {
+                return;
+            }
+            try {
+                mtLlmTaskExecutor.execute(() -> executeClaimedTask(claimedTask.taskType(), claimedTask.task()));
+            } catch (TaskRejectedException e) {
+                LocalDateTime now = LocalDateTime.now();
+                mtAsyncTaskService.rescheduleWithoutRetry(
+                        claimedTask.task(),
+                        now.plusSeconds(1),
+                        "LLM_EXECUTOR_REJECTED",
+                        now
+                );
+                log.warn("LLM任务执行器拒绝任务并已无损重排，taskType={}, taskId={}",
+                        claimedTask.taskType().name(), claimedTask.task().getId());
+                return;
+            }
+        }
+    }
+
+    private ClaimedTask claimNextWeightedLlmTask() {
+        List<MtAsyncTaskTypeEnum> schedule = weightedLlmSchedule();
+        if (schedule.isEmpty()) {
+            return null;
+        }
+        for (int i = 0; i < schedule.size(); i++) {
+            int index = Math.floorMod(llmScheduleCursor.getAndIncrement(), schedule.size());
+            MtAsyncTaskTypeEnum taskType = schedule.get(index);
+            List<Long> taskIds = mtAsyncTaskService.selectExecutableFairTaskIds(
+                    taskType,
+                    llmScopeCursors.get(taskType),
+                    1,
+                    LocalDateTime.now()
+            );
+            if (taskIds.isEmpty()) {
+                continue;
+            }
+            Long taskId = taskIds.get(0);
+            MtAsyncTask task = mtAsyncTaskService.claimTask(
+                    taskType,
+                    taskId,
+                    workerInstanceId + "-llm-dispatcher",
+                    LocalDateTime.now()
+            );
+            if (task != null) {
+                llmScopeCursors.put(taskType, fairScopeKey(task));
+                return new ClaimedTask(taskType, task);
+            }
+        }
+        return null;
+    }
+
+    List<MtAsyncTaskTypeEnum> weightedLlmSchedule() {
+        MtProperties.LlmTaskWeights weights = mtProperties.getAsyncTask().getLlmTaskWeights();
+        List<MtAsyncTaskTypeEnum> schedule = new ArrayList<>();
+        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY, weights.getCommentAutoReply());
+        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP, weights.getCommentAutoImFollowUp());
+        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT, weights.getCommentAutoComplaint());
+        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS, weights.getCommentLogAnalysis());
+        addWeight(schedule, MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE, weights.getKnowledgeDocumentParse());
+        return schedule;
+    }
+
+    private void addWeight(List<MtAsyncTaskTypeEnum> schedule, MtAsyncTaskTypeEnum taskType, int weight) {
+        for (int i = 0; i < Math.max(weight, 0); i++) {
+            schedule.add(taskType);
+        }
+    }
+
+    private void claimAndExecuteTask(MtAsyncTaskTypeEnum taskType, Long taskId) {
         String workerId = workerInstanceId + "-" + Thread.currentThread().getName();
         MtAsyncTask task = mtAsyncTaskService.claimTask(taskType, taskId, workerId, LocalDateTime.now());
         if (task == null) {
             return;
         }
+        executeClaimedTask(taskType, task);
+    }
+
+    void executeClaimedTask(MtAsyncTaskTypeEnum taskType, MtAsyncTask task) {
+        Long taskId = task.getId();
         try {
             switch (taskType) {
                 case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
@@ -152,12 +263,26 @@ public class MtAsyncTaskWorkerTask {
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
                 case AUTH_COMMENT_BACKFILL -> executeAuthCommentBackfillTask(task);
                 case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
+                case COMMENT_LOG_ANALYSIS -> executeCommentLogAnalysisTask(task);
                 case COMMENT_AUTO_COMPLAINT -> executeCommentAutoComplaintTask(task);
                 case COMMENT_AUTO_IM_FOLLOW_UP -> executeCommentAutoImFollowUpTask(task);
                 case KNOWLEDGE_DOCUMENT_PARSE -> executeKnowledgeDocumentParseTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
+        } catch (LlmCapacityDeferredException e) {
+            LocalDateTime now = LocalDateTime.now();
+            long jitterMillis = randomJitterMillis();
+            LocalDateTime nextAvailableAt = now.plusNanos(
+                    Math.max(e.getRetryAfterMillis() + jitterMillis, 1L) * 1_000_000L);
+            mtAsyncTaskService.rescheduleWithoutRetry(
+                    task,
+                    nextAvailableAt,
+                    "LLM_CAPACITY_DEFERRED",
+                    now
+            );
+            log.info("LLM任务容量等待并已无损重排，taskType={}, taskId={}, nextAvailableAt={}",
+                    taskType.name(), taskId, nextAvailableAt);
         } catch (MtAsyncTaskDryRunException e) {
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime nextAvailableAt = now.plusSeconds(e.getRescheduleSeconds());
@@ -193,6 +318,12 @@ public class MtAsyncTaskWorkerTask {
     private void executeCommentAutoReplyTask(MtAsyncTask task) {
         MtCommentAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtCommentAutoReplyTaskPayload.class);
         mtCommentAutoReplyService.executeCommentAutoReplyTask(payload);
+    }
+
+    private void executeCommentLogAnalysisTask(MtAsyncTask task) {
+        MtCommentLogAnalysisTaskPayload payload = JsonUtil.toBean(
+                task.getPayloadJson(), MtCommentLogAnalysisTaskPayload.class);
+        commentLogAnalysisService.executeCommentLogAnalysisTask(payload);
     }
 
     private void executeCommentAutoComplaintTask(MtAsyncTask task) {
@@ -232,6 +363,7 @@ public class MtAsyncTaskWorkerTask {
                     .maxBackoff(Duration.ofSeconds(60))
                     .build();
             case COMMENT_AUTO_REPLY -> resolvePolicy(asyncTask.getCommentAutoReply());
+            case COMMENT_LOG_ANALYSIS -> resolvePolicy(asyncTask.getCommentLogAnalysis());
             case COMMENT_AUTO_COMPLAINT -> resolvePolicy(asyncTask.getCommentAutoComplaint());
             case COMMENT_AUTO_IM_FOLLOW_UP -> resolvePolicy(asyncTask.getCommentAutoImFollowUp());
             case KNOWLEDGE_DOCUMENT_PARSE -> resolvePolicy(asyncTask.getKnowledgeDocumentParse());
@@ -245,6 +377,21 @@ public class MtAsyncTaskWorkerTask {
                 .initialBackoff(Duration.ofSeconds(taskPolicy.getInitialBackoffSeconds()))
                 .maxBackoff(Duration.ofSeconds(taskPolicy.getMaxBackoffSeconds()))
                 .build();
+    }
+
+    private long randomJitterMillis() {
+        long maxJitter = Math.max(llmRateLimitProperties.getRescheduleJitterMillis(), 0L);
+        return maxJitter <= 0L ? 0L : ThreadLocalRandom.current().nextLong(maxJitter + 1L);
+    }
+
+    private String fairScopeKey(MtAsyncTask task) {
+        if (task.getScopeKey() == null || task.getScopeKey().isBlank()) {
+            return "__task__" + task.getId();
+        }
+        return task.getScopeKey();
+    }
+
+    private record ClaimedTask(MtAsyncTaskTypeEnum taskType, MtAsyncTask task) {
     }
 
 }

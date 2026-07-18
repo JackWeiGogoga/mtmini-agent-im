@@ -37,4 +37,20 @@ public class AsyncConfig {
                 executor.getCorePoolSize(), executor.getMaxPoolSize(), asyncTask.getExecutorQueueCapacity());
         return executor;
     }
+
+    @Bean("mtLlmTaskExecutor")
+    public ThreadPoolTaskExecutor mtLlmTaskExecutor(MtProperties mtProperties) {
+        int concurrency = Math.max(mtProperties.getAsyncTask().getLlmExecutorConcurrency(), 1);
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(concurrency);
+        executor.setMaxPoolSize(concurrency);
+        executor.setQueueCapacity(0);
+        executor.setThreadNamePrefix("mt-llm-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        log.info("Async executor initialized, name=mtLlmTaskExecutor, concurrency={}, queueCapacity=0", concurrency);
+        return executor;
+    }
 }

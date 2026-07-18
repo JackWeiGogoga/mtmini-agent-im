@@ -12,6 +12,7 @@ import com.gogoga.backend.service.CommentImMessageComplianceService;
 import com.gogoga.backend.service.CommentImMessageGenerationService;
 import com.gogoga.backend.service.OpenAiCompatibleChatService;
 import com.gogoga.backend.service.SystemPromptService;
+import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.completions.CompletionUsage;
@@ -57,6 +58,8 @@ public class CommentImMessageGenerationServiceImpl implements CommentImMessageGe
                 throw new IllegalStateException("MODEL_COMPLIANCE_" + compliance.getCategory());
             }
             return toModelResult(modelResult, cleaned, durationMs(startNanos));
+        } catch (LlmCapacityDeferredException e) {
+            throw e;
         } catch (Exception e) {
             fallbackReason = safeReason(e);
             log.warn("差评匿名群聊消息使用固定兜底，commentId={}, reason={}",
@@ -194,6 +197,7 @@ public class CommentImMessageGenerationServiceImpl implements CommentImMessageGe
                 .addUserMessage(prompt.getContent())
                 .build();
         ChatCompletion completion = openAiCompatibleChatService.createChatCompletion(
+                knowledge.getModelProvider(),
                 knowledge.getModelBaseUrl(), knowledge.getModelApiKey(), params);
         if (completion == null || completion.choices() == null || completion.choices().isEmpty()) {
             throw new IllegalStateException("IM_MODEL_EMPTY_RESPONSE");

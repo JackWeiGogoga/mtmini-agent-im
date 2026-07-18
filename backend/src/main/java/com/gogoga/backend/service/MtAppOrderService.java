@@ -15,6 +15,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,6 +33,9 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class MtAppOrderService {
+
+    public static final String PULL_LOCK_NAME = "MtAppOrderPullTask";
+    public static final Duration PULL_LOCK_LEASE_DURATION = Duration.ofHours(1);
 
     private final MtAppOrderMapper mtAppOrderMapper;
     private final MtShopService mtShopService;
@@ -55,12 +59,38 @@ public class MtAppOrderService {
             startTime = latestOrderTime.longValue();
         }
 
+        log.info("开始拉取近期订阅订单，appId={}, startTime={}, endTime={}, latestOrderTime={}, pageSize={}",
+                mtProperties.getAppOrder().getAppId(), startTime, endTime, latestOrderTime,
+                mtProperties.getAppOrder().getPageSize());
+        PullResult result = pullOrders(startTime, endTime);
+        log.info("拉取近期订阅订单完成，result={}", result);
+    }
+
+    /**
+     * 按指定时间范围拉取订阅订单，并应用待补偿权益。
+     *
+     * @param startTime 开始时间，Unix 秒
+     * @param endTime 结束时间，Unix 秒
+     * @return 本次处理统计
+     */
+    public PullResult pullOrders(long startTime, long endTime) {
+        Integer appId = mtProperties.getAppOrder().getAppId();
+        if (appId == null) {
+            throw new IllegalStateException("未配置 mt.app-order.app-id");
+        }
+        if (startTime >= endTime) {
+            throw new IllegalArgumentException("订阅订单拉取开始时间必须早于结束时间");
+        }
+
         int pageNum = 1;
         int pageSize = mtProperties.getAppOrder().getPageSize();
         int totalFetched = 0;
         int processedPages = 0;
-        log.info("开始拉取近期订阅订单，appId={}, startTime={}, endTime={}, latestOrderTime={}, pageSize={}",
-                mtProperties.getAppOrder().getAppId(), startTime, endTime, latestOrderTime, pageSize);
+        int createdCount = 0;
+        int updatedCount = 0;
+        int skippedCount = 0;
+        log.info("开始按时间范围拉取订阅订单，appId={}, startTime={}, endTime={}, pageSize={}",
+                appId, startTime, endTime, pageSize);
         while (true) {
             List<MtAppOrder> page = fetchPage(startTime, endTime, pageNum, pageSize);
             if (CollectionUtils.isEmpty(page)) {
@@ -73,7 +103,14 @@ public class MtAppOrderService {
             log.info("拉取订阅订单成功，pageNum={}, pageSize={}, fetchedCount={}", pageNum, pageSize, page.size());
 
             for (MtAppOrder order : page) {
-                saveOrUpdate(order);
+                SaveOutcome outcome = saveOrUpdateInternal(order);
+                if (outcome == SaveOutcome.CREATED) {
+                    createdCount++;
+                } else if (outcome == SaveOutcome.UPDATED) {
+                    updatedCount++;
+                } else {
+                    skippedCount++;
+                }
             }
 
             if (page.size() < pageSize) {
@@ -84,8 +121,20 @@ public class MtAppOrderService {
             pageNum++;
         }
 
-        applyPendingRights();
-        log.info("拉取近期订阅订单完成，processedPages={}, totalFetched={}", processedPages, totalFetched);
+        int appliedRightsCount = applyPendingRightsAndCount();
+        PullResult result = new PullResult(
+                appId,
+                startTime,
+                endTime,
+                processedPages,
+                totalFetched,
+                createdCount,
+                updatedCount,
+                skippedCount,
+                appliedRightsCount
+        );
+        log.info("按时间范围拉取订阅订单完成，result={}", result);
+        return result;
     }
 
     /**
@@ -94,8 +143,12 @@ public class MtAppOrderService {
      * @param incoming 订阅订单
      */
     public void saveOrUpdate(MtAppOrder incoming) {
+        saveOrUpdateInternal(incoming);
+    }
+
+    private SaveOutcome saveOrUpdateInternal(MtAppOrder incoming) {
         if (incoming == null || StringUtils.isBlank(incoming.getOrderId()) || StringUtils.isBlank(incoming.getVersion())) {
-            return;
+            return SaveOutcome.SKIPPED;
         }
 
         MtAppOrder existing = mtAppOrderMapper.selectByOrderId(incoming.getOrderId());
@@ -125,19 +178,24 @@ public class MtAppOrderService {
 
         if (existing == null) {
             mtAppOrderMapper.insert(target);
-            return;
+            return SaveOutcome.CREATED;
         }
         mtAppOrderMapper.updateById(target);
+        return SaveOutcome.UPDATED;
     }
 
     /**
      * 应用待补偿的门店权益
      */
     public void applyPendingRights() {
+        applyPendingRightsAndCount();
+    }
+
+    private int applyPendingRightsAndCount() {
         List<MtAppOrder> pendingOrders = mtAppOrderMapper.selectPendingRightOrders();
         if (CollectionUtils.isEmpty(pendingOrders)) {
             log.info("没有待补偿的订阅订单权益需要处理");
-            return;
+            return 0;
         }
 
         int appliedCount = 0;
@@ -167,6 +225,7 @@ public class MtAppOrderService {
             appliedCount++;
         }
         log.info("处理待补偿订阅订单权益完成，pendingCount={}, appliedCount={}", pendingOrders.size(), appliedCount);
+        return appliedCount;
     }
 
     private void enrichByShop(MtAppOrder order) {
@@ -194,16 +253,14 @@ public class MtAppOrderService {
         try {
             MeituanResponse<AppOrderListResponse> response = meituanClient.invokeApi(request);
             if (response == null || !response.isSuccess() || response.getData() == null) {
-                log.warn("拉取美团订阅订单失败，pageNum={}, code={}, msg={}", pageNum,
-                        response == null ? null : response.getCode(),
-                        response == null ? null : response.getMsg());
-                return new ArrayList<>();
+                String code = response == null ? null : response.getCode();
+                String message = response == null ? null : response.getMsg();
+                throw new IllegalStateException("拉取美团订阅订单失败，code=" + code + "，msg=" + message);
             }
 
             AppOrderListResponse payload = response.getData();
             if (payload.getResult() == null || !Boolean.TRUE.equals(payload.getResult().getSuccess())) {
-                log.warn("拉取美团订阅订单业务失败，pageNum={}, result={}", pageNum, payload.getResult());
-                return new ArrayList<>();
+                throw new IllegalStateException("拉取美团订阅订单业务失败，result=" + payload.getResult());
             }
 
             List<com.meituan.sdk.model.wmoperNg.waimaiad.appOrderList.Order> orders = payload.getOrder();
@@ -218,7 +275,7 @@ public class MtAppOrderService {
             return result;
         } catch (MtSdkException e) {
             log.error("拉取美团订阅订单异常，pageNum={}", pageNum, e);
-            return new ArrayList<>();
+            throw new IllegalStateException("拉取美团订阅订单异常：" + e.getMessage(), e);
         }
     }
 
@@ -238,5 +295,27 @@ public class MtAppOrderService {
         appOrder.setRealPayPrice(order.getRealPayPrice() == null ? null : order.getRealPayPrice().intValue());
         appOrder.setOrderTime(order.getOrderTime());
         return appOrder;
+    }
+
+    private enum SaveOutcome {
+        CREATED,
+        UPDATED,
+        SKIPPED
+    }
+
+    /**
+     * 订阅订单拉取处理统计。
+     */
+    public record PullResult(
+            Integer appId,
+            long startTime,
+            long endTime,
+            int processedPages,
+            int totalFetched,
+            int createdCount,
+            int updatedCount,
+            int skippedCount,
+            int appliedRightsCount
+    ) {
     }
 }
