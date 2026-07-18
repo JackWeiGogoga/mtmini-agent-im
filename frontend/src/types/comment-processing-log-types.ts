@@ -3,7 +3,7 @@ import type { PageParam } from "./common-types";
 export interface CommentProcessingLogQuery extends PageParam {
   commentTimeFrom?: string;
   commentTimeTo?: string;
-  shopId?: number;
+  poiId?: string;
   shopKeyword?: string;
   commentId?: number;
   keyword?: string;

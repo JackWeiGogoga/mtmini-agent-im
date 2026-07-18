@@ -61,6 +61,7 @@ public class CommentProcessingLogService {
         result.setPageSize(Math.min(pageSize, MAX_PAGE_SIZE));
         result.setCommentTimeFrom(StringUtils.trimToNull(result.getCommentTimeFrom()));
         result.setCommentTimeTo(StringUtils.trimToNull(result.getCommentTimeTo()));
+        result.setPoiId(StringUtils.trimToNull(result.getPoiId()));
         result.setShopKeyword(StringUtils.trimToNull(result.getShopKeyword()));
         result.setKeyword(StringUtils.trimToNull(result.getKeyword()));
         result.setSentiment(upper(result.getSentiment()));

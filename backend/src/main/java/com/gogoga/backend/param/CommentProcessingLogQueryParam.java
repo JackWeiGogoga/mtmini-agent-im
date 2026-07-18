@@ -10,7 +10,7 @@ public class CommentProcessingLogQueryParam {
 
     private String commentTimeFrom;
     private String commentTimeTo;
-    private Long shopId;
+    private String poiId;
     private String shopKeyword;
     private Long commentId;
     private String keyword;

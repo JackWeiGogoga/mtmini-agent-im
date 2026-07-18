@@ -255,10 +255,10 @@
     <view
       v-if="activityPopupVisible"
       class="activity-popup-mask"
-      @tap.stop="closeActivityPopup"
+      @tap="closeActivityPopup"
       @touchmove.stop.prevent="noop"
     >
-      <view class="activity-popup-dialog" @tap.stop="openActivityPage">
+      <view class="activity-popup-dialog">
         <image
           class="activity-popup-image"
           src="/static/images/home_302.png"
@@ -266,7 +266,13 @@
         ></image>
         <view
           class="activity-popup-close-zone"
+          role="button"
           @tap.stop="closeActivityPopup"
+        ></view>
+        <view
+          class="activity-popup-action-zone"
+          role="button"
+          @tap.stop="openActivityPage"
         ></view>
       </view>
     </view>
@@ -1450,14 +1456,24 @@ export default {
   display: block;
   width: 100%;
   height: auto;
+  pointer-events: none;
 }
 
 .activity-popup-close-zone {
   position: absolute;
-  top: 72rpx;
-  right: 18rpx;
-  width: 110rpx;
-  height: 110rpx;
+  top: 7%;
+  right: 4%;
+  width: 14%;
+  aspect-ratio: 1;
+  z-index: 1;
+}
+
+.activity-popup-action-zone {
+  position: absolute;
+  right: 20%;
+  bottom: 14%;
+  left: 20%;
+  height: 10%;
   z-index: 1;
 }
 

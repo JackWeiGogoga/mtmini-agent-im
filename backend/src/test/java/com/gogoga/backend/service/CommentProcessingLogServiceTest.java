@@ -55,6 +55,7 @@ class CommentProcessingLogServiceTest {
         CommentProcessingLogQueryParam query = new CommentProcessingLogQueryParam();
         query.setPageNum(0);
         query.setPageSize(999);
+        query.setPoiId("  poi-001  ");
         query.setShopKeyword("  门店  ");
         query.setSentiment(" bad ");
         query.setComplaintStatus(" success ");
@@ -65,6 +66,7 @@ class CommentProcessingLogServiceTest {
         verify(processingLogMapper).selectForAdmin(captor.capture(), isNull());
         assertEquals(1, captor.getValue().getPageNum());
         assertEquals(100, captor.getValue().getPageSize());
+        assertEquals("poi-001", captor.getValue().getPoiId());
         assertEquals("门店", captor.getValue().getShopKeyword());
         assertEquals("BAD", captor.getValue().getSentiment());
         assertEquals("SUCCESS", captor.getValue().getComplaintStatus());

@@ -5,7 +5,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+REMOTE_HOST_FROM_ENV="${REMOTE_HOST-}"
+BACKEND_HOSTS_FROM_ENV="${BACKEND_HOSTS-}"
 REMOTE_HOST="${REMOTE_HOST:-mt4}"
+BACKEND_HOSTS_EXPLICIT=0
+if [[ -n "${BACKEND_HOSTS_FROM_ENV}" ]]; then
+  BACKEND_HOSTS="${BACKEND_HOSTS_FROM_ENV}"
+  BACKEND_HOSTS_EXPLICIT=1
+elif [[ -n "${REMOTE_HOST_FROM_ENV}" ]]; then
+  # Preserve the previous single-host behavior for callers that already set
+  # REMOTE_HOST in their environment.
+  BACKEND_HOSTS="${REMOTE_HOST}"
+else
+  BACKEND_HOSTS="mt3,mt4"
+fi
 REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-/opt/waimaidashi/backend}"
 REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-h5}"
 REMOTE_FRONTEND_DIR="${REMOTE_FRONTEND_DIR:-/var/www/mt-admin}"
@@ -36,6 +49,9 @@ RSYNC_IO_TIMEOUT_SECONDS="${RSYNC_IO_TIMEOUT_SECONDS:-60}"
 SSH_OPTIONS=()
 RSYNC_SSH_COMMAND=""
 USE_RSYNC=0
+BACKEND_HOST_LIST=()
+BACKEND_JAR_PATH=""
+BACKEND_JAR_SHA256=""
 
 DEPLOY_BACKEND=1
 DEPLOY_H5=1
@@ -52,7 +68,8 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Options:
-  --host <ssh-host>           SSH host alias, default: ${REMOTE_HOST}
+  --host <ssh-host>           Static host; also backend host unless BACKEND_HOSTS/--backend-hosts is set
+  --backend-hosts <hosts>     Backend SSH hosts separated by commas, default: ${BACKEND_HOSTS}
   --backend-only              Deploy backend only
   --h5-only                   Deploy H5 only
   --frontend-only             Deploy frontend only
@@ -69,7 +86,8 @@ Options:
   -h, --help                  Show help
 
 Environment variables:
-  REMOTE_HOST                 SSH host alias
+  REMOTE_HOST                 Static-file SSH host; also selects one backend host for backward compatibility
+  BACKEND_HOSTS               Backend SSH hosts separated by commas, default: mt3,mt4
   REMOTE_BACKEND_DIR          Remote backend directory
   REMOTE_H5_DIR               Remote H5 static directory
   REMOTE_FRONTEND_DIR         Remote frontend static directory
@@ -256,11 +274,49 @@ local_sha256() {
   fail "sha256sum/shasum is required for backend artifact verification"
 }
 
+parse_backend_hosts() {
+  local normalized="${BACKEND_HOSTS//,/ }"
+  local candidates=()
+  local candidate
+  local existing
+  local duplicate
+
+  read -r -a candidates <<< "${normalized}"
+  (( ${#candidates[@]} > 0 )) || fail "BACKEND_HOSTS must contain at least one SSH host"
+
+  BACKEND_HOST_LIST=()
+  for candidate in "${candidates[@]}"; do
+    [[ "${candidate}" =~ ^[A-Za-z0-9._@:-]+$ ]] || fail "Invalid backend SSH host: ${candidate}"
+    duplicate=0
+    # macOS still ships Bash 3.2, where expanding an empty array under
+    # `set -u` raises an error. The `-` fallback keeps the first iteration safe.
+    for existing in "${BACKEND_HOST_LIST[@]-}"; do
+      [[ -n "${existing}" ]] || continue
+      if [[ "${existing}" == "${candidate}" ]]; then
+        duplicate=1
+        break
+      fi
+    done
+    if (( duplicate == 0 )); then
+      BACKEND_HOST_LIST+=("${candidate}")
+    fi
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --host)
       [[ $# -ge 2 ]] || fail "--host requires a value"
       REMOTE_HOST="$2"
+      if (( BACKEND_HOSTS_EXPLICIT == 0 )); then
+        BACKEND_HOSTS="$2"
+      fi
+      shift 2
+      ;;
+    --backend-hosts)
+      [[ $# -ge 2 ]] || fail "--backend-hosts requires a value"
+      BACKEND_HOSTS="$2"
+      BACKEND_HOSTS_EXPLICIT=1
       shift 2
       ;;
     --backend-only)
@@ -341,6 +397,9 @@ is_positive_integer "${SSH_SERVER_ALIVE_COUNT_MAX}" || fail "SSH_SERVER_ALIVE_CO
 is_positive_integer "${SSH_RETRY_ATTEMPTS}" || fail "SSH_RETRY_ATTEMPTS must be a positive integer"
 is_positive_integer "${SSH_RETRY_DELAY_SECONDS}" || fail "SSH_RETRY_DELAY_SECONDS must be a positive integer"
 is_positive_integer "${RSYNC_IO_TIMEOUT_SECONDS}" || fail "RSYNC_IO_TIMEOUT_SECONDS must be a positive integer"
+if (( DEPLOY_BACKEND == 1 )); then
+  parse_backend_hosts
+fi
 
 require_cmd ssh
 build_ssh_options
@@ -463,15 +522,20 @@ cleanup_remote_dir_backups() {
   "
 }
 
-deploy_backend() {
-  assert_safe_remote_path "${REMOTE_BACKEND_DIR}" "Remote backend directory"
-  log "Building backend jar"
+build_backend_artifact() {
+  log "Building backend jar once for all backend hosts"
   "${MVN_BIN}" -f "${REPO_ROOT}/backend/pom.xml" clean package -DskipTests
 
-  local jar_path="${REPO_ROOT}/backend/target/backend.jar"
-  [[ -f "${jar_path}" ]] || fail "Backend jar not found: ${jar_path}"
-  local jar_sha256
-  jar_sha256="$(local_sha256 "${jar_path}")"
+  BACKEND_JAR_PATH="${REPO_ROOT}/backend/target/backend.jar"
+  [[ -f "${BACKEND_JAR_PATH}" ]] || fail "Backend jar not found: ${BACKEND_JAR_PATH}"
+  BACKEND_JAR_SHA256="$(local_sha256 "${BACKEND_JAR_PATH}")"
+  log "Backend artifact SHA-256: ${BACKEND_JAR_SHA256}"
+}
+
+deploy_backend_artifact() {
+  assert_safe_remote_path "${REMOTE_BACKEND_DIR}" "Remote backend directory"
+  [[ -f "${BACKEND_JAR_PATH}" ]] || fail "Backend jar not found: ${BACKEND_JAR_PATH}"
+  [[ -n "${BACKEND_JAR_SHA256}" ]] || fail "Backend artifact SHA-256 is empty"
 
   ssh_remote "mkdir -p '${REMOTE_BACKEND_DIR}'"
 
@@ -482,8 +546,8 @@ deploy_backend() {
     remote_backup_jar="${REMOTE_BACKEND_DIR}/backend.jar.backup-$(date +%Y%m%d-%H%M%S)"
   fi
 
-  log "Uploading backend jar to ${REMOTE_HOST}:${remote_new_jar}"
-  transfer_file "${jar_path}" "${REMOTE_HOST}:${remote_new_jar}"
+  log "Uploading backend artifact ${BACKEND_JAR_SHA256} to ${REMOTE_HOST}:${remote_new_jar}"
+  transfer_file "${BACKEND_JAR_PATH}" "${REMOTE_HOST}:${remote_new_jar}"
 
   log "Installing backend jar atomically"
   if (( BACKUP_BACKEND == 1 )); then
@@ -491,7 +555,7 @@ deploy_backend() {
       set -eu
       command -v sha256sum >/dev/null 2>&1
       if [ -f '${remote_new_jar}' ]; then
-        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
+        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${BACKEND_JAR_SHA256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
           rm -f '${remote_new_jar}'
         else
           if [ -f '${remote_jar}' ]; then
@@ -500,7 +564,7 @@ deploy_backend() {
           mv -f '${remote_new_jar}' '${remote_jar}'
         fi
       fi
-      printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null
+      printf '%s  %s\n' '${BACKEND_JAR_SHA256}' '${remote_jar}' | sha256sum -c - >/dev/null
       chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
       chmod 644 '${remote_jar}'
     "
@@ -509,13 +573,13 @@ deploy_backend() {
       set -eu
       command -v sha256sum >/dev/null 2>&1
       if [ -f '${remote_new_jar}' ]; then
-        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
+        if [ -f '${remote_jar}' ] && printf '%s  %s\n' '${BACKEND_JAR_SHA256}' '${remote_jar}' | sha256sum -c - >/dev/null 2>&1; then
           rm -f '${remote_new_jar}'
         else
           mv -f '${remote_new_jar}' '${remote_jar}'
         fi
       fi
-      printf '%s  %s\n' '${jar_sha256}' '${remote_jar}' | sha256sum -c - >/dev/null
+      printf '%s  %s\n' '${BACKEND_JAR_SHA256}' '${remote_jar}' | sha256sum -c - >/dev/null
       chown '${APP_USER}:${APP_GROUP}' '${remote_jar}' || true
       chmod 644 '${remote_jar}'
     "
@@ -559,6 +623,8 @@ deploy_backend() {
   if (( BACKUP_BACKEND == 1 )); then
     cleanup_remote_file_backups "${REMOTE_BACKEND_DIR}" "backend.jar.backup-*"
   fi
+
+  log "Backend artifact ${BACKEND_JAR_SHA256} deployed successfully to ${REMOTE_HOST}"
 }
 
 deploy_h5() {
@@ -683,27 +749,44 @@ deploy_frontend() {
   fi
 }
 
-log "Deploy target: ${REMOTE_HOST}"
-configure_transfer_mode
-
-if (( UPLOAD_ENV == 1 )); then
-  upload_env_file
-fi
-
-if (( UPLOAD_CERTS == 1 )); then
-  upload_cert_files
-fi
-
+PRIMARY_REMOTE_HOST="${REMOTE_HOST}"
 if (( DEPLOY_BACKEND == 1 )); then
-  deploy_backend
+  build_backend_artifact
+  log "Backend deploy hosts: ${BACKEND_HOST_LIST[*]}"
+  for backend_host in "${BACKEND_HOST_LIST[@]}"; do
+    REMOTE_HOST="${backend_host}"
+    log "Backend deploy target: ${REMOTE_HOST}"
+    configure_transfer_mode
+    if (( UPLOAD_ENV == 1 )); then
+      upload_env_file
+    fi
+    if (( UPLOAD_CERTS == 1 )); then
+      upload_cert_files
+    fi
+    deploy_backend_artifact
+  done
+elif (( UPLOAD_ENV == 1 || UPLOAD_CERTS == 1 )); then
+  REMOTE_HOST="${PRIMARY_REMOTE_HOST}"
+  log "Configuration upload target: ${REMOTE_HOST}"
+  configure_transfer_mode
+  if (( UPLOAD_ENV == 1 )); then
+    upload_env_file
+  fi
+  if (( UPLOAD_CERTS == 1 )); then
+    upload_cert_files
+  fi
 fi
 
-if (( DEPLOY_H5 == 1 )); then
-  deploy_h5
-fi
-
-if (( DEPLOY_FRONTEND == 1 )); then
-  deploy_frontend
+if (( DEPLOY_H5 == 1 || DEPLOY_FRONTEND == 1 )); then
+  REMOTE_HOST="${PRIMARY_REMOTE_HOST}"
+  log "Static deploy target: ${REMOTE_HOST}"
+  configure_transfer_mode
+  if (( DEPLOY_H5 == 1 )); then
+    deploy_h5
+  fi
+  if (( DEPLOY_FRONTEND == 1 )); then
+    deploy_frontend
+  fi
 fi
 
 log "Deployment finished"

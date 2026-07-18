@@ -41,7 +41,7 @@ const { Paragraph, Text, Title } = Typography;
 
 interface FilterValues {
   dateRange?: [Dayjs, Dayjs];
-  shopId?: number;
+  poiId?: string;
   shopKeyword?: string;
   commentId?: number;
   keyword?: string;
@@ -239,7 +239,7 @@ export default function CommentProcessingLog() {
         render: (_, record) => (
           <Space direction="vertical" size={0}>
             <Text strong>{text(record.shopName)}</Text>
-            <Text type="secondary">ID {record.shopId} · {text(record.epoiId)}</Text>
+            <Text type="secondary">门店 ID {text(record.poiId)} · ePoiId {text(record.epoiId)}</Text>
           </Space>
         ),
       },
@@ -359,7 +359,7 @@ export default function CommentProcessingLog() {
       pageSize: current.pageSize || 20,
       commentTimeFrom: values.dateRange?.[0]?.format("YYYY-MM-DD 00:00:00"),
       commentTimeTo: values.dateRange?.[1]?.format("YYYY-MM-DD 23:59:59"),
-      shopId: values.shopId,
+      poiId: values.poiId?.trim() || undefined,
       shopKeyword: values.shopKeyword?.trim() || undefined,
       commentId: values.commentId,
       keyword: values.keyword?.trim() || undefined,
@@ -382,7 +382,7 @@ export default function CommentProcessingLog() {
           <Form form={form} layout="vertical" onFinish={submitFilters}>
             <Row gutter={12}>
               <Col xs={24} md={8} xl={6}><Form.Item name="dateRange" label="评价时间"><RangePicker style={{ width: "100%" }} /></Form.Item></Col>
-              <Col xs={12} md={4} xl={3}><Form.Item name="shopId" label="门店 ID"><InputNumber min={1} style={{ width: "100%" }} /></Form.Item></Col>
+              <Col xs={12} md={4} xl={3}><Form.Item name="poiId" label="门店 ID"><Input allowClear placeholder="poiId" /></Form.Item></Col>
               <Col xs={12} md={6} xl={4}><Form.Item name="shopKeyword" label="门店"><Input allowClear placeholder="名称 / ePoiId" /></Form.Item></Col>
               <Col xs={12} md={6} xl={4}><Form.Item name="commentId" label="评价 ID"><InputNumber min={1} style={{ width: "100%" }} /></Form.Item></Col>
               <Col xs={12} md={6} xl={4}><Form.Item name="keyword" label="评价关键词"><Input allowClear /></Form.Item></Col>
@@ -435,7 +435,7 @@ export default function CommentProcessingLog() {
 
 function ProcessingDetail({ record }: { record: CommentProcessingLogRecord }) {
   const reviewItems: DescriptionsProps["items"] = [
-    { key: "shop", label: "门店", children: `${text(record.shopName)}（${record.shopId}）` },
+    { key: "shop", label: "门店", children: `${text(record.shopName)}（门店 ID：${text(record.poiId)}）` },
     { key: "commentId", label: "评价 ID", children: record.commentId },
     { key: "bizCode", label: "评价业务线", children: bizLineTag(record.bizCode) },
     { key: "valid", label: "评价有效性", children: validityTag(record.valid) },

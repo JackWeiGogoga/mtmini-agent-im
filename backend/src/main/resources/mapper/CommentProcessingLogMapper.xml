@@ -20,7 +20,7 @@
 
     <sql id="SelectColumns">
         c.id, c.shop_id AS shopId, COALESCE(s.poi_name, s.name) AS shopName,
-        c.epoi_id AS epoiId, c.poi_id AS poiId, c.comment_id AS commentId,
+        c.epoi_id AS epoiId, s.poi_id AS poiId, c.comment_id AS commentId,
         c.biz_code AS bizCode, c.valid AS valid, c.comment_type AS commentType,
         c.comment_time AS commentTime, c.comment_content AS commentContent,
         c.add_comment AS addComment, c.add_comment_time AS addCommentTime,
@@ -97,7 +97,7 @@
         <include refid="DataScopeWhere"/>
         <if test="query.commentTimeFrom != null and query.commentTimeFrom != ''">AND c.comment_time &gt;= #{query.commentTimeFrom}</if>
         <if test="query.commentTimeTo != null and query.commentTimeTo != ''">AND c.comment_time &lt;= #{query.commentTimeTo}</if>
-        <if test="query.shopId != null">AND c.shop_id = #{query.shopId}</if>
+        <if test="query.poiId != null and query.poiId != ''">AND s.poi_id = #{query.poiId}</if>
         <if test="query.shopKeyword != null and query.shopKeyword != ''">
             AND (s.name LIKE CONCAT('%', #{query.shopKeyword}, '%') OR s.poi_name LIKE CONCAT('%', #{query.shopKeyword}, '%') OR s.epoi_id LIKE CONCAT('%', #{query.shopKeyword}, '%'))
         </if>
