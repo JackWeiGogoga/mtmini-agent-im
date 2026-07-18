@@ -43,18 +43,18 @@
             </view>
             <view
               class="feature-head-status ai-head-status"
-              :class="{ 'feature-head-status-off': reauthRequired }"
+              :class="{ 'feature-head-status-off': !autoReplyEnabled }"
             >
               <image
                 class="feature-head-status-icon"
                 :src="
-                  reauthRequired
-                    ? '/static/icons/close.svg'
-                    : '/static/icons/open.svg'
+                  autoReplyEnabled
+                    ? '/static/icons/open.svg'
+                    : '/static/icons/close.svg'
                 "
                 mode="aspectFit"
               ></image>
-              <text>{{ reauthRequired ? "需授权" : "已授权" }}</text>
+              <text>{{ autoReplyEnabled ? "运行中" : "已关闭" }}</text>
             </view>
           </view>
 
@@ -110,21 +110,22 @@
               >
             </view>
             <view class="current-bid-value-wrap">
-              <text
-                class="current-bid-value"
-                :class="{ 'current-bid-value-failed': reauthRequired }"
-                >{{ serviceStatusText }}</text
-              >
               <view
                 class="appeal-toggle"
                 :class="{
                   'appeal-toggle-on': negativeCommentAppealEnabled,
-                  'appeal-toggle-disabled': operationSettingsSubmitting,
+                  'appeal-toggle-disabled':
+                    operationSettingsSubmitting || !autoReplyEnabled,
                 }"
                 @tap.stop="toggleNegativeCommentAppeal"
               >
                 <view class="appeal-toggle-dot"></view>
               </view>
+              <image
+                class="appeal-recommend-corner"
+                src="/static/icons/rec_corner.svg"
+                mode="aspectFit"
+              ></image>
             </view>
           </view>
           <view v-if="reauthRequired" class="promotion-warning">
@@ -318,6 +319,8 @@ const POWER_BALANCE_SUFFICIENT_THRESHOLD = 6000000;
 const POWER_BALANCE_TIGHT_THRESHOLD = 1000000;
 const RENEWAL_PAGE_URL =
   "https://waimaieapp.meituan.com/ad/mycraft/activity?MYCRAFT_PAGE_ID=2486&appId=138";
+// 临时关闭首页引流弹窗；恢复展示时改为 true。
+const ACTIVITY_POPUP_ENABLED = false;
 let activityPopupShownInCurrentApp = false;
 
 function toNumber(value, fallback = 0) {
@@ -545,12 +548,6 @@ export default {
     vipExpireText() {
       return formatDateText(this.membership.expireAt);
     },
-    serviceStatusText() {
-      if (this.reauthRequired) {
-        return "需重新授权";
-      }
-      return this.autoReplyEnabled ? "运行中" : "已关闭";
-    },
     knowledgeStatusText() {
       return "已配置";
     },
@@ -601,7 +598,7 @@ export default {
   },
   methods: {
     showActivityPopupOnce() {
-      if (activityPopupShownInCurrentApp) {
+      if (!ACTIVITY_POPUP_ENABLED || activityPopupShownInCurrentApp) {
         return;
       }
       activityPopupShownInCurrentApp = true;
@@ -640,9 +637,9 @@ export default {
       this.reauthRequired = Boolean(dashboard.authorization?.reauthRequired);
       const operationSettings = dashboard.operationSettings || {};
       this.autoReplyEnabled = operationSettings.autoReplyEnabled !== false;
-      this.negativeCommentAppealEnabled = Boolean(
-        operationSettings.negativeCommentAppealEnabled,
-      );
+      this.negativeCommentAppealEnabled =
+        this.autoReplyEnabled &&
+        Boolean(operationSettings.negativeCommentAppealEnabled);
       this.commentStats = {
         ...this.commentStats,
         ...(dashboard.commentStats || {}),
@@ -673,12 +670,22 @@ export default {
       this.statsMode = this.statsMode === "comments" ? "power" : "comments";
     },
     async toggleAutoReply() {
+      const nextAutoReplyEnabled = !this.autoReplyEnabled;
       await this.updateOperationSettings({
-        autoReplyEnabled: !this.autoReplyEnabled,
-        negativeCommentAppealEnabled: this.negativeCommentAppealEnabled,
+        autoReplyEnabled: nextAutoReplyEnabled,
+        negativeCommentAppealEnabled: nextAutoReplyEnabled
+          ? this.negativeCommentAppealEnabled
+          : false,
       });
     },
     async toggleNegativeCommentAppeal() {
+      if (!this.autoReplyEnabled) {
+        uni.showToast({
+          title: "请先开启AI回复",
+          icon: "none",
+        });
+        return;
+      }
       await this.updateOperationSettings({
         autoReplyEnabled: this.autoReplyEnabled,
         negativeCommentAppealEnabled: !this.negativeCommentAppealEnabled,
@@ -699,9 +706,9 @@ export default {
       try {
         const savedSettings = await updateMtH5OperationSettings(nextSettings);
         this.autoReplyEnabled = savedSettings.autoReplyEnabled !== false;
-        this.negativeCommentAppealEnabled = Boolean(
-          savedSettings.negativeCommentAppealEnabled,
-        );
+        this.negativeCommentAppealEnabled =
+          this.autoReplyEnabled &&
+          Boolean(savedSettings.negativeCommentAppealEnabled);
         uni.showToast({ title: "已保存", icon: "none" });
       } catch (error) {
         this.autoReplyEnabled = previousSettings.autoReplyEnabled;
@@ -1023,20 +1030,20 @@ export default {
 }
 
 .current-bid-value-wrap {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12rpx;
   flex-shrink: 0;
 }
 
-.current-bid-value {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #6a6d75;
-}
-
-.current-bid-value-failed {
-  color: #e5484d;
+.appeal-recommend-corner {
+  position: absolute;
+  top: -18rpx;
+  right: -18rpx;
+  z-index: 1;
+  width: 44rpx;
+  height: 44rpx;
+  pointer-events: none;
 }
 
 .appeal-toggle {
@@ -1283,8 +1290,23 @@ export default {
   background: #d9dbe2;
 }
 
+.toggle-off::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3rpx solid transparent;
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  animation: autoReplyToggleGlow 1.5s ease-in-out infinite;
+}
+
 .toggle-disabled {
   opacity: 0.6;
+}
+
+.toggle-disabled::after {
+  animation: none;
 }
 
 .toggle-dot {
@@ -1316,6 +1338,19 @@ export default {
 
 .toggle-off .toggle-dot {
   left: 4rpx;
+}
+
+@keyframes autoReplyToggleGlow {
+  0%,
+  100% {
+    border-color: rgba(239, 203, 63, 0);
+    box-shadow: 0 0 0 0 rgba(239, 203, 63, 0);
+  }
+
+  50% {
+    border-color: #efc548;
+    box-shadow: 0 0 18rpx 4rpx rgba(239, 203, 63, 0.42);
+  }
 }
 
 .power-balance-bar {
@@ -1369,10 +1404,6 @@ export default {
 
 .ai-current-bid-main .current-bid-subtitle {
   font-size: 24rpx;
-}
-
-.ai-current-bid-main .current-bid-value {
-  font-size: 30rpx;
 }
 
 .promotion-warning {
