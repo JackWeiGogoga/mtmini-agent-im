@@ -6,8 +6,9 @@ import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.CommentReplySentimentEnum;
-import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
+import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
+import com.gogoga.backend.enums.MtCommentSensitiveTypeEnum;
 import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
 import com.gogoga.backend.mapper.MtCommentMapper;
@@ -19,6 +20,7 @@ import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
 import com.gogoga.backend.service.async.MtCommentLogAnalysisTaskPayload;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -46,6 +48,7 @@ public class MtCommentAutoReplyService {
 
     private static final int REPLY_STATUS_UNREPLIED = 0;
     private static final int MAX_PAGE_SIZE = 20;
+    private static final String REAUTH_REQUIRED_ERROR = "门店授权已失效，请重新授权";
     private static final DateTimeFormatter COMMENT_QUERY_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final MtAccessTokenMapper mtAccessTokenMapper;
@@ -56,6 +59,7 @@ public class MtCommentAutoReplyService {
     private final MtAsyncTaskService mtAsyncTaskService;
     private final ShopOperationSettingsService shopOperationSettingsService;
     private final MtCommentReplyContentService mtCommentReplyContentService;
+    private final MtMeituanAuthorizationFailureHandler mtMeituanAuthorizationFailureHandler;
 
     public void syncAndReplyRecentUnrepliedComments() {
         LocalDateTime now = LocalDateTime.now();
@@ -65,6 +69,9 @@ public class MtCommentAutoReplyService {
         for (MtAccessToken token : candidates) {
             try {
                 syncAndReplyShop(token, queryDate, queryDate, "DAILY_INCREMENTAL");
+            } catch (MtAsyncTaskTerminalFailureException e) {
+                log.warn("评价自动回复门店终止，shopId={}, opBizCode={}, reason={}",
+                        token.getShopId(), token.getOpBizCode(), e.getMessage());
             } catch (RuntimeException e) {
                 log.error("评价自动回复门店处理失败，shopId={}, opBizCode={}", token.getShopId(), token.getOpBizCode(), e);
             }
@@ -114,6 +121,9 @@ public class MtCommentAutoReplyService {
         if (token == null || token.getShopId() == null || StringUtils.isBlank(token.getAccessToken())) {
             return;
         }
+        if (Integer.valueOf(MtAccessTokenAuthStatusEnum.REAUTH_REQUIRED.getCode()).equals(token.getAuthStatus())) {
+            throw new MtAsyncTaskTerminalFailureException("查询门店评价失败：" + REAUTH_REQUIRED_ERROR);
+        }
         MtShop shop = mtShopMapper.selectById(token.getShopId());
         if (shop == null || StringUtils.isBlank(shop.getEpoiId())) {
             log.warn("评价自动回复跳过门店，原因=缺少门店或 epoiId, shopId={}", token.getShopId());
@@ -148,11 +158,25 @@ public class MtCommentAutoReplyService {
             request.setOffset(offset);
             request.setLimit(pageSize);
             request.setReplyStatus(REPLY_STATUS_UNREPLIED);
-            MeituanResponse<List<QueryCommentListResponse>> response;
+            MtMeituanAuthorizationFailureHandler.AuthorizedCallResult<MeituanResponse<List<QueryCommentListResponse>>>
+                    authorizedCallResult;
             try {
-                response = meituanClient.invokeApi(request, token.getAccessToken());
+                authorizedCallResult = mtMeituanAuthorizationFailureHandler.invokeWithRefreshRetry(
+                        shop.getId(),
+                        token.getAccessToken(),
+                        "COMMENT_QUERY",
+                        accessToken -> meituanClient.invokeApi(request, accessToken),
+                        this::inspectAuthFailure
+                );
             } catch (MtSdkException e) {
                 throw new IllegalStateException("查询门店评价失败：" + e.getMessage(), e);
+            }
+            if (StringUtils.isNotBlank(authorizedCallResult.accessToken())) {
+                token.setAccessToken(authorizedCallResult.accessToken());
+            }
+            MeituanResponse<List<QueryCommentListResponse>> response = authorizedCallResult.response();
+            if (authorizedCallResult.confirmedAuthFailure()) {
+                throw new MtAsyncTaskTerminalFailureException("查询门店评价失败：" + REAUTH_REQUIRED_ERROR);
             }
             if (response == null || !response.isSuccess()) {
                 throw new IllegalStateException("查询门店评价失败：" + (response == null ? "EMPTY_RESPONSE" : response.getMsg()));
@@ -248,6 +272,10 @@ public class MtCommentAutoReplyService {
         if (token == null || StringUtils.isBlank(token.getAccessToken())) {
             throw new IllegalStateException("COMMENT_AUTO_REPLY_TOKEN_MISSING");
         }
+        if (Integer.valueOf(MtAccessTokenAuthStatusEnum.REAUTH_REQUIRED.getCode()).equals(token.getAuthStatus())) {
+            mtCommentMapper.markAutoReplyFailed(comment.getId(), REAUTH_REQUIRED_ERROR, LocalDateTime.now());
+            throw new MtAsyncTaskTerminalFailureException("评价自动回复失败：" + REAUTH_REQUIRED_ERROR);
+        }
         CommentReplyContentResultDTO replyResult = mtCommentReplyContentService.generateReply(shop, comment);
         if (replyResult == null || !replyResult.isShouldReply()) {
             String reason = replyResult == null ? "COMMENT_REPLY_GENERATION_SKIPPED" : replyResult.getSkipReason();
@@ -273,7 +301,22 @@ public class MtCommentAutoReplyService {
             request.setCommentId(comment.getCommentId());
             request.setEPoiId(shop.getEpoiId());
             request.setReply(reply);
-            MeituanResponse<String> response = meituanClient.invokeApi(request, token.getAccessToken());
+            MtMeituanAuthorizationFailureHandler.AuthorizedCallResult<MeituanResponse<String>> authorizedCallResult =
+                    mtMeituanAuthorizationFailureHandler.invokeWithRefreshRetry(
+                            shop.getId(),
+                            token.getAccessToken(),
+                            "COMMENT_REPLY",
+                            accessToken -> meituanClient.invokeApi(request, accessToken),
+                            this::inspectAuthFailure
+                    );
+            if (StringUtils.isNotBlank(authorizedCallResult.accessToken())) {
+                token.setAccessToken(authorizedCallResult.accessToken());
+            }
+            MeituanResponse<String> response = authorizedCallResult.response();
+            if (authorizedCallResult.confirmedAuthFailure()) {
+                mtCommentMapper.markAutoReplyFailed(comment.getId(), REAUTH_REQUIRED_ERROR, LocalDateTime.now());
+                throw new MtAsyncTaskTerminalFailureException("评价自动回复失败：" + REAUTH_REQUIRED_ERROR);
+            }
             if (response == null || !response.isSuccess()) {
                 String error = response == null ? "EMPTY_RESPONSE" : response.getMsg();
                 mtCommentMapper.markAutoReplyFailed(comment.getId(), StringUtils.left(error, 1000), LocalDateTime.now());
@@ -311,6 +354,13 @@ public class MtCommentAutoReplyService {
             log.warn("评价自动回复失败，shopId={}, commentId={}", shop.getId(), comment.getCommentId(), e);
             throw new IllegalStateException("评价自动回复失败：" + e.getMessage(), e);
         }
+    }
+
+    private MtMeituanAuthorizationFailureHandler.AuthFailureInfo inspectAuthFailure(MeituanResponse<?> response) {
+        if (response == null) {
+            return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.notAuthFailure();
+        }
+        return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.of(response.getCode(), response.getMsg());
     }
 
     private MtComment toEntity(MtShop shop,

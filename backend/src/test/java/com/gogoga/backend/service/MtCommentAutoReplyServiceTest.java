@@ -5,6 +5,7 @@ import com.gogoga.backend.dto.CommentReplyContentResultDTO;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtComment;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtAccessTokenMapper;
@@ -12,6 +13,7 @@ import com.gogoga.backend.mapper.MtCommentMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
 import com.meituan.sdk.internal.exceptions.MtSdkException;
@@ -22,7 +24,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,6 +33,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,19 +59,17 @@ class MtCommentAutoReplyServiceTest {
     private ShopOperationSettingsService shopOperationSettingsService;
     @Mock
     private MtCommentReplyContentService mtCommentReplyContentService;
+    @Mock
+    private MtAccessTokenService mtAccessTokenService;
 
     private final MtProperties mtProperties = new MtProperties();
 
-    @InjectMocks
     private MtCommentAutoReplyService service;
+    private MtMeituanAuthorizationFailureHandler authorizationFailureHandler;
 
     @BeforeEach
     void setUp() {
-        lenient().when(shopOperationSettingsService.isAutoReplyEnabled(any(Long.class))).thenReturn(true);
-    }
-
-    @Test
-    void syncAndReplyShopSavesCommentAndEnqueuesReplyTask() throws MtSdkException {
+        authorizationFailureHandler = new MtMeituanAuthorizationFailureHandler(mtAccessTokenService);
         service = new MtCommentAutoReplyService(
                 mtAccessTokenMapper,
                 mtShopMapper,
@@ -78,8 +78,14 @@ class MtCommentAutoReplyServiceTest {
                 mtProperties,
                 mtAsyncTaskService,
                 shopOperationSettingsService,
-                mtCommentReplyContentService
+                mtCommentReplyContentService,
+                authorizationFailureHandler
         );
+        lenient().when(shopOperationSettingsService.isAutoReplyEnabled(any(Long.class))).thenReturn(true);
+    }
+
+    @Test
+    void syncAndReplyShopSavesCommentAndEnqueuesReplyTask() throws MtSdkException {
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
         token.setAccessToken("token");
@@ -145,16 +151,6 @@ class MtCommentAutoReplyServiceTest {
 
     @Test
     void scheduledSyncQueriesYesterdayOnly() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
-        );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
         token.setAccessToken("token");
@@ -184,17 +180,80 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
-    void scheduledSyncSkipsShopWhenAutoReplyDisabled() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
+    void scheduledSyncRefreshesTokenOnceAfterAuthFailure() throws MtSdkException {
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token-old");
+        token.setOpBizCode("op-100");
+        when(mtAccessTokenMapper.selectCommentAutoReplyCandidates(any(LocalDateTime.class))).thenReturn(List.of(token));
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MeituanResponse<List<QueryCommentListResponse>> authFailure = new MeituanResponse<>();
+        authFailure.setCode("OP_UNIAUTH_FAILED");
+        authFailure.setMsg("令牌已过期, 请使用refresh_token刷新 鉴权失败");
+        MeituanResponse<List<QueryCommentListResponse>> emptyResponse = new MeituanResponse<>();
+        emptyResponse.setCode("OP_SUCCESS");
+        emptyResponse.setData(List.of());
+        when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token-old")))
+                .thenReturn(authFailure);
+        when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token-new")))
+                .thenReturn(emptyResponse);
+
+        MtAccessToken refreshedToken = new MtAccessToken();
+        refreshedToken.setShopId(100L);
+        refreshedToken.setAccessToken("token-new");
+        when(mtAccessTokenService.refreshTokenForShopWithResult(100L)).thenReturn(
+                new MtAccessTokenService.TokenRefreshResult(true, refreshedToken, 0, null, null)
         );
+        when(mtCommentMapper.selectPendingAutoReplyByShopId(100L)).thenReturn(List.of());
+
+        service.syncAndReplyRecentUnrepliedComments();
+
+        verify(meituanClient).invokeApi(any(QueryCommentListRequest.class), eq("token-old"));
+        verify(meituanClient).invokeApi(any(QueryCommentListRequest.class), eq("token-new"));
+        verify(mtAccessTokenService, never()).markReauthRequired(any());
+    }
+
+    @Test
+    void scheduledSyncMarksReauthRequiredWhenRefreshFails() throws MtSdkException {
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token-old");
+        token.setOpBizCode("op-100");
+        when(mtAccessTokenMapper.selectCommentAutoReplyCandidates(any(LocalDateTime.class))).thenReturn(List.of(token));
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MeituanResponse<List<QueryCommentListResponse>> authFailure = new MeituanResponse<>();
+        authFailure.setCode("OP_UNIAUTH_FAILED");
+        authFailure.setMsg("令牌已过期, 请使用refresh_token刷新 鉴权失败");
+        when(meituanClient.invokeApi(any(QueryCommentListRequest.class), eq("token-old")))
+                .thenReturn(authFailure);
+        when(mtAccessTokenService.refreshTokenForShopWithResult(100L)).thenReturn(
+                new MtAccessTokenService.TokenRefreshResult(
+                        false,
+                        null,
+                        10009,
+                        "授权不存在或已过期, 请联系商家进行授权.",
+                        "REMOTE_REFRESH_FAILED"
+                )
+        );
+
+        service.syncAndReplyRecentUnrepliedComments();
+
+        verify(mtAccessTokenService).markReauthRequired(100L);
+        verify(mtCommentMapper, never()).selectPendingAutoReplyByShopId(100L);
+    }
+
+    @Test
+    void scheduledSyncSkipsShopWhenAutoReplyDisabled() throws MtSdkException {
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
         token.setAccessToken("token");
@@ -215,16 +274,6 @@ class MtCommentAutoReplyServiceTest {
 
     @Test
     void authBackfillUsesConfiguredSevenDayWindow() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
-        );
         MtAccessToken token = new MtAccessToken();
         token.setShopId(100L);
         token.setAccessToken("token");
@@ -257,16 +306,6 @@ class MtCommentAutoReplyServiceTest {
 
     @Test
     void executeCommentAutoReplyTaskRepliesSingleComment() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
-        );
         MtComment comment = new MtComment();
         comment.setId(9L);
         comment.setCommentId(542543250001L);
@@ -326,17 +365,99 @@ class MtCommentAutoReplyServiceTest {
     }
 
     @Test
-    void executeCommentAutoReplyTaskEnqueuesIndependentComplaintAndImTasksForBadComment() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
+    void executeCommentAutoReplyTaskMarksReauthRequiredWhenRefreshFails() throws MtSdkException {
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token-old");
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        CommentReplyContentResultDTO replyResult = new CommentReplyContentResultDTO();
+        replyResult.setShouldReply(true);
+        replyResult.setReplyContent("很好");
+        when(mtCommentReplyContentService.generateReply(shop, comment)).thenReturn(replyResult);
+
+        MeituanResponse<String> authFailure = new MeituanResponse<>();
+        authFailure.setCode("OP_UNIAUTH_FAILED");
+        authFailure.setMsg("授权关系不存在 鉴权失败");
+        when(meituanClient.invokeApi(any(WmoperCommentAddReplyRequest.class), eq("token-old")))
+                .thenReturn(authFailure);
+        when(mtAccessTokenService.refreshTokenForShopWithResult(100L)).thenReturn(
+                new MtAccessTokenService.TokenRefreshResult(
+                        false,
+                        null,
+                        10009,
+                        "授权不存在或已过期, 请联系商家进行授权.",
+                        "REMOTE_REFRESH_FAILED"
+                )
         );
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        assertThrows(MtAsyncTaskTerminalFailureException.class,
+                () -> service.executeCommentAutoReplyTask(payload));
+
+        verify(mtAccessTokenService).markReauthRequired(100L);
+        verify(mtCommentMapper).markAutoReplyFailed(
+                eq(9L),
+                eq("门店授权已失效，请重新授权"),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskStopsBeforeGenerationWhenReauthIsAlreadyRequired() throws MtSdkException {
+        MtComment comment = new MtComment();
+        comment.setId(9L);
+        comment.setCommentId(542543250001L);
+        comment.setReplyStatus(0);
+        comment.setValid(1);
+        comment.setCommentType(4);
+        when(mtCommentMapper.selectByCommentId(542543250001L)).thenReturn(comment);
+
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        shop.setEpoiId("4211");
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+
+        MtAccessToken token = new MtAccessToken();
+        token.setShopId(100L);
+        token.setAccessToken("token-old");
+        token.setAuthStatus(MtAccessTokenAuthStatusEnum.REAUTH_REQUIRED.getCode());
+        when(mtAccessTokenMapper.selectByShopId(100L)).thenReturn(token);
+
+        MtCommentAutoReplyTaskPayload payload = new MtCommentAutoReplyTaskPayload();
+        payload.setShopId(100L);
+        payload.setCommentId(542543250001L);
+
+        assertThrows(MtAsyncTaskTerminalFailureException.class,
+                () -> service.executeCommentAutoReplyTask(payload));
+
+        verify(mtCommentReplyContentService, never()).generateReply(any(), any());
+        verify(meituanClient, never()).invokeApi(any(WmoperCommentAddReplyRequest.class), anyString());
+        verify(mtCommentMapper).markAutoReplyFailed(
+                eq(9L),
+                eq("门店授权已失效，请重新授权"),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void executeCommentAutoReplyTaskEnqueuesIndependentComplaintAndImTasksForBadComment() throws MtSdkException {
         MtComment comment = new MtComment();
         comment.setId(9L);
         comment.setShopId(100L);
@@ -410,16 +531,6 @@ class MtCommentAutoReplyServiceTest {
 
     @Test
     void executeCommentAutoReplyTaskSkipsWhenContentServiceDeclinesReply() throws MtSdkException {
-        service = new MtCommentAutoReplyService(
-                mtAccessTokenMapper,
-                mtShopMapper,
-                mtCommentMapper,
-                meituanClient,
-                mtProperties,
-                mtAsyncTaskService,
-                shopOperationSettingsService,
-                mtCommentReplyContentService
-        );
         MtComment comment = new MtComment();
         comment.setId(9L);
         comment.setCommentId(542543250001L);
