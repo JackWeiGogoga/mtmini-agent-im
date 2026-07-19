@@ -61,6 +61,11 @@ public class MtProperties {
     private Im im = new Im();
 
     /**
+     * 通用敏感词配置。
+     */
+    private SensitiveWord sensitiveWord = new SensitiveWord();
+
+    /**
      * 通用门店知识库配置。
      */
     private Knowledge knowledge = new Knowledge();
@@ -71,6 +76,20 @@ public class MtProperties {
          * 美团 IM 消息 AES 密钥，UTF-8 编码必须恰好 16 字节。
          */
         private String secret;
+    }
+
+    @Data
+    public static class SensitiveWord {
+
+        /**
+         * 是否启用敏感词检测。
+         */
+        private boolean enabled = true;
+
+        /**
+         * 预留给后续 IM 回复生成流程的最大改写次数。
+         */
+        private int maxRewriteAttempts = 1;
     }
 
     @Data

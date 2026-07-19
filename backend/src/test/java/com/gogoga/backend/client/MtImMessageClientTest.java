@@ -1,7 +1,9 @@
 package com.gogoga.backend.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gogoga.backend.dto.SensitiveWordHitDTO;
 import com.gogoga.backend.service.MtImMessageCryptoService;
+import com.gogoga.backend.service.SensitiveWordService;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -34,6 +36,9 @@ class MtImMessageClientTest {
     @Mock
     private MtImMessageCryptoService cryptoService;
 
+    @Mock
+    private SensitiveWordService sensitiveWordService;
+
     @InjectMocks
     private MtImMessageClient client;
 
@@ -53,6 +58,7 @@ class MtImMessageClientTest {
                 ArgumentCaptor.forClass(SendImMsgWmoperRequest.class);
         verify(meituanClient).invokeApi(request.capture(), eq("token"));
         verify(cryptoService).encrypt("reply-content");
+        verify(sensitiveWordService).detect("reply-content");
 
         JsonNode payload = JsonUtil.readTree(request.getValue().serializeToJson());
         JsonNode pushContent = payload.path("push_content");
@@ -73,7 +79,7 @@ class MtImMessageClientTest {
         assertFalse(result.responseSummary().contains("token"));
         assertFalse(result.responseSummary().contains("reply-content"));
         assertFalse(result.responseSummary().contains("encrypted-content"));
-        verifyNoMoreInteractions(meituanClient, cryptoService);
+        verifyNoMoreInteractions(meituanClient, cryptoService, sensitiveWordService);
     }
 
     @Test
@@ -93,7 +99,8 @@ class MtImMessageClientTest {
         assertEquals("售后场景", requests.getAllValues().get(0).getPushContent().getSceneName());
         assertEquals(3, requests.getAllValues().get(1).getPushContent().getMsgType());
         verify(cryptoService, org.mockito.Mockito.times(2)).encrypt("reply-content");
-        verifyNoMoreInteractions(meituanClient, cryptoService);
+        verifyNoInteractions(sensitiveWordService);
+        verifyNoMoreInteractions(meituanClient, cryptoService, sensitiveWordService);
     }
 
     @Test
@@ -109,7 +116,33 @@ class MtImMessageClientTest {
 
         assertEquals("MT_IM_MESSAGE_TYPE_UNSUPPORTED", card.getMessage());
         assertEquals("MT_IM_MESSAGE_TYPE_UNSUPPORTED", unknown.getMessage());
+        verifyNoInteractions(meituanClient, cryptoService, sensitiveWordService);
+    }
+
+    @Test
+    void blocksSensitiveTextBeforeEncryptionAndSdkCallWithSafeSummary() {
+        SensitiveWordHitDTO hit = new SensitiveWordHitDTO();
+        hit.setHit(true);
+        hit.setCategories(java.util.List.of("站外导流违规词"));
+        hit.setHitCount(1);
+        hit.setHighestSeverity("HIGH");
+        when(sensitiveWordService.detect("请加 微-信 处理")).thenReturn(hit);
+
+        MtImMessageClient.SendResult result = client.sendTwoPartyMessage(
+                "token-secret",
+                command(1, null, null, "请加 微-信 处理")
+        );
+
+        assertFalse(result.success());
+        assertEquals("SENSITIVE_WORD_HIT", result.errorCode());
+        assertTrue(result.responseSummary().contains("站外导流违规词"));
+        assertTrue(result.responseSummary().contains("HIGH"));
+        assertFalse(result.responseSummary().contains("微信"));
+        assertFalse(result.responseSummary().contains("请加"));
+        assertFalse(result.responseSummary().contains("token-secret"));
+        verify(sensitiveWordService).detect("请加 微-信 处理");
         verifyNoInteractions(meituanClient, cryptoService);
+        verifyNoMoreInteractions(sensitiveWordService);
     }
 
     @Test
@@ -132,7 +165,8 @@ class MtImMessageClientTest {
         assertFalse(result.responseSummary().contains("reply-content"));
         assertFalse(result.responseSummary().contains("encrypted-content"));
         verify(meituanClient).invokeApi(any(SendImMsgWmoperRequest.class), eq("token-secret"));
-        verifyNoMoreInteractions(meituanClient);
+        verify(sensitiveWordService).detect("reply-content");
+        verifyNoMoreInteractions(meituanClient, sensitiveWordService);
     }
 
     @Test
@@ -146,15 +180,23 @@ class MtImMessageClientTest {
         assertFalse(result.success());
         assertEquals("SDK_ERROR", result.errorCode());
         verify(meituanClient).invokeApi(any(SendImMsgWmoperRequest.class), eq("token"));
-        verifyNoMoreInteractions(meituanClient);
+        verify(sensitiveWordService).detect("reply-content");
+        verifyNoMoreInteractions(meituanClient, sensitiveWordService);
     }
 
     private MtImMessageClient.TwoPartyMessageCommand command(int messageType,
                                                               Integer sceneTag,
                                                               String sceneName) {
+        return command(messageType, sceneTag, sceneName, "reply-content");
+    }
+
+    private MtImMessageClient.TwoPartyMessageCommand command(int messageType,
+                                                              Integer sceneTag,
+                                                              String sceneName,
+                                                              String content) {
         return new MtImMessageClient.TwoPartyMessageCommand(
                 1888888888888888888L,
-                "reply-content",
+                content,
                 messageType,
                 1784374000L,
                 0L,

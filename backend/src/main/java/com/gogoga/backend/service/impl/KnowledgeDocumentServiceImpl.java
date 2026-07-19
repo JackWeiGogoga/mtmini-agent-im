@@ -15,6 +15,7 @@ import com.gogoga.backend.service.KnowledgeEmbeddingService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.SensitiveWordService;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
 import com.gogoga.backend.vo.KnowledgeChunkVO;
@@ -65,6 +66,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     private final MtProperties mtProperties;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final KnowledgeEmbeddingService knowledgeEmbeddingService;
+    private final SensitiveWordService sensitiveWordService;
 
     @Override
     public List<KnowledgeDocumentVO> listCurrentShopDocuments() {
@@ -321,6 +323,8 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         LocalDateTime now = LocalDateTime.now();
         List<MtKnowledgeChunk> chunks = new ArrayList<>();
         for (String text : rawChunks) {
+            sensitiveWordService.validateKnowledgeText(
+                    document.getShopId(), KnowledgeSourceTypeEnum.DOCUMENT.name(), text);
             float[] embedding = knowledgeEmbeddingService.embed(text);
             MtKnowledgeChunk chunk = new MtKnowledgeChunk();
             chunk.setShopId(document.getShopId());

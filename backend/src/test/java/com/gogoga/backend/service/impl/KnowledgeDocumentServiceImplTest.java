@@ -10,6 +10,7 @@ import com.gogoga.backend.service.KnowledgeEmbeddingService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.SensitiveWordService;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +41,7 @@ class KnowledgeDocumentServiceImplTest {
     @Mock private MtAsyncTaskService asyncTaskService;
     @Mock private KnowledgeVectorStore vectorStore;
     @Mock private KnowledgeEmbeddingService embeddingService;
+    @Mock private SensitiveWordService sensitiveWordService;
 
     private KnowledgeDocumentServiceImpl service;
 
@@ -45,7 +49,7 @@ class KnowledgeDocumentServiceImplTest {
     void setUp() {
         service = new KnowledgeDocumentServiceImpl(
                 h5ShopService, documentMapper, chunkMapper, cosStorageService,
-                asyncTaskService, new MtProperties(), vectorStore, embeddingService);
+                asyncTaskService, new MtProperties(), vectorStore, embeddingService, sensitiveWordService);
     }
 
     @Test
@@ -83,6 +87,26 @@ class KnowledgeDocumentServiceImplTest {
         order.verify(documentMapper).updateParseStatus(
                 eq(20L), eq(KnowledgeDocumentParseStatusEnum.FAILED.name()),
                 eq("DOCUMENT_PARSE_FAILED:IllegalStateException"), eq(0), any());
+    }
+
+    @Test
+    void sensitiveDocumentFailsBeforeEmbeddingOrVectorWrite() {
+        MtKnowledgeDocument document = document();
+        when(documentMapper.selectByIdAndShopId(20L, 10L)).thenReturn(document);
+        when(cosStorageService.loadObject("knowledge/10/a.txt"))
+                .thenReturn(CosStorageService.StoredObjectContent.builder()
+                        .content("请加微信沟通".getBytes(StandardCharsets.UTF_8))
+                        .build());
+        doThrow(new com.gogoga.backend.exception.BusinessException("内容命中敏感词类别：站外导流违规词"))
+                .when(sensitiveWordService).validateKnowledgeText(eq(10L), eq("DOCUMENT"), any());
+
+        assertThrows(IllegalStateException.class, () -> service.executeDocumentParseTask(payload()));
+
+        verify(embeddingService, never()).embed(any());
+        verify(vectorStore, never()).upsertChunks(any());
+        verify(documentMapper).updateParseStatus(
+                eq(20L), eq(KnowledgeDocumentParseStatusEnum.FAILED.name()),
+                eq("DOCUMENT_PARSE_FAILED:BusinessException"), eq(0), any());
     }
 
     private MtKnowledgeDocument document() {

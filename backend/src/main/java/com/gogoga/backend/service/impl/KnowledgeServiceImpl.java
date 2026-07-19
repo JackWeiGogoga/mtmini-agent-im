@@ -13,6 +13,7 @@ import com.gogoga.backend.service.KnowledgeEmbeddingService;
 import com.gogoga.backend.service.KnowledgeService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.SensitiveWordService;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
 import com.gogoga.backend.vo.KnowledgeItemVO;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final KnowledgeEmbeddingService knowledgeEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
     private final MtProperties mtProperties;
+    private final SensitiveWordService sensitiveWordService;
 
     @Override
     public List<KnowledgeItemVO> listCurrentShopQa() {
@@ -125,6 +127,11 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (param == null) {
             throw new BusinessException("知识参数不能为空");
         }
+        String text = "标题：" + StringUtils.defaultString(param.getTitle()) + "\n"
+                + "问题：" + StringUtils.defaultString(param.getQuestion()) + "\n"
+                + "回答：" + StringUtils.defaultString(param.getAnswer());
+        sensitiveWordService.validateKnowledgeText(
+                item.getShopId(), KnowledgeSourceTypeEnum.QA.name(), text);
         item.setTitle(StringUtils.trim(param.getTitle()));
         item.setQuestion(StringUtils.trim(param.getQuestion()));
         item.setAnswer(StringUtils.trim(param.getAnswer()));

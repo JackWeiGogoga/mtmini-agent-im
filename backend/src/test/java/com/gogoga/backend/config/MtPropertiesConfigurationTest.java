@@ -20,11 +20,17 @@ class MtPropertiesConfigurationTest {
             MtProperties properties = context.getBean(MtProperties.class);
             assertThat(properties.getKnowledge().getDocumentKeyPrefix()).isEqualTo("knowledge/documents");
             assertThat(properties.getIm()).isNotNull();
+            assertThat(properties.getSensitiveWord().isEnabled()).isTrue();
+            assertThat(properties.getSensitiveWord().getMaxRewriteAttempts()).isEqualTo(1);
+            SensitiveWordsProperties sensitiveWords = context.getBean(SensitiveWordsProperties.class);
+            assertThat(sensitiveWords.getCategories()).isNotEmpty();
+            assertThat(sensitiveWords.getCategories())
+                    .anyMatch(category -> "OFF_PLATFORM".equals(category.getCode()));
         });
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(MtProperties.class)
+    @EnableConfigurationProperties({MtProperties.class, SensitiveWordsProperties.class})
     static class TestConfiguration {
     }
 }

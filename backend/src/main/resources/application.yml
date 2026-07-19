@@ -27,6 +27,8 @@ server:
       suffix: .log
 
 spring:
+  config:
+    import: classpath:sensitive-words.yml
   application:
     name: backend
   profiles:
@@ -217,6 +219,9 @@ mt:
       max-backoff-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_MAX_BACKOFF_SECONDS:900}
   im:
     secret: ${MT_IM_SECRET:}
+  sensitive-word:
+    enabled: ${MT_SENSITIVE_WORD_ENABLED:true}
+    max-rewrite-attempts: ${MT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}
   knowledge:
     enabled: ${MT_KNOWLEDGE_ENABLED:true}
     max-qa-items-per-shop: ${MT_KNOWLEDGE_MAX_QA_ITEMS_PER_SHOP:500}

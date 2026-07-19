@@ -11,6 +11,7 @@ import com.gogoga.backend.param.KnowledgeQaParam;
 import com.gogoga.backend.service.KnowledgeEmbeddingService;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.SensitiveWordService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +22,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +38,7 @@ class KnowledgeServiceImplTest {
     @Mock private MtKnowledgeChunkMapper chunkMapper;
     @Mock private KnowledgeEmbeddingService embeddingService;
     @Mock private KnowledgeVectorStore vectorStore;
+    @Mock private SensitiveWordService sensitiveWordService;
 
     private KnowledgeServiceImpl service;
 
@@ -42,7 +46,7 @@ class KnowledgeServiceImplTest {
     void setUp() {
         service = new KnowledgeServiceImpl(
                 h5ShopService, itemMapper, documentMapper, chunkMapper,
-                embeddingService, vectorStore, new MtProperties());
+                embeddingService, vectorStore, new MtProperties(), sensitiveWordService);
     }
 
     @Test
@@ -106,6 +110,18 @@ class KnowledgeServiceImplTest {
 
         verify(vectorStore).deleteBySource("QA", 77L);
         verify(vectorStore, never()).upsertChunk(any());
+    }
+
+    @Test
+    void rejectsSensitiveQaBeforeInsertAndEmbedding() {
+        when(itemMapper.countEnabledQaByShopId(10L)).thenReturn(0);
+        doThrow(new BusinessException("内容命中敏感词类别：站外导流违规词"))
+                .when(sensitiveWordService).validateKnowledgeText(eq(10L), eq("QA"), any());
+
+        assertThrows(BusinessException.class, () -> service.createShopQa(10L, param(true)));
+
+        verify(itemMapper, never()).insert(any());
+        verify(embeddingService, never()).embed(any());
     }
 
     private KnowledgeQaParam param(boolean enabled) {

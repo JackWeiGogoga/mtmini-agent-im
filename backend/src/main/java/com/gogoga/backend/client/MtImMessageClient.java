@@ -1,7 +1,9 @@
 package com.gogoga.backend.client;
 
+import com.gogoga.backend.dto.SensitiveWordHitDTO;
 import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.service.MtImMessageCryptoService;
+import com.gogoga.backend.service.SensitiveWordService;
 import com.gogoga.backend.util.JsonUtil;
 import com.meituan.sdk.MeituanClient;
 import com.meituan.sdk.MeituanResponse;
@@ -34,9 +36,16 @@ public class MtImMessageClient {
 
     private final MeituanClient meituanClient;
     private final MtImMessageCryptoService cryptoService;
+    private final SensitiveWordService sensitiveWordService;
 
     public SendResult sendTwoPartyMessage(String accessToken, TwoPartyMessageCommand command) {
         validate(accessToken, command);
+        if (command.messageType() == ImMessageTypeEnum.TEXT.getCode()) {
+            SensitiveWordHitDTO hit = sensitiveWordService.detect(command.plaintextContent());
+            if (hit != null && hit.isHit()) {
+                return SendResult.failure("SENSITIVE_WORD_HIT", sensitiveWordSummary(hit));
+            }
+        }
 
         PushContent pushContent = new PushContent();
         pushContent.setMsgId(command.messageId());
@@ -109,6 +118,14 @@ public class MtImMessageClient {
         summary.put("code", response.getCode());
         summary.put("traceId", response.getTraceId());
         summary.put("dataPresent", response.getData() != null);
+        return JsonUtil.toJson(summary);
+    }
+
+    private String sensitiveWordSummary(SensitiveWordHitDTO hit) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("categories", hit.getCategories());
+        summary.put("hitCount", hit.getHitCount());
+        summary.put("highestSeverity", hit.getHighestSeverity());
         return JsonUtil.toJson(summary);
     }
 
