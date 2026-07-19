@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 REMOTE_HOST_FROM_ENV="${REMOTE_HOST-}"
 BACKEND_HOSTS_FROM_ENV="${BACKEND_HOSTS-}"
-REMOTE_HOST="${REMOTE_HOST:-mt4}"
+REMOTE_HOST="${REMOTE_HOST:-mt6}"
 BACKEND_HOSTS_EXPLICIT=0
 if [[ -n "${BACKEND_HOSTS_FROM_ENV}" ]]; then
   BACKEND_HOSTS="${BACKEND_HOSTS_FROM_ENV}"
@@ -17,7 +17,7 @@ elif [[ -n "${REMOTE_HOST_FROM_ENV}" ]]; then
   # REMOTE_HOST in their environment.
   BACKEND_HOSTS="${REMOTE_HOST}"
 else
-  BACKEND_HOSTS="mt3,mt4"
+  BACKEND_HOSTS="mt5,mt6"
 fi
 REMOTE_BACKEND_DIR="${REMOTE_BACKEND_DIR:-/opt/waimaidashi/backend}"
 REMOTE_H5_DIR="${REMOTE_H5_DIR:-/var/www/mt-h5}"
@@ -87,7 +87,7 @@ Options:
 
 Environment variables:
   REMOTE_HOST                 Static-file SSH host; also selects one backend host for backward compatibility
-  BACKEND_HOSTS               Backend SSH hosts separated by commas, default: mt3,mt4
+  BACKEND_HOSTS               Backend SSH hosts separated by commas, default: mt5,mt6
   REMOTE_BACKEND_DIR          Remote backend directory
   REMOTE_H5_DIR               Remote H5 static directory
   REMOTE_FRONTEND_DIR         Remote frontend static directory

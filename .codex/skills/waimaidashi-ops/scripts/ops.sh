@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-WEB_HOST="${WMD_WEB_HOST:-${WMD_EDGE_HOST:-mt4}}"
-DB_HOST="${WMD_DB_HOST:-mt3}"
+WEB_HOST="${WMD_WEB_HOST:-${WMD_EDGE_HOST:-mt6}}"
+DB_HOST="${WMD_DB_HOST:-mt5}"
 EDGE_HOST="${WEB_HOST}"
 BACKEND_SERVICE="${WMD_BACKEND_SERVICE:-waimaidashi-backend}"
 CADDY_SERVICE="${WMD_CADDY_SERVICE:-caddy}"
@@ -12,7 +12,7 @@ REMOTE_ENV_PATH="${WMD_REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 HOST_SELECTOR="both"
 SINCE="30 min ago"
 LINES="200"
-PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|comment|reply|auth"
+PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|im|message|comment|reply|auth"
 SLOW_THRESHOLD="0.5"
 
 usage() {
@@ -20,13 +20,13 @@ usage() {
 Usage:
   ops.sh health [--host web|db|both]
   ops.sh status [--host web|db|both]
-  ops.sh logs [--host web] [--since "30 min ago"] [--lines 200]
-  ops.sh errors [--host web] [--since "2 hours ago"] [--lines 200] [--pattern REGEX]
-  ops.sh tasks [--host web] [--since "6 hours ago"]
+  ops.sh logs [--host web|db|both] [--since "30 min ago"] [--lines 200]
+  ops.sh errors [--host web|db|both] [--since "2 hours ago"] [--lines 200] [--pattern REGEX]
+  ops.sh tasks [--host web|db|both] [--since "6 hours ago"]
   ops.sh ports [--host web|db|both]
   ops.sh caddy
   ops.sh caddy-access [--since "2026/05/17 14:15"] [--lines 20000] [--slow-threshold 0.5]
-  ops.sh env-summary [--host web]
+  ops.sh env-summary [--host web|db]
   ops.sh redis-locks [--lines 100]
   ops.sh redis-persistence
   ops.sh mysql-check
@@ -37,8 +37,8 @@ Usage:
   ops.sh sites
 
 Env overrides:
-  WMD_WEB_HOST=mt4
-  WMD_DB_HOST=mt3
+  WMD_WEB_HOST=mt6
+  WMD_DB_HOST=mt5
   WMD_BACKEND_SERVICE=waimaidashi-backend
   WMD_REMOTE_ENV_PATH=/etc/waimaidashi/backend.env
 EOF
@@ -136,8 +136,8 @@ cmd_status() {
   parse_common_args "$@"
   while IFS= read -r host; do
     if [[ "$(host_role "${host}")" == "db" ]]; then
-      log "database/cache status on ${host}"
-      run_ssh "${host}" "hostname; date; (systemctl is-active mysqld || systemctl is-active mysql || true); sudo systemctl status mysqld --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status mysql --no-pager -l 2>/dev/null | sed -n '1,35p' || true; echo; (systemctl is-active redis || systemctl is-active redis-server || true); sudo systemctl status redis --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status redis-server --no-pager -l 2>/dev/null | sed -n '1,35p' || true"
+      log "database/cache/backend status on ${host}"
+      run_ssh "${host}" "hostname; date; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,35p' || true; echo; (systemctl is-active mysqld || systemctl is-active mysql || true); sudo systemctl status mysqld --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status mysql --no-pager -l 2>/dev/null | sed -n '1,35p' || true; echo; (systemctl is-active redis || systemctl is-active redis-server || true); sudo systemctl status redis --no-pager -l 2>/dev/null | sed -n '1,35p' || sudo systemctl status redis-server --no-pager -l 2>/dev/null | sed -n '1,35p' || true"
     else
       log "backend status on ${host}"
       run_ssh "${host}" "hostname; date; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,45p'"
@@ -149,8 +149,8 @@ cmd_health() {
   parse_common_args "$@"
   while IFS= read -r host; do
     if [[ "$(host_role "${host}")" == "db" ]]; then
-      log "database/cache health on ${host}"
-      run_ssh "${host}" "hostname; date; uptime; echo; (systemctl is-active mysqld || systemctl is-active mysql || true); (systemctl is-active redis || systemctl is-active redis-server || true); echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:31306|:6379)' || true"
+      log "database/cache/backend health on ${host}"
+      run_ssh "${host}" "hostname; date; uptime; echo; systemctl is-active '${BACKEND_SERVICE}' || true; curl -fsS http://127.0.0.1:8080/health/check || true; echo; (systemctl is-active mysqld || systemctl is-active mysql || true); (systemctl is-active redis || systemctl is-active redis-server || true); echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:8080|:31306|:6379)' || true"
     else
       log "web/backend health on ${host}"
       run_ssh "${host}" "hostname; date; uptime; echo; systemctl is-active '${BACKEND_SERVICE}' || true; sudo systemctl status '${BACKEND_SERVICE}' --no-pager -l | sed -n '1,25p'; echo; systemctl is-active '${CADDY_SERVICE}' || true; echo; curl -fsS http://127.0.0.1:8080/health/check || true; echo; free -m; echo; df -h / /opt /var 2>/dev/null || df -h; echo; ss -lntp | egrep '(:8080|:80|:443)' || true"
@@ -161,10 +161,6 @@ cmd_health() {
 cmd_logs() {
   parse_common_args "$@"
   while IFS= read -r host; do
-    if [[ "$(host_role "${host}")" == "db" ]]; then
-      log "skip backend logs on database host ${host}"
-      continue
-    fi
     log "backend logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager -n '${LINES}'"
   done < <(selected_hosts)
@@ -173,10 +169,6 @@ cmd_logs() {
 cmd_errors() {
   parse_common_args "$@"
   while IFS= read -r host; do
-    if [[ "$(host_role "${host}")" == "db" ]]; then
-      log "skip backend filtered logs on database host ${host}"
-      continue
-    fi
     log "backend filtered logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager | egrep -i '${PATTERN}' | tail -n '${LINES}' || true"
   done < <(selected_hosts)
@@ -184,13 +176,9 @@ cmd_errors() {
 
 cmd_tasks() {
   SINCE="6 hours ago"
-  PATTERN="MtCommentAutoReplyTask|MtAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|数据库异步任务|评价自动回复|授权后异步|lock"
+  PATTERN="Mt.*Im|Mt.*Message|MtCommentAutoReplyTask|MtAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|数据库异步任务|IM|消息|评价自动回复|授权后异步|lock"
   parse_common_args "$@"
   while IFS= read -r host; do
-    if [[ "$(host_role "${host}")" == "db" ]]; then
-      log "skip backend task logs on database host ${host}"
-      continue
-    fi
     log "task logs on ${host} since ${SINCE}"
     run_ssh "${host}" "sudo journalctl -u '${BACKEND_SERVICE}' --since '${SINCE}' --no-pager | egrep -i '${PATTERN}' | tail -n '${LINES}' || true"
   done < <(selected_hosts)
@@ -230,9 +218,9 @@ since_raw = os.environ["SINCE"]
 since = since_raw[:16] if since_raw[:1].isdigit() else ""
 slow_threshold = float(os.environ["SLOW_THRESHOLD"])
 paths = [
-    "/var/log/caddy/aib-access.log",
-    "/var/log/caddy/aibadmin-access.log",
-    "/var/log/caddy/aibapi-access.log",
+    "/var/log/caddy/aic-access.log",
+    "/var/log/caddy/aicadmin-access.log",
+    "/var/log/caddy/aicapi-access.log",
 ]
 
 rows = []
@@ -540,7 +528,7 @@ Manual MySQL backup script:
   tools/mysql-backup-download.sh
 
 Defaults:
-  remote host: mt3
+  remote host: mt5
   database: mtmini_ai_agent
   remote dir: /data/backup/mysql
   local dir: ~/data/outsourcing/takeout-master-ai/db-backups
@@ -560,10 +548,10 @@ EOF
 cmd_sites() {
   log "public site headers"
   for url in \
-    https://aib.waimaidashi.com/ \
-    https://aibadmin.waimaidashi.com/ \
-    https://aibapi.waimaidashi.com/api/callbacks/meituan/auth \
-    https://aibapi.waimaidashi.com/api/callbacks/wechat/pay
+    https://aic.waimaidashi.com/ \
+    https://aicadmin.waimaidashi.com/ \
+    https://aicapi.waimaidashi.com/api/callbacks/meituan/auth \
+    https://aicapi.waimaidashi.com/api/callbacks/wechat/pay
   do
     printf '\n[ops] curl -I %s\n' "${url}"
     curl -I --connect-timeout 8 --max-time 15 "${url}" || true

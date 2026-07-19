@@ -16,13 +16,13 @@
 H5：
 
 ```bash
-curl -I https://aib.waimaidashi.com/
+curl -I https://aic.waimaidashi.com/
 ```
 
 管理后台：
 
 ```bash
-curl -I https://aibadmin.waimaidashi.com/
+curl -I https://aicadmin.waimaidashi.com/
 ```
 
 React Router 管理后台必须保留 `try_files {path} /index.html`。
@@ -30,8 +30,8 @@ React Router 管理后台必须保留 `try_files {path} /index.html`。
 ## 回调入口验证
 
 ```bash
-curl -I https://aibapi.waimaidashi.com/api/callbacks/meituan/auth
-curl -I https://aibapi.waimaidashi.com/api/callbacks/wechat/pay
+curl -I https://aicapi.waimaidashi.com/api/callbacks/meituan/auth
+curl -I https://aicapi.waimaidashi.com/api/callbacks/wechat/pay
 ```
 
 这些接口通常限制真实请求方法，`405` 可能只是说明路由已到达服务，不必直接判定为异常。
@@ -41,7 +41,7 @@ curl -I https://aibapi.waimaidashi.com/api/callbacks/wechat/pay
 用户明确授权后才 reload。必须先 validate：
 
 ```bash
-ssh mt4 'sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy'
+ssh mt6 'sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy'
 ```
 
 ## 后端重启
@@ -49,7 +49,7 @@ ssh mt4 'sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl rel
 用户明确授权后才重启：
 
 ```bash
-ssh mt4 'sudo systemctl restart waimaidashi-backend && sudo systemctl status waimaidashi-backend --no-pager -l'
+ssh mt6 'sudo systemctl restart waimaidashi-backend && sudo systemctl status waimaidashi-backend --no-pager -l'
 ```
 
 重启后至少观察 10 分钟内错误：

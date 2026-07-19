@@ -5,7 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-REMOTE_HOST="${REMOTE_HOST:-mt4}"
+REMOTE_HOST="${REMOTE_HOST:-mt6}"
+SERVER_ROLE="${SERVER_ROLE:-web}"
 APP_USER="${APP_USER:-waimaidashi}"
 APP_GROUP="${APP_GROUP:-waimaidashi}"
 APP_HOME="${APP_HOME:-/opt/waimaidashi}"
@@ -35,6 +36,7 @@ Usage: $(basename "$0") [options]
 
 Options:
   --host <ssh-host>           SSH host alias, default: ${REMOTE_HOST}
+  --role <web|data>           Server role, default: ${SERVER_ROLE}; data skips Caddy
   --skip-env                  Do not upload backend.env
   --skip-caddy                Do not upload Caddyfile
   --skip-service              Do not upload systemd service file
@@ -46,6 +48,7 @@ Options:
 
 Environment variables:
   REMOTE_HOST                 SSH host alias
+  SERVER_ROLE                 Server role: web or data
   APP_USER                    App user name
   APP_GROUP                   App group name
   APP_HOME                    App home directory
@@ -81,6 +84,11 @@ while [[ $# -gt 0 ]]; do
     --host)
       [[ $# -ge 2 ]] || fail "--host requires a value"
       REMOTE_HOST="$2"
+      shift 2
+      ;;
+    --role)
+      [[ $# -ge 2 ]] || fail "--role requires a value"
+      SERVER_ROLE="$2"
       shift 2
       ;;
     --skip-env)
@@ -120,6 +128,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "${SERVER_ROLE}" in
+  web)
+    ;;
+  data)
+    UPLOAD_CADDY=0
+    RELOAD_CADDY=0
+    ;;
+  *)
+    fail "--role/SERVER_ROLE must be web or data"
+    ;;
+esac
 
 require_cmd ssh
 require_cmd scp

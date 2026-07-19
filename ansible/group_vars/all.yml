@@ -27,6 +27,7 @@ common_packages:
   - chrony
   - curl
   - dnf-plugins-core
+  - firewalld
   - git
   - jq
   - lsof
@@ -71,6 +72,8 @@ app_directories:
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0755"
+
+web_directories:
   - path: /var/www/mt-admin
     owner: root
     group: root

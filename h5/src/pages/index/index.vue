@@ -3,8 +3,8 @@
     <view class="page-shell">
       <view class="header">
         <app-top-notice
-          message="登录 PC 端: https://aibadmin.waimaidashi.com"
-          copy-text="https://aibadmin.waimaidashi.com"
+          message="登录 PC 端: https://aicadmin.waimaidashi.com"
+          copy-text="https://aicadmin.waimaidashi.com"
           :show-icon="false"
           safe-top
         />

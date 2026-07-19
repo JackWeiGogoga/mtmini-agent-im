@@ -45,7 +45,7 @@
 
 ## 远端执行 SQL 模板
 
-不要手写 SSH + MySQL 密码命令。统一使用 `ops.sh mysql-query`，脚本会在 `mt3` 上通过 `/root/.my.cnf` 连接 MySQL；`/root/.my.cnf` 的 `[client]` 必须包含 `database=mtmini_ai_agent`。
+不要手写 SSH + MySQL 密码命令。统一使用 `ops.sh mysql-query`，脚本会在 `mt5` 上通过 `/root/.my.cnf` 连接 MySQL；`/root/.my.cnf` 的 `[client]` 必须包含 `database=mtmini_ai_agent`。
 
 ```bash
 .codex/skills/waimaidashi-ops/scripts/ops.sh mysql-query --sql "

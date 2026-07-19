@@ -33,7 +33,7 @@ public class MtProperties {
     /**
      * 授权成功后的跳转地址
      */
-    private String callbackSuccessUrl = "https://aib.waimaidashi.com/#/";
+    private String callbackSuccessUrl = "https://aic.waimaidashi.com/#/";
 
     /**
      * Token 刷新配置
