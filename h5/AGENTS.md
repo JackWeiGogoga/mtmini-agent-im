@@ -3,12 +3,13 @@
 ## 角色定位
 
 - `h5/` 是美团门店场景中的商家端 uni-app 小应用。
-- 首页展示本地 IM 自动回复总开关、授权状态、权益与算力，并提供知识库和客服入口。
+- 首页展示本地 IM 自动回复总开关、授权状态、权益与算力；底部“日志”Tab 展示当前门店回复明细、会话列表和跨 Session 完整历史。
 
 ## 关键模块
 
 - `src/App.vue` 与授权回调页：美团拉起和门店直登。
 - `src/pages/index/index.vue`：IM 服务状态与唯一总开关。
+- `src/pages/reply-logs/index.vue`：当前门店用户消息、AI 回复、会话聚合与向上加载的历史时间线。
 - `src/pages/knowledge/index.vue`：通用 QA、知识文档与切片管理。
 - `src/pages/power/`、`src/pages/support/`：算力和客服。
 - `src/utils/mt-auth.js`：登录态、门店信息和 H5 API 封装。

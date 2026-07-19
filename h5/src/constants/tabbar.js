@@ -7,6 +7,13 @@ const TABBAR_ITEMS = [
     activeIcon: "/static/tabbar/home-fill.png",
   },
   {
+    key: "logs",
+    label: "日志",
+    path: "/pages/reply-logs/index",
+    icon: "/static/tabbar/log.png",
+    activeIcon: "/static/tabbar/log-fill.png",
+  },
+  {
     key: "power",
     label: "算力",
     path: "/pages/power/index",

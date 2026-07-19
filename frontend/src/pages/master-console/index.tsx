@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Form, Input, Select, Segmented, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
+import { Button, Drawer, Form, Input, Select, Segmented, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { createStyles } from "antd-style";
 import type { ColumnsType } from "antd/es/table";
 import type { SortOrder } from "antd/es/table/interface";
-import { DatabaseOutlined, DownloadOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
+import { DatabaseOutlined, DownloadOutlined, MessageOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
@@ -15,6 +15,8 @@ import {
   getMasterConsoleShops,
   getMasterConsoleVisibleUsers,
   updateMasterConsoleShopOperationSettings,
+  getMasterConsoleImAutoReplyLogs,
+  getMasterConsoleImConversationHistory,
 } from "@/services/master-console-api";
 import { reportAdminBehaviorEvent } from "@/services/user-behavior-analytics-api";
 import type {
@@ -25,6 +27,8 @@ import type {
   ShopBindingStatus,
   VisibleUserOption,
 } from "@/types";
+import type { ImAutoReplyLogQuery } from "@/types";
+import ImReplyLogTable from "@/pages/im-auto-replies/components/ImReplyLogTable";
 
 const { Text } = Typography;
 const USER_SEARCH_DEBOUNCE_MS = 300;
@@ -86,6 +90,7 @@ const MasterConsole: React.FC = () => {
   const [visibleUsers, setVisibleUsers] = useState<VisibleUserOption[]>([]);
   const [userLoading, setUserLoading] = useState(false);
   const [savingShopIds, setSavingShopIds] = useState<number[]>([]);
+  const [logShop, setLogShop] = useState<MasterConsoleShopRow>();
   const userSearchTimer = useRef<number | null>(null);
 
   const buildRequestQuery = useCallback((value: MasterConsoleQueryParam) => {
@@ -142,6 +147,19 @@ const MasterConsole: React.FC = () => {
     }
   }, []);
 
+  const loadShopReplyLogs = useCallback((params: ImAutoReplyLogQuery) => {
+    if (!logShop) throw new Error("未选择门店");
+    return getMasterConsoleImAutoReplyLogs(logShop.shopId, params);
+  }, [logShop]);
+
+  const loadShopConversationHistory = useCallback((
+    conversationId: number,
+    params?: { cursorTime?: string; cursorId?: number; pageSize?: number },
+  ) => {
+    if (!logShop) throw new Error("未选择门店");
+    return getMasterConsoleImConversationHistory(logShop.shopId, conversationId, params);
+  }, [logShop]);
+
   const columns = useMemo<ColumnsType<MasterConsoleShopRow>>(() => [
     {
       title: "门店", key: "shop", width: 260, fixed: isCompact ? undefined : "left",
@@ -182,11 +200,14 @@ const MasterConsole: React.FC = () => {
     },
     { title: "绑定时间", dataIndex: "bindTime", width: 160, render: formatDateTime },
     {
-      title: "操作", key: "actions", width: 110, fixed: isCompact ? undefined : "right",
-      render: (_, record) => <Button type="link" icon={<DatabaseOutlined />} onClick={() => {
-        reportAdminBehaviorEvent("PC_KNOWLEDGE_VIEW", record.shopId, { portalType: currentUser?.activePortal, entrySource: "MASTER_CONSOLE" });
-        navigate(`/merchant-knowledge?shopId=${record.shopId}`);
-      }}>知识库</Button>,
+      title: "操作", key: "actions", width: 190, fixed: isCompact ? undefined : "right",
+      render: (_, record) => <Space size={0}>
+        <Button type="link" icon={<MessageOutlined />} onClick={() => setLogShop(record)}>回复日志</Button>
+        <Button type="link" icon={<DatabaseOutlined />} onClick={() => {
+          reportAdminBehaviorEvent("PC_KNOWLEDGE_VIEW", record.shopId, { portalType: currentUser?.activePortal, entrySource: "MASTER_CONSOLE" });
+          navigate(`/merchant-knowledge?shopId=${record.shopId}`);
+        }}>知识库</Button>
+      </Space>,
     },
   ], [currentUser?.activePortal, isCompact, navigate, query.sortField, query.sortOrder, saveImSwitch, savingShopIds]);
 
@@ -228,6 +249,20 @@ const MasterConsole: React.FC = () => {
         updateQuery({ pageNum: pagination.current || 1, pageSize: pagination.pageSize || 10, sortField: value?.field === "powerBalance" ? "powerBalance" : undefined, sortOrder: value?.order || undefined });
       }}
     />
+    <Drawer
+      title={`${logShop?.shopName || "门店"} · 回复日志`}
+      open={Boolean(logShop)}
+      onClose={() => setLogShop(undefined)}
+      width="88vw"
+      destroyOnHidden
+    >
+      {logShop ? <ImReplyLogTable
+        compact
+        showShopFilter={false}
+        loadPage={loadShopReplyLogs}
+        loadHistory={loadShopConversationHistory}
+      /> : null}
+    </Drawer>
   </PageContainer>;
 };
 

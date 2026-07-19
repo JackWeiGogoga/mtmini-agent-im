@@ -6,6 +6,9 @@ import type {
   PageInfo,
   ShopOperationSettingsUpdateParam,
   VisibleUserOption,
+  ImAutoReplyLog,
+  ImAutoReplyLogQuery,
+  ImConversationHistoryPage,
 } from "@/types";
 
 const MASTER_CONSOLE_BASE_URL = "/system/master-console";
@@ -53,5 +56,26 @@ export async function updateMasterConsoleShopOperationSettings(
     unknown,
     { data: ShopOperationSettingsUpdateParam & { shopId: number } }
   >(`${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/operation-settings`, params);
+  return response.data;
+}
+
+export async function getMasterConsoleImAutoReplyLogs(
+  shopId: number,
+  params: ImAutoReplyLogQuery,
+): Promise<PageInfo<ImAutoReplyLog>> {
+  const response = await request.get<unknown, { data: PageInfo<ImAutoReplyLog> }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/im-auto-replies`, { params },
+  );
+  return response.data;
+}
+
+export async function getMasterConsoleImConversationHistory(
+  shopId: number,
+  conversationId: number,
+  params?: { cursorTime?: string; cursorId?: number; pageSize?: number },
+): Promise<ImConversationHistoryPage> {
+  const response = await request.get<unknown, { data: ImConversationHistoryPage }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/im-conversations/${conversationId}/messages`, { params },
+  );
   return response.data;
 }

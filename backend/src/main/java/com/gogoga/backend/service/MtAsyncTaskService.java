@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * 数据库异步任务服务。
@@ -179,14 +180,14 @@ public class MtAsyncTaskService {
                 task.getTaskType(), task.getId(), nextAvailableAt, safeErrorSummary);
     }
 
-    public void handleFailure(
+    public boolean handleFailure(
             MtAsyncTask task,
             MtAsyncTaskExecutionPolicy policy,
             String errorSummary,
             LocalDateTime now
     ) {
         if (task == null || policy == null) {
-            return;
+            return false;
         }
         LocalDateTime currentTime = now == null ? LocalDateTime.now() : now;
         String safeErrorSummary = StringUtils.left(StringUtils.defaultIfBlank(errorSummary, "UNKNOWN_ERROR"), LAST_ERROR_MAX_LENGTH);
@@ -196,7 +197,7 @@ public class MtAsyncTaskService {
             mtAsyncTaskMetricsService.increment(task.getTaskType(), "dead");
             log.warn("数据库异步任务进入终态失败，taskType={}, taskId={}, retryCount={}, error={}",
                     task.getTaskType(), task.getId(), nextRetryCount, safeErrorSummary);
-            return;
+            return true;
         }
         LocalDateTime nextAvailableAt = currentTime.plus(resolveBackoff(policy, nextRetryCount));
         mtAsyncTaskMapper.rescheduleFromProcessing(
@@ -210,6 +211,7 @@ public class MtAsyncTaskService {
         mtAsyncTaskMetricsService.increment(task.getTaskType(), "retry");
         log.warn("数据库异步任务重试回退，taskType={}, taskId={}, retryCount={}, nextAvailableAt={}, error={}",
                 task.getTaskType(), task.getId(), nextRetryCount, nextAvailableAt, safeErrorSummary);
+        return false;
     }
 
     public void markTerminalFailure(MtAsyncTask task, String errorSummary, LocalDateTime now) {
@@ -240,6 +242,16 @@ public class MtAsyncTaskService {
             int limit,
             LocalDateTime now
     ) {
+        return recoverStaleTasks(taskType, policy, limit, now, null);
+    }
+
+    public int recoverStaleTasks(
+            MtAsyncTaskTypeEnum taskType,
+            MtAsyncTaskExecutionPolicy policy,
+            int limit,
+            LocalDateTime now,
+            Consumer<MtAsyncTask> terminalListener
+    ) {
         if (taskType == null || policy == null || limit <= 0) {
             return 0;
         }
@@ -247,7 +259,10 @@ public class MtAsyncTaskService {
         LocalDateTime claimedBefore = currentTime.minus(policy.getTimeout());
         List<MtAsyncTask> staleTasks = mtAsyncTaskMapper.selectStaleProcessingTasks(taskType.name(), claimedBefore, limit);
         for (MtAsyncTask task : staleTasks) {
-            handleFailure(task, policy, "STALE_TASK_TIMEOUT", currentTime);
+            boolean dead = handleFailure(task, policy, "STALE_TASK_TIMEOUT", currentTime);
+            if (dead && terminalListener != null) {
+                terminalListener.accept(task);
+            }
             mtAsyncTaskMetricsService.increment(taskType.name(), "stale_recovered");
             log.warn("数据库异步任务回收超时任务，taskType={}, taskId={}, claimedAt={}",
                     taskType.name(), task.getId(), task.getClaimedAt());

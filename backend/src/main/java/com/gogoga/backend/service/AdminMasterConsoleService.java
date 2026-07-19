@@ -102,6 +102,10 @@ public class AdminMasterConsoleService {
         );
     }
 
+    public void requireVisibleShop(Long shopId) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+    }
+
     private PageInfo<AdminMasterConsoleRowVO> buildRows(PageInfo<UserShopBindingVO> bindingPage,
                                                         DashboardStatsRangeTypeEnum statsRange) {
         List<UserShopBindingVO> bindings = bindingPage.getList() == null

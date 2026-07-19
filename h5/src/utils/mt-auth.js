@@ -188,6 +188,18 @@ export function getMtH5TabStatus() {
   return request('/api/h5/shop/tab-status', 'GET')
 }
 
+export function getMtH5ImAutoReplyLogs(params = {}) {
+  return request('/api/h5/im-auto-replies/messages', 'GET', params)
+}
+
+export function getMtH5ImConversations(params = {}) {
+  return request('/api/h5/im-auto-replies/conversations', 'GET', params)
+}
+
+export function getMtH5ImConversationHistory(conversationId, params = {}) {
+  return request(`/api/h5/im-auto-replies/conversations/${conversationId}/messages`, 'GET', params)
+}
+
 export function completeMtH5Guide(guideCode) {
   return request(`/api/h5/shop/guides/${guideCode}/complete`, 'POST')
 }

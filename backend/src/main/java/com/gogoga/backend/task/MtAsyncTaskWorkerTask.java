@@ -6,6 +6,7 @@ import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
+import com.gogoga.backend.service.MtImAutoReplyOrchestrationService;
 import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
@@ -13,6 +14,7 @@ import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
+import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
 import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -54,12 +56,14 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
             MtAsyncTaskTypeEnum.AUTH_CONFIGURE_IM,
-            MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE
+            MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
+            MtAsyncTaskTypeEnum.IM_AUTO_REPLY
     );
 
     private final MtAsyncTaskService mtAsyncTaskService;
     private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
     private final KnowledgeDocumentService knowledgeDocumentService;
+    private final MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
     private final LlmRateLimitProperties llmRateLimitProperties;
@@ -77,6 +81,7 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskService mtAsyncTaskService,
             MtAuthAsyncTaskService mtAuthAsyncTaskService,
             KnowledgeDocumentService knowledgeDocumentService,
+            MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
             LlmRateLimitProperties llmRateLimitProperties,
@@ -86,6 +91,7 @@ public class MtAsyncTaskWorkerTask {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
         this.knowledgeDocumentService = knowledgeDocumentService;
+        this.imAutoReplyOrchestrationService = imAutoReplyOrchestrationService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
         this.llmRateLimitProperties = llmRateLimitProperties;
@@ -108,7 +114,8 @@ public class MtAsyncTaskWorkerTask {
                     taskType,
                     resolvePolicy(taskType),
                     asyncTask.getRecoveryLimit(),
-                    LocalDateTime.now()
+                    LocalDateTime.now(),
+                    taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY ? this::markImAutoReplyDead : null
             );
         }
         if (recoveredCount > 0) {
@@ -208,6 +215,7 @@ public class MtAsyncTaskWorkerTask {
         MtProperties.LlmTaskWeights weights = mtProperties.getAsyncTask().getLlmTaskWeights();
         List<MtAsyncTaskTypeEnum> schedule = new ArrayList<>();
         addWeight(schedule, MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE, weights.getKnowledgeDocumentParse());
+        addWeight(schedule, MtAsyncTaskTypeEnum.IM_AUTO_REPLY, weights.getImAutoReply());
         return schedule;
     }
 
@@ -235,6 +243,7 @@ public class MtAsyncTaskWorkerTask {
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
                 case AUTH_CONFIGURE_IM -> executeAuthConfigureImTask(task);
                 case KNOWLEDGE_DOCUMENT_PARSE -> executeKnowledgeDocumentParseTask(task);
+                case IM_AUTO_REPLY -> executeImAutoReplyTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
@@ -262,9 +271,28 @@ public class MtAsyncTaskWorkerTask {
                     taskType.name(), taskId, e.getMessage());
             mtAsyncTaskService.markTerminalFailure(task, e.getMessage(), LocalDateTime.now());
         } catch (Exception e) {
-            log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
-            mtAsyncTaskService.handleFailure(task, resolvePolicy(taskType), e.getMessage(), LocalDateTime.now());
+            String errorSummary;
+            if (taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY) {
+                errorSummary = "IM_AUTO_REPLY_EXECUTION_FAILED:" + e.getClass().getSimpleName();
+                log.error("IM自动回复任务执行失败，taskId={}, errorType={}", taskId, e.getClass().getSimpleName());
+            } else {
+                errorSummary = e.getMessage();
+                log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
+            }
+            boolean dead = mtAsyncTaskService.handleFailure(
+                    task, resolvePolicy(taskType), errorSummary, LocalDateTime.now());
+            if (dead && taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY) {
+                markImAutoReplyDead(task);
+            }
         }
+    }
+
+    private void markImAutoReplyDead(MtAsyncTask task) {
+        if (task == null) {
+            return;
+        }
+        MtImAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImAutoReplyTaskPayload.class);
+        imAutoReplyOrchestrationService.markDeadAfterRetryExhausted(payload);
     }
 
     private void executeAuthSyncRightsTask(MtAsyncTask task) {
@@ -288,6 +316,11 @@ public class MtAsyncTaskWorkerTask {
         knowledgeDocumentService.executeDocumentParseTask(payload);
     }
 
+    private void executeImAutoReplyTask(MtAsyncTask task) {
+        MtImAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImAutoReplyTaskPayload.class);
+        imAutoReplyOrchestrationService.execute(payload);
+    }
+
     private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
         MtAuthPostProcessTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtAuthPostProcessTaskPayload.class);
         if (payload == null || payload.getShopId() == null) {
@@ -309,6 +342,7 @@ public class MtAsyncTaskWorkerTask {
                     .maxBackoff(Duration.ofSeconds(60))
                     .build();
             case KNOWLEDGE_DOCUMENT_PARSE -> resolvePolicy(asyncTask.getKnowledgeDocumentParse());
+            case IM_AUTO_REPLY -> resolvePolicy(asyncTask.getImAutoReply());
         };
     }
 

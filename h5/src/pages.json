@@ -9,6 +9,14 @@
       }
     },
     {
+      "path": "pages/reply-logs/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "回复日志",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/power/index",
       "style": {
         "navigationStyle": "custom",

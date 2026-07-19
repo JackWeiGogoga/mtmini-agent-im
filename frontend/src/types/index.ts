@@ -44,6 +44,9 @@ export * from "./knowledge-types";
 // 系统提示词类型
 export * from "./system-prompt-types";
 
+// IM 自动回复记录
+export * from "./im-auto-reply-types";
+
 // 菜单管理类型
 export type {
   Menu,

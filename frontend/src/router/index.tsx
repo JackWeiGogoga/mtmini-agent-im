@@ -39,6 +39,7 @@ const UserManage = lazy(() => import("@/pages/user-manage"));
 const RoleManage = lazy(() => import("@/pages/role-manage"));
 const MenuManage = lazy(() => import("@/pages/menu-manage"));
 const SystemPromptManage = lazy(() => import("@/pages/system-prompt"));
+const ImAutoReplyManage = lazy(() => import("@/pages/im-auto-replies"));
 const Forbidden = lazy(() => import("@/pages/error/Forbidden"));
 
 /**
@@ -242,6 +243,16 @@ const router = createBrowserRouter(
           ),
         },
         // 系统管理
+        {
+          path: "/im-auto-replies",
+          element: (
+            <AuthLayout permission="system:im-auto-reply:list">
+              <LazyWrapper>
+                <ImAutoReplyManage />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
         {
           path: "/system/user",
           element: (

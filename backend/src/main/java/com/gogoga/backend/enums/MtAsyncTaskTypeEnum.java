@@ -13,6 +13,7 @@ public enum MtAsyncTaskTypeEnum {
     AUTH_BLOCK_ORDER_PUSH("授权后停止订单推送"),
     AUTH_CONFIGURE_IM("授权后初始化门店IM"),
     KNOWLEDGE_DOCUMENT_PARSE("知识文档解析"),
+    IM_AUTO_REPLY("IM多轮自动回复"),
     ;
 
     private final String desc;

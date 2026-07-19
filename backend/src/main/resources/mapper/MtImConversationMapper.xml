@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImConversationMapper">
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImConversation">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="open_user_id" property="openUserId"/>
+        <result column="current_session_id" property="currentSessionId"/>
+        <result column="last_message_id" property="lastMessageId"/>
+        <result column="message_count" property="messageCount"/>
+        <result column="user_message_count" property="userMessageCount"/>
+        <result column="ai_message_count" property="aiMessageCount"/>
+        <result column="merchant_message_count" property="merchantMessageCount"/>
+        <result column="session_count" property="sessionCount"/>
+        <result column="first_message_at" property="firstMessageAt"/>
+        <result column="last_message_at" property="lastMessageAt"/>
+        <result column="last_user_message_at" property="lastUserMessageAt"/>
+        <result column="last_ai_reply_at" property="lastAiReplyAt"/>
+        <result column="version" property="version"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="BaseColumnList">
+        id, shop_id, open_user_id, current_session_id, last_message_id, message_count,
+        user_message_count, ai_message_count, merchant_message_count, session_count,
+        first_message_at, last_message_at, last_user_message_at, last_ai_reply_at,
+        version, create_time, update_time
+    </sql>
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImConversation"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_conversation (
+            shop_id, open_user_id, current_session_id, last_message_id, message_count,
+            user_message_count, ai_message_count, merchant_message_count, session_count,
+            first_message_at, last_message_at, last_user_message_at, last_ai_reply_at,
+            version, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{openUserId}, #{currentSessionId}, #{lastMessageId}, #{messageCount},
+            #{userMessageCount}, #{aiMessageCount}, #{merchantMessageCount}, #{sessionCount},
+            #{firstMessageAt}, #{lastMessageAt}, #{lastUserMessageAt}, #{lastAiReplyAt},
+            #{version}, #{createTime}, #{updateTime}
+        )
+    </insert>
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_conversation WHERE id = #{id} LIMIT 1
+    </select>
+    <select id="selectByShopAndOpenUser" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_conversation
+        WHERE shop_id = #{shopId} AND open_user_id = #{openUserId} LIMIT 1
+    </select>
+    <select id="selectByShopAndOpenUserForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_conversation
+        WHERE shop_id = #{shopId} AND open_user_id = #{openUserId} LIMIT 1 FOR UPDATE
+    </select>
+    <update id="updateCurrentSession" parameterType="com.gogoga.backend.entity.mt.MtImConversation">
+        UPDATE mt_im_conversation
+        SET current_session_id = #{currentSessionId},
+            session_count = #{sessionCount},
+            version = version + 1,
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+    <update id="incrementMessageAggregate">
+        UPDATE mt_im_conversation
+        SET last_message_id = IF(last_message_at IS NULL OR #{eventTime} &gt;= last_message_at, #{messageId}, last_message_id),
+            message_count = message_count + 1,
+            user_message_count = user_message_count + IF(#{senderRole} = 'USER', 1, 0),
+            ai_message_count = ai_message_count + IF(#{senderRole} = 'AI', 1, 0),
+            merchant_message_count = merchant_message_count + IF(#{senderRole} = 'MERCHANT', 1, 0),
+            first_message_at = COALESCE(first_message_at, #{eventTime}),
+            last_message_at = GREATEST(COALESCE(last_message_at, #{eventTime}), #{eventTime}),
+            last_user_message_at = IF(#{senderRole} = 'USER', GREATEST(COALESCE(last_user_message_at, #{eventTime}), #{eventTime}), last_user_message_at),
+            last_ai_reply_at = IF(#{senderRole} = 'AI', GREATEST(COALESCE(last_ai_reply_at, #{eventTime}), #{eventTime}), last_ai_reply_at),
+            version = version + 1,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

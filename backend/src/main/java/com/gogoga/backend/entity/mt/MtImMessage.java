@@ -5,13 +5,21 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 美团 IM 两方会话回调与消息事实。
+ * IM 两方会话统一消息事实，既包含美团回调，也包含内部生成的 AI 回复。
  */
 @Data
 public class MtImMessage {
 
     private Long id;
     private Long shopId;
+    private Long conversationId;
+    private Long sessionId;
+    private String recordSource;
+    private String senderRole;
+    private Long replyToMessageId;
+    private Long autoReplyId;
+    private String deliveryStatus;
+    private LocalDateTime eventTime;
     private String callbackMsgId;
     private String callbackMsgType;
     private Long developerId;

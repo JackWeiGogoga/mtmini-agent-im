@@ -5,11 +5,15 @@ import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
+import com.gogoga.backend.param.ImAutoReplyLogQueryParam;
+import com.gogoga.backend.service.ImReplyLogQueryService;
 import com.gogoga.backend.service.AdminMasterConsoleService;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
 import com.gogoga.backend.vo.ResultVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
+import com.gogoga.backend.vo.ImAutoReplyLogVO;
+import com.gogoga.backend.vo.ImConversationHistoryPageVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -34,6 +41,7 @@ import java.util.List;
 public class AdminMasterConsoleController {
 
     private final AdminMasterConsoleService adminMasterConsoleService;
+    private final ImReplyLogQueryService imReplyLogQueryService;
 
     @GetMapping("/shops")
     @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
@@ -95,6 +103,29 @@ public class AdminMasterConsoleController {
             @PathVariable Long shopId,
             @Valid @RequestBody ShopOperationSettingsUpdateParam param) {
         return ResultVO.success(adminMasterConsoleService.updateOperationSettings(shopId, param));
+    }
+
+    @GetMapping("/shops/{shopId}/im-auto-replies")
+    @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
+    public ResultVO<PageInfo<ImAutoReplyLogVO>> listImAutoReplies(
+            @PathVariable Long shopId,
+            ImAutoReplyLogQueryParam param) {
+        adminMasterConsoleService.requireVisibleShop(shopId);
+        return ResultVO.success(imReplyLogQueryService.listReplyLogs(param, shopId));
+    }
+
+    @GetMapping("/shops/{shopId}/im-conversations/{conversationId}/messages")
+    @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
+    public ResultVO<ImConversationHistoryPageVO> getImConversationHistory(
+            @PathVariable Long shopId,
+            @PathVariable Long conversationId,
+            @RequestParam(required = false)
+            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime cursorTime,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "30") Integer pageSize) {
+        adminMasterConsoleService.requireVisibleShop(shopId);
+        return ResultVO.success(imReplyLogQueryService.history(
+                conversationId, shopId, cursorTime, cursorId, pageSize));
     }
 
 }

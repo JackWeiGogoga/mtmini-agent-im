@@ -3,13 +3,14 @@
 ## 角色定位
 
 - `frontend/` 是 PC 管理后台，不是商家 H5。
-- 这里承载内部管理能力：登录、用户/角色/菜单、门店、算力、本地 IM 开关与通用门店知识库。
+- 这里承载内部管理能力：登录、用户/角色/菜单、门店、算力、本地 IM 开关、自动回复记录与会话历史、通用门店知识库。
 - 如果需求是商家在美团里看到的页面或交互，通常应该去 `h5/`，不是这里。
 
 ## 关键结构
 
 - `src/router/`：路由与受保护页面入口。
 - `src/pages/`：当前主要是登录、注册、欢迎页、用户管理、角色管理、菜单管理、错误页。
+- `src/pages/im-auto-replies/`：自动回复消息明细、会话聚合和跨 Session 完整对话抽屉。
 - `src/services/`：按业务拆分的接口封装。
 - `src/utils/request.ts`：Axios 实例、统一错误处理、登录态跳转。
 - `src/components/AppMessageContext/`：Ant Design `message`、`modal`、`notification` 的统一上下文出口。

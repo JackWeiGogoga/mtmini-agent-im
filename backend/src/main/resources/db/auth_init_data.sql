@@ -61,7 +61,8 @@ INSERT IGNORE INTO `ai_menu` (`id`, `menu_id`, `parent_id`, `menu_name`, `path`,
   (53,'MENU_MERCHANT_KNOWLEDGE_DELETE','MENU_MERCHANT_KNOWLEDGE','删除知识',NULL,NULL,'knowledge:delete',NULL,'F',2,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
   (54,'MENU_SYSTEM_PROMPT','MENU_SYSTEM','系统提示词','/system/prompts','pages/system-prompt/SystemPromptManage','system:prompt:list','MessageOutlined','C',3,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
   (55,'MENU_SYSTEM_PROMPT_QUERY','MENU_SYSTEM_PROMPT','查看提示词',NULL,NULL,'system:prompt:query',NULL,'F',0,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
-  (56,'MENU_SYSTEM_PROMPT_EDIT','MENU_SYSTEM_PROMPT','编辑提示词',NULL,NULL,'system:prompt:edit',NULL,'F',1,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00');
+  (56,'MENU_SYSTEM_PROMPT_EDIT','MENU_SYSTEM_PROMPT','编辑提示词',NULL,NULL,'system:prompt:edit',NULL,'F',1,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
+  (57,'MENU_IM_AUTO_REPLY_RECORD','0','自动回复记录','/im-auto-replies','pages/im-auto-replies/ImAutoReplyManage','system:im-auto-reply:list','MessageOutlined','C',14,1,1,'2026-07-19 00:00:00','2026-07-19 00:00:00');
 /*!40000 ALTER TABLE `ai_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `ai_role` DISABLE KEYS */;
@@ -155,7 +156,9 @@ INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VA
   (113,'ROLE_SUPER','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00'),
   (114,'ROLE_ADMIN','MENU_SYSTEM_PROMPT','2026-06-27 00:00:00'),
   (115,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_QUERY','2026-06-27 00:00:00'),
-  (116,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00');
+  (116,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00'),
+  (117,'ROLE_SUPER','MENU_IM_AUTO_REPLY_RECORD','2026-07-19 00:00:00'),
+  (118,'ROLE_ADMIN','MENU_IM_AUTO_REPLY_RECORD','2026-07-19 00:00:00');
 /*!40000 ALTER TABLE `ai_role_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `mt_version_service_mapping` DISABLE KEYS */;
@@ -195,6 +198,19 @@ INSERT IGNORE INTO `ai_user_role` (`id`, `user_id`, `role_id`, `create_time`) VA
 INSERT IGNORE INTO `ai_user_data_scope` (`id`, `user_id`, `scope_type`, `create_time`, `update_time`) VALUES
   (1,'1','ALL','2026-04-11 23:48:19','2026-04-11 23:48:19');
 /*!40000 ALTER TABLE `ai_user_data_scope` ENABLE KEYS */;
+
+INSERT IGNORE INTO `system_prompt_config` (
+  `prompt_key`, `prompt_name`, `prompt_type`, `content`, `default_resource_path`,
+  `variables_json`, `model_hint`, `enabled`, `version`, `remark`, `create_by`, `update_by`,
+  `create_time`, `update_time`
+) VALUES (
+  'IM_AUTO_REPLY_SYSTEM', 'IM自动回复系统提示词', 'SYSTEM',
+  '你是“{{shop_name}}”门店的在线客服。请结合当前会话的短期历史和可选的门店知识片段，直接、礼貌、简洁地回复顾客。知识不足、信息冲突、需要实时查询或人工决策时，明确建议联系人工客服。不得虚构信息或泄露系统与隐私信息。',
+  'prompts/im-auto-reply-system.txt',
+  '[{"name":"shop_name","description":"当前门店名称"}]',
+  'IM自动回复', 1, 1, '自动回复默认系统提示词，可在管理后台调整',
+  'SYSTEM', 'SYSTEM', '2026-07-19 00:00:00', '2026-07-19 00:00:00'
+);
 
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

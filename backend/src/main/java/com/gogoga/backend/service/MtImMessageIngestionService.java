@@ -5,7 +5,10 @@ import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtImMessage;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.ImMessageDecryptStatusEnum;
+import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
 import com.gogoga.backend.enums.ImMessageParseStatusEnum;
+import com.gogoga.backend.enums.ImMessageRecordSourceEnum;
+import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
 import com.gogoga.backend.mapper.MtImMessageMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.util.JsonUtil;
@@ -19,7 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -35,6 +41,8 @@ public class MtImMessageIngestionService {
     private final MtImMessageMapper mtImMessageMapper;
     private final MtShopMapper mtShopMapper;
     private final MtImMessageCryptoService cryptoService;
+    private final MtImConversationService conversationService;
+    private final MtImAutoReplyEnqueueService autoReplyEnqueueService;
 
     @Transactional(rollbackFor = Exception.class)
     public IngestionResult ingest(Map<String, String> parameters) {
@@ -56,13 +64,20 @@ public class MtImMessageIngestionService {
 
         MtImMessage message = buildBaseMessage(parameters, callbackMsgId);
         parseMessage(message, parameters.get("message"));
+        enrichTimelineMetadata(message);
         if (message.getAppId() != null && message.getPlatformMsgId() != null) {
             MtImMessage platformExisting = mtImMessageMapper.selectByPlatformMessage(
                     message.getAppId(), message.getPlatformMsgId());
             if (platformExisting != null) {
+                if (ImMessageRecordSourceEnum.AI_AUTO_REPLY.name().equals(platformExisting.getRecordSource())) {
+                    message.setId(platformExisting.getId());
+                    mtImMessageMapper.mergeCallbackIntoInternalMessage(message);
+                }
                 return IngestionResult.duplicate(platformExisting.getId());
             }
         }
+
+        assignConversation(message);
 
         try {
             mtImMessageMapper.insert(message);
@@ -73,6 +88,8 @@ public class MtImMessageIngestionService {
             }
             throw duplicate;
         }
+        conversationService.recordMessage(message);
+        autoReplyEnqueueService.enqueueIfEligible(message);
         log.info("美团IM消息已入库，recordId={}, shopId={}, callbackMsgId={}, platformMsgId={}, msgType={}, parseStatus={}, decryptStatus={}",
                 message.getId(), message.getShopId(), safeId(message.getCallbackMsgId()),
                 message.getPlatformMsgId(), message.getMsgType(), message.getParseStatus(), message.getDecryptStatus());
@@ -124,12 +141,50 @@ public class MtImMessageIngestionService {
         message.setEpoiId(parameters.get("ePoiId"));
         message.setCallbackTimestamp(parseLong(parameters.get("timestamp")));
         message.setSignVerified(true);
+        message.setRecordSource(ImMessageRecordSourceEnum.MEITUAN_CALLBACK.name());
+        message.setDeliveryStatus(ImMessageDeliveryStatusEnum.RECEIVED.name());
+        message.setEventTime(now);
         message.setParseStatus(ImMessageParseStatusEnum.PARSE_FAILED.name());
         message.setDecryptStatus(ImMessageDecryptStatusEnum.NOT_APPLICABLE.name());
         message.setReceivedAt(now);
         message.setCreateTime(now);
         message.setUpdateTime(now);
         return message;
+    }
+
+    private void enrichTimelineMetadata(MtImMessage message) {
+        if (Integer.valueOf(2).equals(message.getMsgSource())) {
+            message.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        } else if (Integer.valueOf(1).equals(message.getMsgSource())) {
+            message.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        }
+        message.setEventTime(resolveEventTime(message.getMessageCts(), message.getReceivedAt()));
+    }
+
+    private void assignConversation(MtImMessage message) {
+        if (message.getShopId() == null || message.getOpenUserId() == null || message.getSenderRole() == null) {
+            return;
+        }
+        MtImConversationService.Assignment assignment = conversationService.assign(
+                message.getShopId(), message.getOpenUserId(), message.getEventTime());
+        if (assignment != null) {
+            message.setConversationId(assignment.conversation().getId());
+            message.setSessionId(assignment.session().getId());
+        }
+    }
+
+    private LocalDateTime resolveEventTime(Long cts, LocalDateTime fallback) {
+        if (cts == null || cts <= 0L) {
+            return fallback;
+        }
+        try {
+            Instant instant = cts >= 1_000_000_000_000L
+                    ? Instant.ofEpochMilli(cts)
+                    : Instant.ofEpochSecond(cts);
+            return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        } catch (DateTimeException ignored) {
+            return fallback;
+        }
     }
 
     private void parseMessage(MtImMessage message, String rawMessage) {

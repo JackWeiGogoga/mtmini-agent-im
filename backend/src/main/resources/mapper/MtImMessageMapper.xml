@@ -5,6 +5,14 @@
     <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImMessage">
         <id column="id" property="id"/>
         <result column="shop_id" property="shopId"/>
+        <result column="conversation_id" property="conversationId"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="record_source" property="recordSource"/>
+        <result column="sender_role" property="senderRole"/>
+        <result column="reply_to_message_id" property="replyToMessageId"/>
+        <result column="auto_reply_id" property="autoReplyId"/>
+        <result column="delivery_status" property="deliveryStatus"/>
+        <result column="event_time" property="eventTime"/>
         <result column="callback_msg_id" property="callbackMsgId"/>
         <result column="callback_msg_type" property="callbackMsgType"/>
         <result column="developer_id" property="developerId"/>
@@ -43,7 +51,9 @@
     </resultMap>
 
     <sql id="BaseColumnList">
-        id, shop_id, callback_msg_id, callback_msg_type, developer_id, business_id,
+        id, shop_id, conversation_id, session_id, record_source, sender_role,
+        reply_to_message_id, auto_reply_id, delivery_status, event_time,
+        callback_msg_id, callback_msg_type, developer_id, business_id,
         op_biz_code, epoi_id, callback_timestamp, sign_verified, biz_type, extended_field,
         inner_sig, inner_timestamp, platform_msg_id, app_id, app_poi_code, msg_type,
         msg_source, message_cts, order_id, open_user_id, scene_tag, scene_name, has_reply,
@@ -55,7 +65,9 @@
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImMessage"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_im_message (
-            shop_id, callback_msg_id, callback_msg_type, developer_id, business_id,
+            shop_id, conversation_id, session_id, record_source, sender_role,
+            reply_to_message_id, auto_reply_id, delivery_status, event_time,
+            callback_msg_id, callback_msg_type, developer_id, business_id,
             op_biz_code, epoi_id, callback_timestamp, sign_verified, biz_type, extended_field,
             inner_sig, inner_timestamp, platform_msg_id, app_id, app_poi_code, msg_type,
             msg_source, message_cts, order_id, open_user_id, scene_tag, scene_name, has_reply,
@@ -63,7 +75,9 @@
             decrypt_status, error_code, error_summary, raw_message_json, raw_push_content_json,
             received_at, create_time, update_time
         ) VALUES (
-            #{shopId}, #{callbackMsgId}, #{callbackMsgType}, #{developerId}, #{businessId},
+            #{shopId}, #{conversationId}, #{sessionId}, #{recordSource}, #{senderRole},
+            #{replyToMessageId}, #{autoReplyId}, #{deliveryStatus}, #{eventTime},
+            #{callbackMsgId}, #{callbackMsgType}, #{developerId}, #{businessId},
             #{opBizCode}, #{epoiId}, #{callbackTimestamp}, #{signVerified}, #{bizType}, #{extendedField},
             #{innerSig}, #{innerTimestamp}, #{platformMsgId}, #{appId}, #{appPoiCode}, #{msgType},
             #{msgSource}, #{messageCts}, #{orderId}, #{openUserId}, #{sceneTag}, #{sceneName}, #{hasReply},
@@ -72,6 +86,13 @@
             #{receivedAt}, #{createTime}, #{updateTime}
         )
     </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_im_message
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
 
     <select id="selectByCallbackMsgId" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
@@ -86,5 +107,59 @@
         WHERE app_id = #{appId}
           AND platform_msg_id = #{platformMsgId}
         LIMIT 1
+    </select>
+
+    <update id="mergeCallbackIntoInternalMessage" parameterType="com.gogoga.backend.entity.mt.MtImMessage">
+        UPDATE mt_im_message
+        SET callback_msg_id = #{callbackMsgId}, callback_msg_type = #{callbackMsgType},
+            developer_id = #{developerId}, business_id = #{businessId}, op_biz_code = #{opBizCode},
+            epoi_id = #{epoiId}, callback_timestamp = #{callbackTimestamp}, sign_verified = #{signVerified},
+            biz_type = #{bizType}, extended_field = #{extendedField}, inner_sig = #{innerSig},
+            inner_timestamp = #{innerTimestamp}, app_poi_code = #{appPoiCode}, msg_type = #{msgType},
+            msg_source = #{msgSource}, message_cts = #{messageCts}, order_id = #{orderId},
+            open_user_id = #{openUserId}, scene_tag = #{sceneTag}, scene_name = #{sceneName},
+            has_reply = #{hasReply}, msg_content_ciphertext = #{msgContentCiphertext},
+            msg_content_hash = COALESCE(#{msgContentHash}, msg_content_hash),
+            parse_status = #{parseStatus}, decrypt_status = #{decryptStatus},
+            error_code = #{errorCode}, error_summary = #{errorSummary},
+            raw_message_json = #{rawMessageJson}, raw_push_content_json = #{rawPushContentJson},
+            received_at = #{receivedAt}, delivery_status = 'SENT', update_time = #{updateTime}
+        WHERE id = #{id} AND record_source = 'AI_AUTO_REPLY'
+    </update>
+
+    <update id="updateDeliveryStatus">
+        UPDATE mt_im_message
+        SET delivery_status = #{deliveryStatus}, error_code = #{errorCode},
+            error_summary = #{errorSummary}, update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectRecentBySession" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_im_message
+        WHERE session_id = #{sessionId}
+          AND (sender_role IN ('USER', 'MERCHANT')
+            OR (sender_role = 'AI' AND delivery_status = 'SENT'))
+          AND msg_content_plaintext IS NOT NULL
+        ORDER BY event_time DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectAfterMessageInConversation" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_im_message
+        WHERE conversation_id = #{conversationId} AND id &gt; #{messageId}
+        ORDER BY event_time ASC, id ASC
+    </select>
+
+    <select id="selectConversationHistoryBefore" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_im_message
+        WHERE conversation_id = #{conversationId}
+        <if test="cursorTime != null and cursorId != null">
+            AND (event_time &lt; #{cursorTime} OR (event_time = #{cursorTime} AND id &lt; #{cursorId}))
+        </if>
+        ORDER BY event_time DESC, id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

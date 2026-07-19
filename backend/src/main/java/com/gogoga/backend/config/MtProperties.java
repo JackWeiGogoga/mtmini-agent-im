@@ -36,6 +36,11 @@ public class MtProperties {
     private String callbackSuccessUrl = "https://aic.waimaidashi.com/#/";
 
     /**
+     * 美团 SDK 出站调用配置。
+     */
+    private Api api = new Api();
+
+    /**
      * Token 刷新配置
      */
     private Token token = new Token();
@@ -61,6 +66,11 @@ public class MtProperties {
     private Im im = new Im();
 
     /**
+     * IM 多轮自动回复配置。
+     */
+    private ImAutoReply imAutoReply = new ImAutoReply();
+
+    /**
      * 通用敏感词配置。
      */
     private SensitiveWord sensitiveWord = new SensitiveWord();
@@ -71,11 +81,104 @@ public class MtProperties {
     private Knowledge knowledge = new Knowledge();
 
     @Data
+    public static class Api {
+
+        /**
+         * 是否阻断全部美团 SDK 出站调用。安全起见默认开启。
+         */
+        private boolean dryRun = true;
+
+        /**
+         * 数据库异步任务因 dry run 跳过后的无损重排秒数。
+         */
+        private long dryRunRescheduleSeconds = 3600L;
+    }
+
+    @Data
     public static class Im {
         /**
          * 美团 IM 消息 AES 密钥，UTF-8 编码必须恰好 16 字节。
          */
         private String secret;
+    }
+
+    @Data
+    public static class ImAutoReply {
+
+        /**
+         * 全局编排总开关。默认关闭，发布后可按环境灰度开启。
+         */
+        private boolean enabled = false;
+
+        /**
+         * 连续多少分钟无消息后开启新的短期记忆 Session。
+         */
+        private long sessionIdleMinutes = 30L;
+
+        /**
+         * 提供给模型的当前 Session 最大历史轮数。
+         */
+        private int historyMaxRounds = 100;
+
+        /**
+         * 连续用户消息防抖时间。
+         */
+        private long debounceMillis = 2000L;
+
+        /**
+         * 模型上下文中消息正文的最大字符预算。
+         */
+        private int maxContextChars = 24000;
+
+        /**
+         * 单次回复最大输出 token。
+         */
+        private int maxCompletionTokens = 512;
+
+        /**
+         * Chat 生成温度。
+         */
+        private double temperature = 0.3D;
+
+        /**
+         * RAG 检索时拼接的最近用户消息条数。
+         */
+        private int ragRecentUserMessages = 3;
+
+        /**
+         * Conversation 分布式锁租约秒数。
+         */
+        private long lockLeaseSeconds = 60L;
+
+        /**
+         * Conversation 分布式锁续租间隔秒数。
+         */
+        private long lockRenewSeconds = 20L;
+
+        /**
+         * Chat 模型供应商。
+         */
+        private String modelProvider = "TOKENHUB";
+
+        /**
+         * Chat OpenAI-compatible base URL。
+         */
+        private String modelBaseUrl = "https://tokenhub.tencentmaas.com/v1";
+
+        /**
+         * Chat OpenAI-compatible API Key。
+         */
+        private String modelApiKey;
+
+        /**
+         * Chat 模型。
+         */
+        private String chatModel = "deepseek-v4-flash";
+
+        /**
+         * 敏感词改写仍失败时使用的固定安全回复。
+         */
+        private String safeFallbackReply = "抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。";
     }
 
     @Data
@@ -237,6 +340,11 @@ public class MtProperties {
         private TaskPolicy knowledgeDocumentParse = new TaskPolicy();
 
         /**
+         * IM 自动回复任务策略。
+         */
+        private TaskPolicy imAutoReply = new TaskPolicy();
+
+        /**
          * 历史终态任务清理配置
          */
         private Cleanup cleanup = new Cleanup();
@@ -246,6 +354,7 @@ public class MtProperties {
     @Data
     public static class LlmTaskWeights {
         private int knowledgeDocumentParse = 1;
+        private int imAutoReply = 5;
     }
 
     @Data

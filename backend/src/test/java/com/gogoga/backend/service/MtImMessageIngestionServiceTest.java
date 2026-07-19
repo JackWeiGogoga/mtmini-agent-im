@@ -37,6 +37,8 @@ class MtImMessageIngestionServiceTest {
     @Mock private MtImMessageMapper messageMapper;
     @Mock private MtShopMapper shopMapper;
     @Mock private MtImMessageCryptoService cryptoService;
+    @Mock private MtImConversationService conversationService;
+    @Mock private MtImAutoReplyEnqueueService autoReplyEnqueueService;
 
     private MtImMessageIngestionService service;
 
@@ -46,7 +48,8 @@ class MtImMessageIngestionServiceTest {
         properties.setSignKey(SIGN_KEY);
         properties.setDeveloperId(123L);
         properties.setBusinessId(1);
-        service = new MtImMessageIngestionService(properties, messageMapper, shopMapper, cryptoService);
+        service = new MtImMessageIngestionService(
+                properties, messageMapper, shopMapper, cryptoService, conversationService, autoReplyEnqueueService);
     }
 
     @Test
@@ -140,6 +143,22 @@ class MtImMessageIngestionServiceTest {
         assertTrue(result.success());
         assertTrue(result.duplicate());
         assertEquals(8L, result.recordId());
+        verify(messageMapper, never()).insert(any());
+    }
+
+    @Test
+    void mergesMeituanEchoIntoExistingInternalAiMessage() throws Exception {
+        MtImMessage existing = new MtImMessage();
+        existing.setId(8L);
+        existing.setRecordSource("AI_AUTO_REPLY");
+        when(messageMapper.selectByPlatformMessage(9637L, 42L)).thenReturn(existing);
+        String envelope = "{\"biz_type\":1,\"push_content\":{\"app_id\":9637,\"msg_id\":42}}";
+
+        MtImMessageIngestionService.IngestionResult result = service.ingest(
+                signedParameters("callback-ai-echo", envelope));
+
+        assertTrue(result.duplicate());
+        verify(messageMapper).mergeCallbackIntoInternalMessage(any());
         verify(messageMapper, never()).insert(any());
     }
 

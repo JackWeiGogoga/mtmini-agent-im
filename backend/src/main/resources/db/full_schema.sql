@@ -498,10 +498,63 @@ CREATE TABLE `mt_im_auto_reply_setting_history` (
   KEY `idx_mt_im_auto_reply_history_setting` (`setting_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='门店IM自动回复设置历史表';
 
+CREATE TABLE `mt_im_conversation` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint NOT NULL COMMENT '本地门店ID',
+  `open_user_id` bigint NOT NULL COMMENT '开放用户ID',
+  `current_session_id` bigint DEFAULT NULL COMMENT '当前短期记忆Session ID',
+  `last_message_id` bigint DEFAULT NULL COMMENT '最后一条统一消息ID',
+  `message_count` int NOT NULL DEFAULT '0' COMMENT '全部消息数',
+  `user_message_count` int NOT NULL DEFAULT '0' COMMENT '用户消息数',
+  `ai_message_count` int NOT NULL DEFAULT '0' COMMENT 'AI自动回复消息数',
+  `merchant_message_count` int NOT NULL DEFAULT '0' COMMENT '商家人工消息数',
+  `session_count` int NOT NULL DEFAULT '0' COMMENT '历史Session数',
+  `first_message_at` datetime DEFAULT NULL COMMENT '首条消息时间',
+  `last_message_at` datetime DEFAULT NULL COMMENT '最后消息时间',
+  `last_user_message_at` datetime DEFAULT NULL COMMENT '最后用户消息时间',
+  `last_ai_reply_at` datetime DEFAULT NULL COMMENT '最后AI回复时间',
+  `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mt_im_conversation_shop_user` (`shop_id`,`open_user_id`),
+  KEY `idx_mt_im_conversation_latest` (`last_message_at`,`id`),
+  KEY `idx_mt_im_conversation_shop_latest` (`shop_id`,`last_message_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='门店与顾客的长期IM会话流';
+
+CREATE TABLE `mt_im_conversation_session` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `conversation_id` bigint NOT NULL COMMENT '长期会话ID',
+  `session_no` int NOT NULL COMMENT '会话内Session序号',
+  `status` varchar(32) NOT NULL COMMENT 'ACTIVE/CLOSED',
+  `boundary_reason` varchar(32) NOT NULL COMMENT 'INITIAL/IDLE_TIMEOUT',
+  `started_at` datetime NOT NULL COMMENT 'Session开始时间',
+  `last_active_at` datetime NOT NULL COMMENT 'Session最后活动时间',
+  `closed_at` datetime DEFAULT NULL COMMENT 'Session关闭时间',
+  `message_count` int NOT NULL DEFAULT '0' COMMENT '全部消息数',
+  `user_message_count` int NOT NULL DEFAULT '0' COMMENT '用户消息数',
+  `ai_message_count` int NOT NULL DEFAULT '0' COMMENT 'AI消息数',
+  `merchant_message_count` int NOT NULL DEFAULT '0' COMMENT '商家人工消息数',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mt_im_session_conversation_no` (`conversation_id`,`session_no`),
+  KEY `idx_mt_im_session_conversation_status` (`conversation_id`,`status`,`last_active_at`),
+  KEY `idx_mt_im_session_conversation_latest` (`conversation_id`,`last_active_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='IM会话短期记忆Session';
+
 CREATE TABLE `mt_im_message` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `shop_id` bigint DEFAULT NULL COMMENT '本地门店ID',
-  `callback_msg_id` varchar(128) NOT NULL COMMENT '外层回调消息ID',
+  `conversation_id` bigint DEFAULT NULL COMMENT '长期会话ID',
+  `session_id` bigint DEFAULT NULL COMMENT '短期记忆Session ID',
+  `record_source` varchar(32) NOT NULL DEFAULT 'MEITUAN_CALLBACK' COMMENT 'MEITUAN_CALLBACK/AI_AUTO_REPLY',
+  `sender_role` varchar(32) DEFAULT NULL COMMENT 'USER/MERCHANT/AI',
+  `reply_to_message_id` bigint DEFAULT NULL COMMENT '回复的用户消息ID',
+  `auto_reply_id` bigint DEFAULT NULL COMMENT '自动回复编排记录ID',
+  `delivery_status` varchar(32) NOT NULL DEFAULT 'RECEIVED' COMMENT 'RECEIVED/GENERATED/SENDING/SENT/FAILED',
+  `event_time` datetime NOT NULL COMMENT '统一消息事件时间',
+  `callback_msg_id` varchar(128) DEFAULT NULL COMMENT '外层回调消息ID，内部AI消息为空',
   `callback_msg_type` varchar(64) DEFAULT NULL COMMENT '外层消息类型',
   `developer_id` bigint DEFAULT NULL COMMENT '开发者ID',
   `business_id` int DEFAULT NULL COMMENT '业务ID',
@@ -539,11 +592,51 @@ CREATE TABLE `mt_im_message` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_mt_im_message_callback` (`callback_msg_id`),
   UNIQUE KEY `uk_mt_im_message_platform` (`app_id`,`platform_msg_id`),
-  KEY `idx_mt_im_message_conversation` (`shop_id`,`open_user_id`,`message_cts`),
+  UNIQUE KEY `uk_mt_im_message_auto_reply` (`auto_reply_id`),
+  KEY `idx_mt_im_message_conversation_cursor` (`conversation_id`,`event_time`,`id`),
+  KEY `idx_mt_im_message_session_cursor` (`session_id`,`event_time`,`id`),
+  KEY `idx_mt_im_message_shop_cursor` (`shop_id`,`event_time`,`id`),
+  KEY `idx_mt_im_message_shop_role_cursor` (`shop_id`,`sender_role`,`event_time`,`id`),
+  KEY `idx_mt_im_message_open_user` (`shop_id`,`open_user_id`,`event_time`,`id`),
   KEY `idx_mt_im_message_reply_candidate` (`shop_id`,`msg_source`,`has_reply`,`message_cts`),
   KEY `idx_mt_im_message_order` (`order_id`),
   KEY `idx_mt_im_message_received` (`received_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='美团IM两方会话消息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='IM会话统一消息时间线';
+
+CREATE TABLE `mt_im_auto_reply` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint NOT NULL COMMENT '本地门店ID',
+  `conversation_id` bigint NOT NULL COMMENT '长期会话ID',
+  `session_id` bigint NOT NULL COMMENT '短期记忆Session ID',
+  `trigger_message_id` bigint NOT NULL COMMENT '触发自动回复的用户消息ID',
+  `reply_message_id` bigint DEFAULT NULL COMMENT '生成的AI统一消息ID',
+  `outbound_message_id` bigint NOT NULL COMMENT '稳定的美团出站消息ID',
+  `status` varchar(32) NOT NULL COMMENT 'PENDING/GENERATING/GENERATED/BILLED/SENDING/SENT/SUPERSEDED/SKIPPED/DEAD',
+  `skip_reason` varchar(64) DEFAULT NULL COMMENT '跳过或淘汰原因',
+  `rag_used` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否使用RAG上下文',
+  `rag_chunk_count` int NOT NULL DEFAULT '0' COMMENT '采用知识片段数',
+  `rag_max_score` decimal(8,6) DEFAULT NULL COMMENT '最高知识相似度',
+  `model_provider` varchar(64) DEFAULT NULL COMMENT 'Chat模型供应商',
+  `model_name` varchar(128) DEFAULT NULL COMMENT 'Chat模型名称',
+  `prompt_tokens` int DEFAULT NULL COMMENT '输入token数',
+  `completion_tokens` int DEFAULT NULL COMMENT '输出token数',
+  `power_amount` int DEFAULT NULL COMMENT '实际扣减算力',
+  `rewrite_count` int NOT NULL DEFAULT '0' COMMENT '敏感词改写次数',
+  `generated_at` datetime DEFAULT NULL COMMENT '生成完成时间',
+  `billed_at` datetime DEFAULT NULL COMMENT '算力扣减完成时间',
+  `sent_at` datetime DEFAULT NULL COMMENT '发送成功时间',
+  `last_error_code` varchar(128) DEFAULT NULL COMMENT '最近错误码',
+  `last_error_summary` varchar(1000) DEFAULT NULL COMMENT '安全错误摘要',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mt_im_auto_reply_trigger` (`trigger_message_id`),
+  UNIQUE KEY `uk_mt_im_auto_reply_reply` (`reply_message_id`),
+  UNIQUE KEY `uk_mt_im_auto_reply_outbound` (`outbound_message_id`),
+  KEY `idx_mt_im_auto_reply_shop_time` (`shop_id`,`create_time`,`id`),
+  KEY `idx_mt_im_auto_reply_conversation_time` (`conversation_id`,`create_time`,`id`),
+  KEY `idx_mt_im_auto_reply_status_time` (`status`,`create_time`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='IM自动回复编排与计费记录';
 
 CREATE TABLE `mt_h5_guide_state` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -717,7 +810,10 @@ CREATE TABLE `mt_shop` (
   `phone` varchar(255) DEFAULT NULL COMMENT '通知手机号',
   `shipping_time` varchar(255) DEFAULT NULL COMMENT '营业时间',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_mt_shop_epoi_id` (`epoi_id`)
+  UNIQUE KEY `uk_mt_shop_epoi_id` (`epoi_id`),
+  KEY `idx_mt_shop_poi_id` (`poi_id`),
+  KEY `idx_mt_shop_name` (`name`(191)),
+  KEY `idx_mt_shop_poi_name` (`poi_name`(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='美团店铺表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 

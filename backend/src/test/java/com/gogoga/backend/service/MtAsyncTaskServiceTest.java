@@ -100,8 +100,9 @@ class MtAsyncTaskServiceTest {
                 .build();
         LocalDateTime now = LocalDateTime.of(2026, 4, 18, 12, 0);
 
-        mtAsyncTaskService.handleFailure(task, policy, "STALE_TASK_TIMEOUT", now);
+        boolean dead = mtAsyncTaskService.handleFailure(task, policy, "STALE_TASK_TIMEOUT", now);
 
+        assertTrue(dead);
         verify(mtAsyncTaskMapper).markDead(
                 1L,
                 MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),

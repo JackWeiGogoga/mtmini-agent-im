@@ -1,0 +1,300 @@
+package com.gogoga.backend.service;
+
+import com.gogoga.backend.annotation.RequiresShopRight;
+import com.gogoga.backend.client.MtImMessageClient;
+import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.constant.MtShopRightCodeConstant;
+import com.gogoga.backend.dto.ImAutoReplyChatResult;
+import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
+import com.gogoga.backend.dto.SensitiveWordHitDTO;
+import com.gogoga.backend.entity.mt.MtAccessToken;
+import com.gogoga.backend.entity.mt.MtImAutoReply;
+import com.gogoga.backend.entity.mt.MtImMessage;
+import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
+import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
+import com.gogoga.backend.enums.ImMessageTypeEnum;
+import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
+import com.gogoga.backend.enums.MtImAutoReplyStatusEnum;
+import com.gogoga.backend.exception.PowerInsufficientException;
+import com.gogoga.backend.mapper.MtImAutoReplyMapper;
+import com.gogoga.backend.mapper.MtImMessageMapper;
+import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
+import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
+import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
+import com.gogoga.backend.util.MeituanAuthFailureUtil;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * IM 自动回复的防抖、生成、RAG、安全、计费和幂等发送编排。
+ */
+@Service
+@RequiredArgsConstructor
+public class MtImAutoReplyOrchestrationService {
+
+    private static final String PROMPT_KEY = "IM_AUTO_REPLY_SYSTEM";
+    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史简洁、礼貌地回复；信息不足时建议联系人工客服，不得虚构。";
+
+    private final MtProperties mtProperties;
+    private final MtImAutoReplyMapper autoReplyMapper;
+    private final MtImMessageMapper messageMapper;
+    private final MtShopMapper shopMapper;
+    private final ShopOperationSettingsService settingsService;
+    private final MtShopRightService shopRightService;
+    private final MtAccessTokenService accessTokenService;
+    private final MtMeituanAuthorizationFailureHandler authorizationFailureHandler;
+    private final ImConversationLockService conversationLockService;
+    private final ImAutoReplyContextService contextService;
+    private final ImAutoReplyRagService ragService;
+    private final ImAutoReplyChatService chatService;
+    private final SystemPromptService systemPromptService;
+    private final SensitiveWordService sensitiveWordService;
+    private final MtImAutoReplyStateService stateService;
+    private final MtImMessageClient messageClient;
+
+    public void execute(MtImAutoReplyTaskPayload payload) {
+        validatePayload(payload);
+        MtImAutoReply initial = autoReplyMapper.selectById(payload.getAutoReplyId());
+        if (initial == null) {
+            throw new MtAsyncTaskTerminalFailureException("IM_AUTO_REPLY_NOT_FOUND");
+        }
+        if (isTerminal(initial.getStatus())) {
+            return;
+        }
+        ImConversationLockService.LockHandle lock = conversationLockService.tryAcquire(initial.getConversationId());
+        if (lock == null) {
+            throw new MtAsyncTaskDryRunException("IM_CONVERSATION_LOCK_BUSY", 1L);
+        }
+        try (lock) {
+            executeWithLock(initial.getId(), lock);
+        }
+    }
+
+    /**
+     * 数据库任务耗尽重试或超时回收进入 DEAD 时，同步自动回复业务状态。
+     */
+    public void markDeadAfterRetryExhausted(MtImAutoReplyTaskPayload payload) {
+        if (payload == null || payload.getAutoReplyId() == null) {
+            return;
+        }
+        MtImAutoReply autoReply = autoReplyMapper.selectById(payload.getAutoReplyId());
+        if (autoReply != null && !isTerminal(autoReply.getStatus())) {
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.DEAD, "RETRY_EXHAUSTED");
+        }
+    }
+
+    private void executeWithLock(Long autoReplyId, ImConversationLockService.LockHandle lock) {
+        MtImAutoReply autoReply = autoReplyMapper.selectById(autoReplyId);
+        if (autoReply == null || isTerminal(autoReply.getStatus())) {
+            return;
+        }
+        MtImMessage trigger = messageMapper.selectById(autoReply.getTriggerMessageId());
+        if (trigger == null) {
+            stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.DEAD, "TRIGGER_MESSAGE_NOT_FOUND");
+            throw new MtAsyncTaskTerminalFailureException("TRIGGER_MESSAGE_NOT_FOUND");
+        }
+
+        SkipDecision decision = checkShopReadiness(autoReply.getShopId());
+        if (decision != null) {
+            stateService.markStatus(autoReplyId, decision.status(), decision.reason());
+            return;
+        }
+        decision = checkNewerMessages(trigger);
+        if (decision != null) {
+            stateService.markStatus(autoReplyId, decision.status(), decision.reason());
+            return;
+        }
+
+        if (autoReply.getReplyMessageId() == null) {
+            generateAndPersist(autoReply, trigger);
+            autoReply = autoReplyMapper.selectById(autoReplyId);
+        }
+        if (autoReply.getBilledAt() == null) {
+            try {
+                autoReply = stateService.bill(autoReplyId);
+            } catch (PowerInsufficientException insufficient) {
+                stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.SKIPPED,
+                        PowerInsufficientException.REASON_CODE);
+                throw new MtAsyncTaskTerminalFailureException(PowerInsufficientException.REASON_CODE);
+            }
+        }
+        if (!lock.isValid()) {
+            throw new MtAsyncTaskDryRunException("IM_CONVERSATION_LOCK_LOST", 1L);
+        }
+
+        decision = checkNewerMessages(trigger);
+        if (decision == null) {
+            decision = checkShopReadiness(autoReply.getShopId());
+        }
+        if (decision != null) {
+            stateService.markStatus(autoReplyId, decision.status(), decision.reason());
+            return;
+        }
+
+        MtImMessage replyMessage = messageMapper.selectById(autoReply.getReplyMessageId());
+        if (replyMessage == null || StringUtils.isBlank(replyMessage.getMsgContentPlaintext())) {
+            stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.DEAD, "REPLY_MESSAGE_NOT_FOUND");
+            throw new MtAsyncTaskTerminalFailureException("REPLY_MESSAGE_NOT_FOUND");
+        }
+        if (ImMessageDeliveryStatusEnum.SENT.name().equals(replyMessage.getDeliveryStatus())) {
+            stateService.markSent(autoReplyId);
+            return;
+        }
+        send(autoReply, trigger, replyMessage);
+    }
+
+    private void generateAndPersist(MtImAutoReply autoReply, MtImMessage trigger) {
+        stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.GENERATING, null);
+        ImAutoReplyContextService.Context context = contextService.build(autoReply.getSessionId());
+        ImAutoReplyRagService.RagContext ragContext = ragService.retrieve(
+                autoReply.getShopId(),
+                context.latestUserMessages(mtProperties.getImAutoReply().getRagRecentUserMessages()));
+        MtShop shop = shopMapper.selectById(autoReply.getShopId());
+        String shopName = shop == null ? "当前门店"
+                : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
+        ResolvedSystemPromptDTO prompt = systemPromptService.render(
+                PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+
+        ImAutoReplyChatResult result = chatService.generate(
+                prompt.getContent(), ragContext.promptContext(), context.messages());
+        String content = result.content();
+        int rewriteCount = 0;
+        int maxRewriteAttempts = Math.max(mtProperties.getSensitiveWord().getMaxRewriteAttempts(), 0);
+        while (isSensitive(content) && rewriteCount < maxRewriteAttempts) {
+            ImAutoReplyChatResult rewritten = chatService.rewrite(
+                    prompt.getContent(), ragContext.promptContext(), context.messages(), content);
+            result = result.plusUsage(rewritten);
+            content = result.content();
+            rewriteCount++;
+        }
+        if (isSensitive(content)) {
+            content = mtProperties.getImAutoReply().getSafeFallbackReply();
+            if (isSensitive(content)) {
+                stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.DEAD, "SAFE_FALLBACK_REJECTED");
+                throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
+            }
+        }
+        stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount);
+    }
+
+    private void send(MtImAutoReply autoReply, MtImMessage trigger, MtImMessage replyMessage) {
+        MtAccessToken token = accessTokenService.findByShopId(autoReply.getShopId());
+        if (!isUsableToken(token)) {
+            MtAccessTokenService.TokenRefreshResult refresh = accessTokenService.refreshTokenForShopWithResult(autoReply.getShopId());
+            token = refresh == null ? null : refresh.token();
+        }
+        if (!isUsableToken(token)) {
+            authorizationFailureHandler.handleConfirmedAuthFailure(
+                    autoReply.getShopId(), "IM_AUTO_REPLY_SEND", "TOKEN_UNAVAILABLE", null);
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
+            throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
+        }
+
+        stateService.markSending(autoReply.getId());
+        MtImMessageClient.SendResult result = sendOnce(token.getAccessToken(), autoReply, trigger, replyMessage);
+        if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
+            MtAccessTokenService.TokenRefreshResult refresh = accessTokenService.refreshTokenForShopWithResult(autoReply.getShopId());
+            MtAccessToken refreshed = refresh == null ? null : refresh.token();
+            if (isUsableToken(refreshed)) {
+                result = sendOnce(refreshed.getAccessToken(), autoReply, trigger, replyMessage);
+            }
+            if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
+                authorizationFailureHandler.handleConfirmedAuthFailure(
+                        autoReply.getShopId(), "IM_AUTO_REPLY_SEND", result.errorCode(), result.responseSummary());
+                stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
+                throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
+            }
+        }
+        if (!result.success()) {
+            stateService.markSendFailure(autoReply.getId(), result.errorCode(), result.responseSummary());
+            throw new IllegalStateException(StringUtils.defaultIfBlank(result.errorCode(), "IM_SEND_FAILED"));
+        }
+        stateService.markSent(autoReply.getId());
+    }
+
+    private MtImMessageClient.SendResult sendOnce(String accessToken,
+                                                   MtImAutoReply autoReply,
+                                                   MtImMessage trigger,
+                                                   MtImMessage replyMessage) {
+        return messageClient.sendTwoPartyMessage(accessToken, new MtImMessageClient.TwoPartyMessageCommand(
+                autoReply.getOutboundMessageId(), replyMessage.getMsgContentPlaintext(),
+                ImMessageTypeEnum.TEXT.getCode(), replyMessage.getMessageCts(),
+                trigger.getOrderId() == null ? 0L : trigger.getOrderId(), trigger.getOpenUserId(),
+                trigger.getSceneTag(), trigger.getSceneName(), trigger.getExtendedField()));
+    }
+
+    private SkipDecision checkShopReadiness(Long shopId) {
+        if (!mtProperties.getImAutoReply().isEnabled()) {
+            return SkipDecision.skipped("GLOBAL_SWITCH_DISABLED");
+        }
+        if (!settingsService.isAutoReplyEnabled(shopId)) {
+            return SkipDecision.skipped("SHOP_SWITCH_DISABLED");
+        }
+        if (!shopRightService.hasShopRight(shopId, RequiresShopRight.Logical.OR,
+                MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION)) {
+            return SkipDecision.skipped("SHOP_RIGHT_MISSING");
+        }
+        MtAccessToken token = accessTokenService.findByShopId(shopId);
+        if (token == null || Integer.valueOf(MtAccessTokenAuthStatusEnum.REAUTH_REQUIRED.getCode()).equals(token.getAuthStatus())) {
+            return SkipDecision.skipped("AUTH_REQUIRED");
+        }
+        return null;
+    }
+
+    private SkipDecision checkNewerMessages(MtImMessage trigger) {
+        List<MtImMessage> newer = messageMapper.selectAfterMessageInConversation(
+                trigger.getConversationId(), trigger.getId());
+        if (newer == null) {
+            return null;
+        }
+        for (MtImMessage message : newer) {
+            if (ImMessageSenderRoleEnum.MERCHANT.name().equals(message.getSenderRole())) {
+                return SkipDecision.skipped("MANUAL_REPLY_AFTER_TRIGGER");
+            }
+            if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())) {
+                return new SkipDecision(MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
+            }
+        }
+        return null;
+    }
+
+    private boolean isSensitive(String content) {
+        SensitiveWordHitDTO hit = sensitiveWordService.detect(content);
+        return hit != null && hit.isHit();
+    }
+
+    private boolean isUsableToken(MtAccessToken token) {
+        return token != null
+                && Integer.valueOf(MtAccessTokenAuthStatusEnum.VALID.getCode()).equals(token.getAuthStatus())
+                && StringUtils.isNotBlank(token.getAccessToken())
+                && token.getExpiresAt() != null
+                && token.getExpiresAt().isAfter(LocalDateTime.now());
+    }
+
+    private boolean isTerminal(String status) {
+        return MtImAutoReplyStatusEnum.SENT.name().equals(status)
+                || MtImAutoReplyStatusEnum.SUPERSEDED.name().equals(status)
+                || MtImAutoReplyStatusEnum.SKIPPED.name().equals(status)
+                || MtImAutoReplyStatusEnum.DEAD.name().equals(status);
+    }
+
+    private void validatePayload(MtImAutoReplyTaskPayload payload) {
+        if (payload == null || payload.getAutoReplyId() == null || payload.getTriggerMessageId() == null
+                || payload.getConversationId() == null || payload.getSessionId() == null || payload.getShopId() == null) {
+            throw new MtAsyncTaskTerminalFailureException("IM_AUTO_REPLY_TASK_PAYLOAD_INVALID");
+        }
+    }
+
+    private record SkipDecision(MtImAutoReplyStatusEnum status, String reason) {
+        static SkipDecision skipped(String reason) {
+            return new SkipDecision(MtImAutoReplyStatusEnum.SKIPPED, reason);
+        }
+    }
+}
