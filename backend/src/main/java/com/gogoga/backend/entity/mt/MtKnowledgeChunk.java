@@ -17,6 +17,7 @@ public class MtKnowledgeChunk {
     private Long itemId;
     private Long documentId;
     private String chunkText;
+    private String category;
     private String embeddingProvider;
     private String embeddingModel;
     private Integer embeddingDim;

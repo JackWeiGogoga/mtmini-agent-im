@@ -21,6 +21,13 @@ public class ImAutoReplyRagService {
     private final KnowledgeEmbeddingService knowledgeEmbeddingService;
 
     public RagContext retrieve(Long shopId, List<String> recentUserMessages) {
+        return retrieve(shopId, recentUserMessages, null);
+    }
+
+    /**
+     * @param preferredCategory 消息分类，命中同类知识时排序加权，实现分类优先且可回退。
+     */
+    public RagContext retrieve(Long shopId, List<String> recentUserMessages, String preferredCategory) {
         if (!mtProperties.getKnowledge().isEnabled() || shopId == null
                 || !knowledgeVectorStore.hasShopKnowledge(shopId)) {
             return RagContext.empty();
@@ -34,7 +41,7 @@ public class ImAutoReplyRagService {
         }
 
         float[] queryEmbedding = knowledgeEmbeddingService.embed(query);
-        List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shopId, queryEmbedding);
+        List<KnowledgeSearchHitDTO> hits = knowledgeVectorStore.searchTopK(shopId, queryEmbedding, preferredCategory);
         if (hits == null || hits.isEmpty()) {
             return new RagContext(true, List.of(), null, "");
         }

@@ -48,6 +48,7 @@ public class MtH5HomeDashboardService {
         dashboard.setGuide(buildGuideSummary(shop.getId()));
         dashboard.setAuthorization(buildLocalAuthorizationStatus(shop.getId()));
         dashboard.setOperationSettings(shopOperationSettingsService.buildSettings(shop));
+        dashboard.setMessageStats(buildMessageStats(shop.getId(), statsRange));
         if (!hidePower) {
             dashboard.setPowerStats(buildPowerStats(shop.getId(), powerAccount, statsRange));
         }
@@ -110,6 +111,20 @@ public class MtH5HomeDashboardService {
         summary.setTotalConsume(snapshot.getTotalConsume());
         summary.setInsufficient(isPowerInsufficient(snapshot.getBalance()));
         summary.setStatusText(Boolean.TRUE.equals(summary.getInsufficient()) ? "不足" : null);
+        return summary;
+    }
+
+    private MtH5HomeDashboardVO.MessageStatsSummary buildMessageStats(Long shopId,
+                                                                      DashboardStatsRangeTypeEnum statsRange) {
+        ShopDashboardMetricsService.MessageStatsSnapshot snapshot =
+                shopDashboardMetricsService.buildMessageStats(shopId, statsRange);
+        MtH5HomeDashboardVO.MessageStatsSummary summary = new MtH5HomeDashboardVO.MessageStatsSummary();
+        summary.setCurrentMessageReplyCount(snapshot.getCurrentMessageReplyCount());
+        summary.setPreviousMessageReplyCount(snapshot.getPreviousMessageReplyCount());
+        summary.setCurrentAfterSaleMessageCount(snapshot.getCurrentAfterSaleMessageCount());
+        summary.setPreviousAfterSaleMessageCount(snapshot.getPreviousAfterSaleMessageCount());
+        summary.setMessageReplyRate(snapshot.getMessageReplyRate());
+        summary.setPreviousMessageReplyRate(snapshot.getPreviousMessageReplyRate());
         return summary;
     }
 

@@ -52,6 +52,7 @@ public class MtImAutoReplyOrchestrationService {
     private final MtMeituanAuthorizationFailureHandler authorizationFailureHandler;
     private final ImConversationLockService conversationLockService;
     private final ImAutoReplyContextService contextService;
+    private final ImMessageClassificationService messageClassificationService;
     private final ImAutoReplyRagService ragService;
     private final ImAutoReplyChatService chatService;
     private final SystemPromptService systemPromptService;
@@ -153,9 +154,11 @@ public class MtImAutoReplyOrchestrationService {
     private void generateAndPersist(MtImAutoReply autoReply, MtImMessage trigger) {
         stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.GENERATING, null);
         ImAutoReplyContextService.Context context = contextService.build(autoReply.getSessionId());
+        List<String> recentUserMessages = context.latestUserMessages(
+                mtProperties.getImAutoReply().getRagRecentUserMessages());
+        String userMessageCategory = messageClassificationService.classify(recentUserMessages).name();
         ImAutoReplyRagService.RagContext ragContext = ragService.retrieve(
-                autoReply.getShopId(),
-                context.latestUserMessages(mtProperties.getImAutoReply().getRagRecentUserMessages()));
+                autoReply.getShopId(), recentUserMessages, userMessageCategory);
         MtShop shop = shopMapper.selectById(autoReply.getShopId());
         String shopName = shop == null ? "当前门店"
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
@@ -181,7 +184,8 @@ public class MtImAutoReplyOrchestrationService {
                 throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
             }
         }
-        stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount);
+        stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
+                userMessageCategory);
     }
 
     private void send(MtImAutoReply autoReply, MtImMessage trigger, MtImMessage replyMessage) {

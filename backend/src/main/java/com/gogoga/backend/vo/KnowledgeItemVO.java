@@ -15,6 +15,7 @@ public class KnowledgeItemVO {
     private String title;
     private String question;
     private String answer;
+    private String category;
     private Boolean enabled;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

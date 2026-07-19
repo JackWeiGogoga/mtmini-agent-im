@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
 
     private static final double QA_SOURCE_BONUS = 0.03D;
+    private static final double CATEGORY_MATCH_BONUS = 0.05D;
 
     private final MtKnowledgeChunkMapper mtKnowledgeChunkMapper;
     private final MtProperties mtProperties;
@@ -54,12 +55,18 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
 
     @Override
     public List<KnowledgeSearchHitDTO> searchTopK(Long shopId, float[] queryEmbedding) {
+        return searchTopK(shopId, queryEmbedding, null);
+    }
+
+    @Override
+    public List<KnowledgeSearchHitDTO> searchTopK(Long shopId, float[] queryEmbedding, String preferredCategory) {
         if (shopId == null || queryEmbedding == null || queryEmbedding.length == 0) {
             return List.of();
         }
         MtProperties.Knowledge knowledge = mtProperties.getKnowledge();
         int limit = Math.max(1, knowledge.getMaxSearchCandidates());
         int topK = Math.max(1, knowledge.getTopK());
+        String category = StringUtils.trimToNull(preferredCategory);
         List<MtKnowledgeChunk> candidates = mtKnowledgeChunkMapper.selectSearchCandidates(
                 shopId,
                 knowledge.getEmbeddingProvider(),
@@ -68,7 +75,7 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
                 limit
         );
         return candidates.stream()
-                .map(chunk -> toHit(chunk, queryEmbedding))
+                .map(chunk -> toHit(chunk, queryEmbedding, category))
                 .filter(hit -> hit.getCosineScore() >= knowledge.getMinContextCosineScore())
                 .sorted(Comparator.comparing(KnowledgeSearchHitDTO::getScore).reversed())
                 .limit(topK)
@@ -80,12 +87,15 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
         return shopId != null && mtKnowledgeChunkMapper.countAvailableByShopId(shopId) > 0;
     }
 
-    private KnowledgeSearchHitDTO toHit(MtKnowledgeChunk chunk, float[] queryEmbedding) {
+    private KnowledgeSearchHitDTO toHit(MtKnowledgeChunk chunk, float[] queryEmbedding, String preferredCategory) {
         float[] embedding = EmbeddingVectorUtil.fromFloat32Blob(chunk.getEmbeddingBlob());
         double cosine = EmbeddingVectorUtil.cosineSimilarity(queryEmbedding, embedding);
         double score = cosine;
         if (StringUtils.equals(chunk.getSourceType(), KnowledgeSourceTypeEnum.QA.name())) {
             score += QA_SOURCE_BONUS;
+        }
+        if (preferredCategory != null && StringUtils.equalsIgnoreCase(chunk.getCategory(), preferredCategory)) {
+            score += CATEGORY_MATCH_BONUS;
         }
         KnowledgeSearchHitDTO hit = new KnowledgeSearchHitDTO();
         hit.setChunk(chunk);

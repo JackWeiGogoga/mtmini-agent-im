@@ -15,6 +15,7 @@ public class MtKnowledgeItem {
     private String title;
     private String question;
     private String answer;
+    private String category;
     private Boolean enabled;
     private Boolean deleted;
     private LocalDateTime createTime;

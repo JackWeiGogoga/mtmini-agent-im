@@ -259,6 +259,7 @@ const MasterConsole: React.FC = () => {
       {logShop ? <ImReplyLogTable
         compact
         showShopFilter={false}
+        showRagColumn={false}
         loadPage={loadShopReplyLogs}
         loadHistory={loadShopConversationHistory}
       /> : null}

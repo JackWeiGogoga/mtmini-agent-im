@@ -42,14 +42,14 @@ class ImAutoReplyRagServiceTest {
         chunk.setChunkText("门店营业到 22:00");
         hit.setChunk(chunk);
         hit.setCosineScore(0.91D);
-        when(vectorStore.searchTopK(1L, embedding)).thenReturn(List.of(hit));
+        when(vectorStore.searchTopK(1L, embedding, null)).thenReturn(List.of(hit));
 
         ImAutoReplyRagService.RagContext result = service().retrieve(
                 1L, List.of("配送多久", "营业到几点"));
 
         assertTrue(result.used());
         assertTrue(result.promptContext().contains("门店营业到 22:00"));
-        verify(vectorStore).searchTopK(1L, embedding);
+        verify(vectorStore).searchTopK(1L, embedding, null);
     }
 
     private ImAutoReplyRagService service() {

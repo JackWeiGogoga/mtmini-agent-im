@@ -3,6 +3,7 @@ package com.gogoga.backend.service.impl;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtKnowledgeChunk;
 import com.gogoga.backend.entity.mt.MtKnowledgeItem;
+import com.gogoga.backend.enums.KnowledgeCategoryEnum;
 import com.gogoga.backend.enums.KnowledgeSourceTypeEnum;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtKnowledgeChunkMapper;
@@ -135,6 +136,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         item.setTitle(StringUtils.trim(param.getTitle()));
         item.setQuestion(StringUtils.trim(param.getQuestion()));
         item.setAnswer(StringUtils.trim(param.getAnswer()));
+        item.setCategory(KnowledgeCategoryEnum.fromValue(param.getCategory()).name());
         item.setEnabled(Boolean.TRUE.equals(param.getEnabled()));
     }
 
@@ -155,6 +157,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         chunk.setSourceId(item.getId());
         chunk.setItemId(item.getId());
         chunk.setChunkText(text);
+        chunk.setCategory(KnowledgeCategoryEnum.fromValue(item.getCategory()).name());
         chunk.setEmbeddingProvider(knowledge.getEmbeddingProvider());
         chunk.setEmbeddingModel(knowledge.getEmbeddingModel());
         chunk.setEmbeddingDim(embedding.length);
@@ -189,6 +192,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         vo.setTitle(item.getTitle());
         vo.setQuestion(item.getQuestion());
         vo.setAnswer(item.getAnswer());
+        vo.setCategory(KnowledgeCategoryEnum.fromValue(item.getCategory()).name());
         vo.setEnabled(item.getEnabled());
         vo.setCreateTime(item.getCreateTime());
         vo.setUpdateTime(item.getUpdateTime());

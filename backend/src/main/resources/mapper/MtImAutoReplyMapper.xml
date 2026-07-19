@@ -11,6 +11,7 @@
         <result column="outbound_message_id" property="outboundMessageId"/>
         <result column="status" property="status"/>
         <result column="skip_reason" property="skipReason"/>
+        <result column="user_message_category" property="userMessageCategory"/>
         <result column="rag_used" property="ragUsed"/>
         <result column="rag_chunk_count" property="ragChunkCount"/>
         <result column="rag_max_score" property="ragMaxScore"/>
@@ -30,7 +31,7 @@
     </resultMap>
     <sql id="BaseColumnList">
         id, shop_id, conversation_id, session_id, trigger_message_id, reply_message_id,
-        outbound_message_id, status, skip_reason, rag_used, rag_chunk_count, rag_max_score,
+        outbound_message_id, status, skip_reason, user_message_category, rag_used, rag_chunk_count, rag_max_score,
         model_provider, model_name, prompt_tokens, completion_tokens, power_amount, rewrite_count,
         generated_at, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
     </sql>
@@ -38,12 +39,12 @@
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_im_auto_reply (
             shop_id, conversation_id, session_id, trigger_message_id, reply_message_id,
-            outbound_message_id, status, skip_reason, rag_used, rag_chunk_count, rag_max_score,
+            outbound_message_id, status, skip_reason, user_message_category, rag_used, rag_chunk_count, rag_max_score,
             model_provider, model_name, prompt_tokens, completion_tokens, power_amount, rewrite_count,
             generated_at, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
         ) VALUES (
             #{shopId}, #{conversationId}, #{sessionId}, #{triggerMessageId}, #{replyMessageId},
-            #{outboundMessageId}, #{status}, #{skipReason}, #{ragUsed}, #{ragChunkCount}, #{ragMaxScore},
+            #{outboundMessageId}, #{status}, #{skipReason}, #{userMessageCategory}, #{ragUsed}, #{ragChunkCount}, #{ragMaxScore},
             #{modelProvider}, #{modelName}, #{promptTokens}, #{completionTokens}, #{powerAmount}, #{rewriteCount},
             #{generatedAt}, #{billedAt}, #{sentAt}, #{lastErrorCode}, #{lastErrorSummary}, #{createTime}, #{updateTime}
         )
@@ -55,9 +56,25 @@
         SELECT <include refid="BaseColumnList"/> FROM mt_im_auto_reply
         WHERE trigger_message_id = #{triggerMessageId} LIMIT 1
     </select>
+    <select id="countSentBetween" resultType="int">
+        SELECT COUNT(1) FROM mt_im_auto_reply
+        WHERE shop_id = #{shopId} AND status = 'SENT'
+        AND sent_at &gt;= #{from} AND sent_at &lt; #{to}
+    </select>
+    <select id="countAfterSaleBetween" resultType="int">
+        SELECT COUNT(1) FROM mt_im_auto_reply
+        WHERE shop_id = #{shopId} AND user_message_category = 'AFTER_SALE'
+        AND create_time &gt;= #{from} AND create_time &lt; #{to}
+    </select>
+    <select id="countTriggeredBetween" resultType="int">
+        SELECT COUNT(1) FROM mt_im_auto_reply
+        WHERE shop_id = #{shopId}
+        AND create_time &gt;= #{from} AND create_time &lt; #{to}
+    </select>
     <update id="update" parameterType="com.gogoga.backend.entity.mt.MtImAutoReply">
         UPDATE mt_im_auto_reply
         SET reply_message_id = #{replyMessageId}, status = #{status}, skip_reason = #{skipReason},
+            user_message_category = #{userMessageCategory},
             rag_used = #{ragUsed}, rag_chunk_count = #{ragChunkCount}, rag_max_score = #{ragMaxScore},
             model_provider = #{modelProvider}, model_name = #{modelName}, prompt_tokens = #{promptTokens},
             completion_tokens = #{completionTokens}, power_amount = #{powerAmount}, rewrite_count = #{rewriteCount},

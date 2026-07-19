@@ -47,7 +47,8 @@ public class MtImAutoReplyStateService {
                                      String replyContent,
                                      ImAutoReplyChatResult chatResult,
                                      ImAutoReplyRagService.RagContext ragContext,
-                                     int rewriteCount) {
+                                     int rewriteCount,
+                                     String userMessageCategory) {
         MtImAutoReply autoReply = requireAutoReply(autoReplyId);
         if (autoReply.getReplyMessageId() != null) {
             return messageMapper.selectById(autoReply.getReplyMessageId());
@@ -87,6 +88,7 @@ public class MtImAutoReplyStateService {
 
         autoReply.setReplyMessageId(message.getId());
         autoReply.setStatus(MtImAutoReplyStatusEnum.GENERATED.name());
+        autoReply.setUserMessageCategory(userMessageCategory);
         autoReply.setRagUsed(ragContext != null && ragContext.used());
         autoReply.setRagChunkCount(ragContext == null || ragContext.hits() == null ? 0 : ragContext.hits().size());
         autoReply.setRagMaxScore(ragContext == null || ragContext.maxCosineScore() == null

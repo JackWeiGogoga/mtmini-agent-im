@@ -51,6 +51,7 @@ class MtImAutoReplyOrchestrationServiceTest {
     @Mock private ImConversationLockService lockService;
     @Mock private ImConversationLockService.LockHandle lockHandle;
     @Mock private ImAutoReplyContextService contextService;
+    @Mock private ImMessageClassificationService messageClassificationService;
     @Mock private ImAutoReplyRagService ragService;
     @Mock private ImAutoReplyChatService chatService;
     @Mock private SystemPromptService promptService;
@@ -67,7 +68,8 @@ class MtImAutoReplyOrchestrationServiceTest {
         properties.getImAutoReply().setEnabled(true);
         service = new MtImAutoReplyOrchestrationService(
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
-                tokenService, authFailureHandler, lockService, contextService, ragService, chatService,
+                tokenService, authFailureHandler, lockService, contextService, messageClassificationService,
+                ragService, chatService,
                 promptService, sensitiveWordService, stateService, messageClient);
     }
 
@@ -119,7 +121,10 @@ class MtImAutoReplyOrchestrationServiceTest {
         mockReadyShop();
         when(contextService.build(21L)).thenReturn(new ImAutoReplyContextService.Context(
                 List.of(new ImAutoReplyChatMessage("user", "问题")), List.of("问题")));
-        when(ragService.retrieve(1L, List.of("问题"))).thenReturn(ImAutoReplyRagService.RagContext.empty());
+        when(messageClassificationService.classify(List.of("问题")))
+                .thenReturn(com.gogoga.backend.enums.KnowledgeCategoryEnum.GENERAL);
+        when(ragService.retrieve(1L, List.of("问题"), "GENERAL"))
+                .thenReturn(ImAutoReplyRagService.RagContext.empty());
         ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
@@ -137,7 +142,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         service.execute(payload());
 
         ArgumentCaptor<ImAutoReplyChatResult> usage = ArgumentCaptor.forClass(ImAutoReplyChatResult.class);
-        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("安全答复"), usage.capture(), any(), eq(1));
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("安全答复"), usage.capture(), any(), eq(1), eq("GENERAL"));
         assertEquals(15, usage.getValue().promptTokens());
         assertEquals(3, usage.getValue().completionTokens());
     }

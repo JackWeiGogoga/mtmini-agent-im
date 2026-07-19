@@ -29,12 +29,13 @@ interface Props {
     params?: { cursorTime?: string; cursorId?: number; pageSize?: number },
   ) => Promise<ImConversationHistoryPage>;
   showShopFilter?: boolean;
+  showRagColumn?: boolean;
   compact?: boolean;
 }
 
 type SearchForm = ImAutoReplyLogQuery & { timeRange?: [Dayjs, Dayjs] };
 
-export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter = true, compact = false }: Props) {
+export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter = true, showRagColumn = true, compact = false }: Props) {
   const [form] = Form.useForm<SearchForm>();
   const [query, setQuery] = useState<ImAutoReplyLogQuery>({ pageNum: 1, pageSize: compact ? 10 : 20 });
   const [items, setItems] = useState<ImAutoReplyLog[]>([]);
@@ -81,21 +82,21 @@ export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter 
           <Text type="secondary">{row.aiMessageTime ? dayjs(row.aiMessageTime).format("YYYY-MM-DD HH:mm:ss") : "-"}</Text>
         </Space>,
       },
-      {
-        title: "RAG / 计费", key: "rag", width: 170,
-        render: (_, row) => <Space direction="vertical" size={3}>
-          <Tag color={row.ragUsed ? "blue" : "default"}>{row.ragUsed ? `RAG ${row.ragChunkCount || 0} 条` : "未使用 RAG"}</Tag>
-          <Text type="secondary">Token：{(row.promptTokens || 0) + (row.completionTokens || 0)}</Text>
-          <Text type="secondary">算力：{row.powerAmount ?? "-"}</Text>
-        </Space>,
-      },
-      {
-        title: "操作", key: "action", width: 100, fixed: "right",
-        render: (_, row) => <Button type="link" onClick={() => setSelected(row)}>完整对话</Button>,
-      },
     );
+    if (showRagColumn) values.push({
+      title: "RAG / 计费", key: "rag", width: 170,
+      render: (_, row) => <Space direction="vertical" size={3}>
+        <Tag color={row.ragUsed ? "blue" : "default"}>{row.ragUsed ? `RAG ${row.ragChunkCount || 0} 条` : "未使用 RAG"}</Tag>
+        <Text type="secondary">Token：{(row.promptTokens || 0) + (row.completionTokens || 0)}</Text>
+        <Text type="secondary">算力：{row.powerAmount ?? "-"}</Text>
+      </Space>,
+    });
+    values.push({
+      title: "操作", key: "action", width: 100, fixed: "right",
+      render: (_, row) => <Button type="link" onClick={() => setSelected(row)}>完整对话</Button>,
+    });
     return values;
-  }, [showShopFilter]);
+  }, [showShopFilter, showRagColumn]);
 
   return <>
     <Form form={form} layout="inline" style={{ marginBottom: 16, rowGap: 12 }} onFinish={() => {
@@ -114,7 +115,7 @@ export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter 
       <Form.Item name="openUserId"><Input allowClear placeholder="顾客 openUserId" /></Form.Item>
       <Form.Item name="orderId"><Input allowClear placeholder="订单ID" /></Form.Item>
       <Form.Item name="status"><Select allowClear placeholder="回复状态" options={STATUS_OPTIONS} style={{ width: 150 }} /></Form.Item>
-      <Form.Item name="ragUsed"><Select allowClear placeholder="RAG" style={{ width: 120 }} options={[{ label: "已使用", value: true }, { label: "未使用", value: false }]} /></Form.Item>
+      {showRagColumn ? <Form.Item name="ragUsed"><Select allowClear placeholder="RAG" style={{ width: 120 }} options={[{ label: "已使用", value: true }, { label: "未使用", value: false }]} /></Form.Item> : null}
       <Form.Item name="timeRange"><DatePicker.RangePicker showTime placeholder={["开始时间", "结束时间"]} /></Form.Item>
       <Form.Item><Space><Button type="primary" htmlType="submit">查询</Button><Button onClick={() => { form.resetFields(); setQuery({ pageNum: 1, pageSize: compact ? 10 : 20 }); }}>重置</Button></Space></Form.Item>
     </Form>

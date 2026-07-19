@@ -37,6 +37,7 @@
             <view class="question-icon">?</view>
             <view class="row-main">
               <view class="row-head">
+                <text class="category-badge" :class="categoryClass(row.category)">{{ categoryLabel(row.category) }}</text>
                 <text class="row-title">{{ row.title }}</text>
                 <view class="row-actions">
                   <text v-if="row.type === 'QA'" class="row-link" @tap="toggleAnswer(row.id)">查看回答</text>
@@ -66,6 +67,15 @@
         <view class="form-line">
           <text class="form-label">标题：</text>
           <input v-model="qaForm.title" class="form-input" maxlength="10" placeholder="请输入（10字内）" />
+        </view>
+        <view class="form-line">
+          <text class="form-label">类型：</text>
+          <picker class="form-picker" :range="categoryOptions" range-key="label" :value="categoryIndex" @change="changeCategory">
+            <view class="picker-value">
+              <text>{{ categoryOptions[categoryIndex].label }}</text>
+              <text class="picker-arrow">▼</text>
+            </view>
+          </picker>
         </view>
         <view class="form-line form-line-top">
           <text class="form-label">问题Q：</text>
@@ -237,6 +247,13 @@ import {
   uploadKnowledgeDocument,
 } from '@/utils/mt-auth'
 
+const categoryOptions = [
+  { label: '普通类', value: 'GENERAL' },
+  { label: '配送类', value: 'DELIVERY' },
+  { label: '售后类', value: 'AFTER_SALE' },
+  { label: '其他', value: 'OTHER' },
+]
+
 const qaItems = ref([])
 const documents = ref([])
 const uploading = ref(false)
@@ -258,6 +275,12 @@ const qaForm = reactive({
   title: '',
   question: '',
   answer: '',
+  category: 'GENERAL',
+})
+
+const categoryIndex = computed(() => {
+  const index = categoryOptions.findIndex((item) => item.value === qaForm.category)
+  return index === -1 ? 0 : index
 })
 
 const knowledgeRows = computed(() => {
@@ -266,6 +289,7 @@ const knowledgeRows = computed(() => {
     type: 'QA',
     id: item.id,
     title: item.title || '知识问答',
+    category: item.category || 'GENERAL',
     question: item.question || '',
     answer: item.answer || '',
     raw: item,
@@ -559,7 +583,13 @@ function openQaForm(item) {
   qaForm.title = item?.title || ''
   qaForm.question = item?.question || ''
   qaForm.answer = item?.answer || ''
+  qaForm.category = item?.category || 'GENERAL'
   qaFormVisible.value = true
+}
+
+function changeCategory(event) {
+  const index = Number(event?.detail?.value || 0)
+  qaForm.category = categoryOptions[index]?.value || 'GENERAL'
 }
 
 function closeQaForm() {
@@ -583,6 +613,7 @@ async function submitQaForm() {
       title,
       question,
       answer,
+      category: qaForm.category || 'GENERAL',
       enabled: true,
     }
     if (editingQaId.value) {
@@ -642,6 +673,19 @@ function confirmClearKnowledge() {
 
 function toggleAnswer(id) {
   expandedQaId.value = expandedQaId.value === id ? null : id
+}
+
+function categoryLabel(value) {
+  return categoryOptions.find((item) => item.value === value)?.label || '普通类'
+}
+
+function categoryClass(value) {
+  return {
+    GENERAL: 'category-general',
+    DELIVERY: 'category-delivery',
+    AFTER_SALE: 'category-after-sale',
+    OTHER: 'category-other',
+  }[value] || 'category-general'
 }
 
 function parseStatusText(value) {
@@ -939,6 +983,35 @@ function formatFileSize(value) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.category-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 700;
+}
+
+.category-general {
+  background: #eef1f6;
+  color: #55617a;
+}
+
+.category-delivery {
+  background: #e7f2ff;
+  color: #2b6cb0;
+}
+
+.category-after-sale {
+  background: #fdeeee;
+  color: #cf4b4b;
+}
+
+.category-other {
+  background: #f1f0ee;
+  color: #8a7d63;
 }
 
 .row-actions {

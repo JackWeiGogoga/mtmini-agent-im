@@ -3,6 +3,7 @@ package com.gogoga.backend.vo;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -21,6 +22,8 @@ public class MtH5HomeDashboardVO implements Serializable {
     private MembershipSummary membership;
 
     private PowerStatsSummary powerStats;
+
+    private MessageStatsSummary messageStats;
 
     private MtH5TabStatusVO tabStatus;
 
@@ -74,6 +77,24 @@ public class MtH5HomeDashboardVO implements Serializable {
         private Boolean insufficient;
 
         private String statusText;
+    }
+
+    @Data
+    public static class MessageStatsSummary implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private Integer currentMessageReplyCount;
+
+        private Integer previousMessageReplyCount;
+
+        private Integer currentAfterSaleMessageCount;
+
+        private Integer previousAfterSaleMessageCount;
+
+        private BigDecimal messageReplyRate;
+
+        private BigDecimal previousMessageReplyRate;
     }
 
     @Data

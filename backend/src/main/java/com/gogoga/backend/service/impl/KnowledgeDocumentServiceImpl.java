@@ -4,6 +4,7 @@ import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtKnowledgeChunk;
 import com.gogoga.backend.entity.mt.MtKnowledgeDocument;
 import com.gogoga.backend.enums.KnowledgeDocumentParseStatusEnum;
+import com.gogoga.backend.enums.KnowledgeCategoryEnum;
 import com.gogoga.backend.enums.KnowledgeSourceTypeEnum;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.exception.BusinessException;
@@ -332,6 +333,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             chunk.setSourceId(document.getId());
             chunk.setDocumentId(document.getId());
             chunk.setChunkText(text);
+            chunk.setCategory(KnowledgeCategoryEnum.GENERAL.name());
             chunk.setEmbeddingProvider(knowledge.getEmbeddingProvider());
             chunk.setEmbeddingModel(knowledge.getEmbeddingModel());
             chunk.setEmbeddingDim(embedding.length);

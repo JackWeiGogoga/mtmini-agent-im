@@ -20,6 +20,7 @@ public class MtImAutoReply {
     private Long outboundMessageId;
     private String status;
     private String skipReason;
+    private String userMessageCategory;
     private Boolean ragUsed;
     private Integer ragChunkCount;
     private BigDecimal ragMaxScore;

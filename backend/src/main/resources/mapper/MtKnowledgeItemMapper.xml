@@ -7,12 +7,13 @@
         <result column="title" property="title"/>
         <result column="question" property="question"/>
         <result column="answer" property="answer"/>
+        <result column="category" property="category"/>
         <result column="enabled" property="enabled"/>
         <result column="deleted" property="deleted"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
-    <sql id="BaseColumnList">id, shop_id, title, question, answer, enabled, deleted, create_time, update_time</sql>
+    <sql id="BaseColumnList">id, shop_id, title, question, answer, category, enabled, deleted, create_time, update_time</sql>
     <select id="selectById" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/> FROM mt_knowledge_item WHERE id = #{id} LIMIT 1
     </select>
@@ -27,12 +28,12 @@
         SELECT COUNT(1) FROM mt_knowledge_item WHERE shop_id = #{shopId} AND enabled = 1 AND deleted = 0
     </select>
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtKnowledgeItem" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO mt_knowledge_item (shop_id, title, question, answer, enabled, deleted, create_time, update_time)
-        VALUES (#{shopId}, #{title}, #{question}, #{answer}, #{enabled}, #{deleted}, #{createTime}, #{updateTime})
+        INSERT INTO mt_knowledge_item (shop_id, title, question, answer, category, enabled, deleted, create_time, update_time)
+        VALUES (#{shopId}, #{title}, #{question}, #{answer}, #{category}, #{enabled}, #{deleted}, #{createTime}, #{updateTime})
     </insert>
     <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtKnowledgeItem">
         UPDATE mt_knowledge_item SET title=#{title}, question=#{question}, answer=#{answer},
-        enabled=#{enabled}, deleted=#{deleted}, update_time=#{updateTime} WHERE id=#{id}
+        category=#{category}, enabled=#{enabled}, deleted=#{deleted}, update_time=#{updateTime} WHERE id=#{id}
     </update>
     <update id="softDeleteByIdAndShopId">
         UPDATE mt_knowledge_item SET deleted=1, enabled=0, update_time=NOW() WHERE id=#{id} AND shop_id=#{shopId}

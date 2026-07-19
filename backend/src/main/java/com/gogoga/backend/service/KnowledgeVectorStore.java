@@ -15,5 +15,7 @@ public interface KnowledgeVectorStore {
 
     List<KnowledgeSearchHitDTO> searchTopK(Long shopId, float[] queryEmbedding);
 
+    List<KnowledgeSearchHitDTO> searchTopK(Long shopId, float[] queryEmbedding, String preferredCategory);
+
     boolean hasShopKnowledge(Long shopId);
 }
