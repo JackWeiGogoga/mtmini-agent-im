@@ -1,11 +1,8 @@
 package com.gogoga.backend.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.gogoga.backend.service.MtImMessageCryptoService;
-import com.gogoga.backend.util.JsonUtil;
+import com.gogoga.backend.service.MtImMessageIngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.MediaType;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * 美团 IM 消息回调控制器。
@@ -24,7 +22,7 @@ import java.util.Map;
 @RequestMapping("/api/callbacks/meituan")
 public class MtImMessageCallbackController {
 
-    private final MtImMessageCryptoService cryptoService;
+    private final MtImMessageIngestionService ingestionService;
 
     /**
      * 接收美团 IM 两方会话消息。
@@ -38,39 +36,19 @@ public class MtImMessageCallbackController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public Map<String, Object> receiveImMessage(@RequestParam MultiValueMap<String, String> parameters) {
-        String decryptedMsgContent = null;
+        Map<String, String> singleValueParameters = new LinkedHashMap<>();
+        parameters.forEach((key, values) -> singleValueParameters.put(key, values == null || values.isEmpty()
+                ? null : values.get(0)));
         try {
-            decryptedMsgContent = decryptMsgContent(parameters.getFirst("message"));
+            MtImMessageIngestionService.IngestionResult result = ingestionService.ingest(singleValueParameters);
+            if (result.success()) {
+                return Map.of("code", 0, "message", "success");
+            }
+            return Map.of("code", 1, "message", result.errorCode());
         } catch (RuntimeException e) {
-            log.warn("美团 IM 消息回调解密失败，msgId={}, error={}",
-                    parameters.getFirst("msgId"), e.getMessage());
+            log.error("美团IM消息持久化失败，callbackMsgId={}, errorType={}",
+                    parameters.getFirst("msgId"), e.getClass().getSimpleName());
+            return Map.of("code", 2, "message", "persist_failed");
         }
-        log.info("收到美团 IM 消息回调，parameters={}, decryptedMsgContent={}",
-                parameters, decryptedMsgContent);
-        return Map.of("code", 0, "message", "success");
-    }
-
-    private String decryptMsgContent(String message) {
-        if (StringUtils.isBlank(message)) {
-            return null;
-        }
-        JsonNode messageNode = JsonUtil.toBean(message, JsonNode.class);
-        if (messageNode == null || !messageNode.isObject()) {
-            throw new IllegalArgumentException("MT_IM_CALLBACK_MESSAGE_INVALID");
-        }
-
-        JsonNode pushContentNode = messageNode.get("push_content");
-        if (pushContentNode != null && pushContentNode.isTextual()) {
-            pushContentNode = JsonUtil.toBean(pushContentNode.asText(), JsonNode.class);
-        }
-        if (pushContentNode == null || !pushContentNode.isObject()) {
-            throw new IllegalArgumentException("MT_IM_CALLBACK_PUSH_CONTENT_INVALID");
-        }
-
-        String encryptedMsgContent = pushContentNode.path("msg_content").asText(null);
-        if (StringUtils.isBlank(encryptedMsgContent)) {
-            return null;
-        }
-        return cryptoService.decrypt(encryptedMsgContent);
     }
 }

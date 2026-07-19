@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/mtmini_ai_agent_reply?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/mtmini_ai_agent_im?useUnicode=true&characterEncoding=UTF8&autoReconnect=true&allowMultiQueries=true&zeroDateTimeBehavior=convertToNull}
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:root123456}
   data:
@@ -17,13 +17,6 @@ mt:
   async-task:
     enabled: ${MT_ASYNC_TASK_ENABLED:true}
     worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:true}
-  comment:
-    query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:true}
-    reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:true}
-    complaint-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:true}
-    im-follow-up:
-      create-group-dry-run: ${MT_COMMENT_IM_CREATE_GROUP_DRY_RUN:true}
-      send-message-dry-run: ${MT_COMMENT_IM_SEND_MESSAGE_DRY_RUN:true}
 
 scheduled:
   enabled: ${SCHEDULED_ENABLED:false}

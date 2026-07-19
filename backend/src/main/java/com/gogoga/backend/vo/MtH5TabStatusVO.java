@@ -15,8 +15,6 @@ public class MtH5TabStatusVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private Boolean logUnread;
-
     private Boolean powerInsufficient;
 
     private String powerStatusText;

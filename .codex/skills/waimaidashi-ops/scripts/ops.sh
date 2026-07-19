@@ -12,7 +12,7 @@ REMOTE_ENV_PATH="${WMD_REMOTE_ENV_PATH:-/etc/waimaidashi/backend.env}"
 HOST_SELECTOR="both"
 SINCE="30 min ago"
 LINES="200"
-PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|im|message|comment|reply|auth"
+PATTERN="error|exception|failed|timeout|refused|deadlock|duplicate|lock|meituan|wechat|redis|mysql|caddy|callback|async|im|message|knowledge|power|auth"
 SLOW_THRESHOLD="0.5"
 
 usage() {
@@ -176,7 +176,7 @@ cmd_errors() {
 
 cmd_tasks() {
   SINCE="6 hours ago"
-  PATTERN="Mt.*Im|Mt.*Message|MtCommentAutoReplyTask|MtAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|数据库异步任务|IM|消息|评价自动回复|授权后异步|lock"
+  PATTERN="Mt.*Im|Mt.*Message|MtAsyncTaskWorkerTask|MtAppOrderPullTask|MtAccessTokenRefreshTask|YouzanAccessTokenRefreshTask|RedisDistributedLockService|async-task|数据库异步任务|IM|消息自动回复|授权后异步|lock"
   parse_common_args "$@"
   while IFS= read -r host; do
     log "task logs on ${host} since ${SINCE}"

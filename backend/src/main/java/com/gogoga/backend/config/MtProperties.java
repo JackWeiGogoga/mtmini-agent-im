@@ -56,9 +56,22 @@ public class MtProperties {
     private AsyncTask asyncTask = new AsyncTask();
 
     /**
-     * 评价自动回复配置
+     * IM 消息配置。
      */
-    private Comment comment = new Comment();
+    private Im im = new Im();
+
+    /**
+     * 通用门店知识库配置。
+     */
+    private Knowledge knowledge = new Knowledge();
+
+    @Data
+    public static class Im {
+        /**
+         * 美团 IM 消息 AES 密钥，UTF-8 编码必须恰好 16 字节。
+         */
+        private String secret;
+    }
 
     @Data
     public static class Token {
@@ -195,29 +208,9 @@ public class MtProperties {
         private TaskPolicy authBackfillPoiId = new TaskPolicy();
 
         /**
-         * 授权后评价回补任务策略
+         * 授权后初始化门店 IM 任务策略。
          */
-        private TaskPolicy authCommentBackfill = new TaskPolicy();
-
-        /**
-         * 评价自动回复任务策略
-         */
-        private TaskPolicy commentAutoReply = new TaskPolicy();
-
-        /**
-         * 评论日志 AI 分析任务策略。
-         */
-        private TaskPolicy commentLogAnalysis = new TaskPolicy();
-
-        /**
-         * 差评自动投诉任务策略
-         */
-        private TaskPolicy commentAutoComplaint = new TaskPolicy();
-
-        /**
-         * 差评 IM 跟进任务策略
-         */
-        private TaskPolicy commentAutoImFollowUp = noRetryTaskPolicy();
+        private TaskPolicy authConfigureIm = new TaskPolicy();
 
         /**
          * 知识文档解析任务策略
@@ -229,19 +222,10 @@ public class MtProperties {
          */
         private Cleanup cleanup = new Cleanup();
 
-        private static TaskPolicy noRetryTaskPolicy() {
-            TaskPolicy policy = new TaskPolicy();
-            policy.setMaxRetryCount(0);
-            return policy;
-        }
     }
 
     @Data
     public static class LlmTaskWeights {
-        private int commentAutoReply = 5;
-        private int commentAutoImFollowUp = 2;
-        private int commentAutoComplaint = 2;
-        private int commentLogAnalysis = 1;
         private int knowledgeDocumentParse = 1;
     }
 
@@ -301,132 +285,6 @@ public class MtProperties {
          * 最大退避秒数
          */
         private long maxBackoffSeconds = 1800L;
-    }
-
-    @Data
-    public static class Comment {
-
-        /**
-         * 评价拉取 cron。默认每天早中晚各一次。
-         */
-        private String pullCron = "0 0 8,13,19 * * ?";
-
-        /**
-         * 查询窗口回看天数。
-         */
-        private int lookbackDays = 7;
-
-        /**
-         * 查询分页大小，美团最大 20。
-         */
-        private int pageSize = 20;
-
-        /**
-         * 评价查询 dry run。开启后不调用美团查询评价接口。
-         */
-        private boolean queryDryRun = false;
-
-        /**
-         * 评价回复 dry run。开启后不调用美团添加商家回复接口。
-         */
-        private boolean replyDryRun = false;
-
-        /**
-         * 差评申诉 dry run。开启后不调用美团评价申诉接口。
-         */
-        private boolean complaintDryRun = false;
-
-        /**
-         * dry run 命中已有异步回复任务时的无损重排秒数。
-         */
-        private long dryRunRescheduleSeconds = 3600L;
-
-        /**
-         * 自动回复固定文案。
-         */
-        private String defaultReply = "很好";
-
-        /**
-         * 评论知识库与 RAG 回复配置。
-         */
-        private Knowledge knowledge = new Knowledge();
-
-        /**
-         * 评论回复敏感词配置。
-         */
-        private SensitiveWord sensitiveWord = new SensitiveWord();
-
-        /**
-         * 差评自动投诉配置。
-         */
-        private Complaint complaint = new Complaint();
-
-        /**
-         * 差评匿名群聊跟进配置。
-         */
-        private ImFollowUp imFollowUp = new ImFollowUp();
-    }
-
-    @Data
-    public static class ImFollowUp {
-
-        /**
-         * 美团 IM 加密密钥，UTF-8 编码必须恰好 16 字节。
-         */
-        private String imSecret;
-
-        /**
-         * 建群 dry run，默认禁止真实调用。
-         */
-        private boolean createGroupDryRun = true;
-
-        /**
-         * 发送消息 dry run，默认禁止真实调用。
-         */
-        private boolean sendMessageDryRun = true;
-
-        /**
-         * dry run 无损重排秒数。
-         */
-        private long dryRunRescheduleSeconds = 3600L;
-
-        /**
-         * 兜底消息消耗算力。
-         */
-        private int fallbackPowerAmount = 1000;
-
-        /**
-         * 模型不可用或内容不合规时使用的消息模板，支持 {{commentContent}}。
-         */
-        private String fallbackMessage = "我是售后处理专员：亲~收到了您的一条差评[{{commentContent}}]，抱歉给您带来不好的体验，能提供一下订单号和联系号码吗？方便我核实后给您补偿处理☺️";
-    }
-
-    @Data
-    public static class Complaint {
-
-        /**
-         * 申诉文本最大长度。
-         */
-        private int maxContentLength = 300;
-
-        /**
-         * 申诉模型 usage 缺失时的兜底算力消耗。
-         */
-        private int fallbackPowerAmount = 1000;
-    }
-
-    @Data
-    public static class SensitiveWord {
-
-        /**
-         * 是否启用敏感词检测。
-         */
-        private boolean enabled = true;
-
-        /**
-         * 命中敏感词后的最大改写次数。
-         */
-        private int maxRewriteAttempts = 1;
     }
 
     @Data
@@ -530,66 +388,6 @@ public class MtProperties {
         /**
          * 知识文档 COS key 前缀。
          */
-        private String documentKeyPrefix = "comment-knowledge/documents";
-
-        /**
-         * 是否启用评价图片多模态识别。
-         */
-        private boolean visionEnabled = true;
-
-        /**
-         * 图片识别模型供应商。
-         */
-        private String visionProvider = "TOKENHUB";
-
-        /**
-         * 图片识别 OpenAI-compatible base URL。
-         */
-        private String visionModelBaseUrl = "https://tokenhub.tencentmaas.com/v1";
-
-        /**
-         * 图片识别 OpenAI-compatible API Key。
-         */
-        private String visionModelApiKey;
-
-        /**
-         * 图片识别模型。
-         */
-        private String visionModel = "qwen3.5-flash";
-
-        /**
-         * 单条评价最多识别图片数量。
-         */
-        private int visionMaxImageCount = 3;
-
-        /**
-         * 图片识别超时时间，秒。
-         */
-        private long visionTimeoutSeconds = 30L;
-
-        /**
-         * 图片识别 usage 缺失时的兜底算力消耗。
-         */
-        private int visionFallbackPowerAmount = 1000;
-
-        /**
-         * 测试图片上传 COS key 前缀。
-         */
-        private String visionImageKeyPrefix = "comment-knowledge/vision-images";
-
-        /**
-         * 测试回复临时图片 COS key 前缀。
-         */
-        private String visionTempImageKeyPrefix = "comment-knowledge/vision-temp-images";
-
-        /**
-         * RAG 回复估算算力消耗，后续可按真实 token 计费替换。
-         */
-        private int fallbackRagPowerAmount = 1000;
-
-        /**
-         * 评论日志分析 usage 缺失时的兜底算力消耗。
-         */
-        private int analysisFallbackPowerAmount = 1000;
+        private String documentKeyPrefix = "knowledge/documents";
     }
 }

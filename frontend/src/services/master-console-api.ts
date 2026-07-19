@@ -1,7 +1,6 @@
 import request from "@/utils/request";
 import { downloadXlsx } from "@/utils/download";
 import type {
-  CommentReplyLogRecord,
   MasterConsoleQueryParam,
   MasterConsoleShopRow,
   PageInfo,
@@ -54,20 +53,5 @@ export async function updateMasterConsoleShopOperationSettings(
     unknown,
     { data: ShopOperationSettingsUpdateParam & { shopId: number } }
   >(`${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/operation-settings`, params);
-  return response.data;
-}
-
-export async function getMasterConsoleCommentReplyLogs(
-  shopId: number,
-  bindingDomain?: string,
-  pageNum = 1,
-  pageSize = 20,
-): Promise<PageInfo<CommentReplyLogRecord>> {
-  const response = await request.get<
-    unknown,
-    { data: PageInfo<CommentReplyLogRecord> }
-  >(`${MASTER_CONSOLE_BASE_URL}/comment-reply-logs`, {
-    params: { shopId, bindingDomain, pageNum, pageSize },
-  });
   return response.data;
 }

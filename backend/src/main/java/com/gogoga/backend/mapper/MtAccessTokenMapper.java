@@ -49,14 +49,6 @@ public interface MtAccessTokenMapper {
     List<MtAccessToken> selectRefreshCandidates(@Param("refreshBefore") LocalDateTime refreshBefore);
 
     /**
-     * 查询可用于评价自动回复的有效授权门店 token。
-     *
-     * @param now 当前时间
-     * @return token 列表
-     */
-    List<MtAccessToken> selectCommentAutoReplyCandidates(@Param("now") LocalDateTime now);
-
-    /**
      * 新增 token
      *
      * @param token token 实体

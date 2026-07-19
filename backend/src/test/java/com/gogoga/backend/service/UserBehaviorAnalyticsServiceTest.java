@@ -114,7 +114,7 @@ class UserBehaviorAnalyticsServiceTest {
         when(userShopBindingService.requireCurrentUserVisibleShop(8L, null)).thenReturn(shop);
 
         UserBehaviorEventReportParam param = new UserBehaviorEventReportParam();
-        param.setEventType("PC_COMMENT_LOG_VIEW");
+        param.setEventType("PC_KNOWLEDGE_VIEW");
         param.setClientEventId("admin-event-2");
         param.setSessionId("admin-session-1");
         param.setContextJson("{\"portalType\":\"ADMIN\"}");
@@ -125,7 +125,7 @@ class UserBehaviorAnalyticsServiceTest {
         verify(userBehaviorEventMapper).insert(captor.capture());
         UserBehaviorEvent event = captor.getValue();
         assertEquals("ADMIN_BACKEND", event.getEventSource());
-        assertEquals("PC_COMMENT_LOG_VIEW", event.getEventType());
+        assertEquals("PC_KNOWLEDGE_VIEW", event.getEventType());
         assertEquals("admin-1", event.getBackendUserId());
         assertEquals("400", event.getShopPhoneSnapshot());
     }

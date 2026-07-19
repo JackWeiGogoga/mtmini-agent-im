@@ -82,7 +82,7 @@ class MtPowerConsumeServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> mtPowerConsumeService.consume(buildRequest()));
 
         assertEquals("当前算力余额不足", exception.getMessage());
-        verify(shopOperationSettingsService).disableCommentProcessingForInsufficientPower(1L);
+        verify(shopOperationSettingsService).disableImAutoReplyForInsufficientPower(1L);
         verify(mtPowerAccountMapper, never()).deductBySource(anyLong(), anyInt(), anyInt(), anyInt(), anyInt(), any());
         verify(mtPowerConsumeMapper, never()).insert(any());
     }

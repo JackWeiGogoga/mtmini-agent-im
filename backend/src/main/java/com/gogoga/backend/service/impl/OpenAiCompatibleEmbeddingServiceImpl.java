@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.gogoga.backend.client.OpenAiCompatibleClientFactory;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.exception.BusinessException;
-import com.gogoga.backend.service.CommentReplyEmbeddingService;
+import com.gogoga.backend.service.KnowledgeEmbeddingService;
 import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.gogoga.backend.service.llm.LlmRateLimitContext;
 import com.gogoga.backend.service.llm.LlmRateLimitDescriptor;
@@ -26,7 +26,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OpenAiCompatibleEmbeddingServiceImpl implements CommentReplyEmbeddingService {
+public class OpenAiCompatibleEmbeddingServiceImpl implements KnowledgeEmbeddingService {
 
     private final MtProperties mtProperties;
     private final OpenAiCompatibleClientFactory clientFactory;
@@ -37,7 +37,7 @@ public class OpenAiCompatibleEmbeddingServiceImpl implements CommentReplyEmbeddi
         if (StringUtils.isBlank(text)) {
             throw new BusinessException(400, "向量化文本不能为空");
         }
-        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        MtProperties.Knowledge knowledge = mtProperties.getKnowledge();
         String baseUrlConfig = StringUtils.defaultIfBlank(knowledge.getEmbeddingBaseUrl(), knowledge.getModelBaseUrl());
         String apiKeyConfig = StringUtils.defaultIfBlank(knowledge.getEmbeddingApiKey(), knowledge.getModelApiKey());
         if (StringUtils.isBlank(baseUrlConfig)) {

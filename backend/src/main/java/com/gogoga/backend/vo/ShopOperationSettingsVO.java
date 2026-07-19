@@ -15,6 +15,4 @@ public class ShopOperationSettingsVO implements Serializable {
     private Long shopId;
 
     private Boolean autoReplyEnabled;
-
-    private Boolean negativeCommentAppealEnabled;
 }

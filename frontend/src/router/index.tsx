@@ -25,9 +25,6 @@ const PowerRechargeOrderManage = lazy(
 const UserBehaviorAnalytics = lazy(
   () => import("@/pages/user-behavior-analytics"),
 );
-const CommentReplyKnowledgeManage = lazy(
-  () => import("@/pages/comment-reply-knowledge"),
-);
 const MerchantKnowledgeManage = lazy(
   () => import("@/pages/merchant-knowledge"),
 );
@@ -42,9 +39,6 @@ const UserManage = lazy(() => import("@/pages/user-manage"));
 const RoleManage = lazy(() => import("@/pages/role-manage"));
 const MenuManage = lazy(() => import("@/pages/menu-manage"));
 const SystemPromptManage = lazy(() => import("@/pages/system-prompt"));
-const CommentProcessingLog = lazy(
-  () => import("@/pages/comment-processing-log"),
-);
 const Forbidden = lazy(() => import("@/pages/error/Forbidden"));
 
 /**
@@ -208,29 +202,9 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: "/comment-reply-knowledge",
-          element: (
-            <AuthLayout permission="comment:reply-knowledge:list">
-              <LazyWrapper>
-                <CommentReplyKnowledgeManage />
-              </LazyWrapper>
-            </AuthLayout>
-          ),
-        },
-        {
-          path: "/comment-processing-logs",
-          element: (
-            <AuthLayout permission="comment:processing-log:list">
-              <LazyWrapper>
-                <CommentProcessingLog />
-              </LazyWrapper>
-            </AuthLayout>
-          ),
-        },
-        {
           path: "/merchant-knowledge",
           element: (
-            <AuthLayout permission="comment:merchant-knowledge:list">
+            <AuthLayout permission="knowledge:list">
               <LazyWrapper>
                 <MerchantKnowledgeManage />
               </LazyWrapper>

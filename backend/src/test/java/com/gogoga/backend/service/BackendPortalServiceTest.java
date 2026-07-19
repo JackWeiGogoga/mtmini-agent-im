@@ -102,7 +102,7 @@ class BackendPortalServiceTest {
         Menu ordinaryShops = menu("MENU_SHOP_MANAGE", "/shops", "shop:binding:list");
         Menu powerManagement = menu("MENU_POWER_MANAGE", "/power-management", "shop:power-management:list");
         Menu mtAppOrders = menu("MENU_MT_APP_ORDER", "/mt-app-orders", "shop:mt-app-order:list");
-        Menu merchantKnowledge = menu("MENU_MERCHANT_KNOWLEDGE", "/merchant-knowledge", "comment:merchant-knowledge:list");
+        Menu merchantKnowledge = menu("MENU_MERCHANT_KNOWLEDGE", "/merchant-knowledge", "knowledge:list");
         Menu behaviorAnalytics = menu("MENU_USER_BEHAVIOR_ANALYTICS", "/analytics/user-behavior", "analytics:user-behavior:list");
 
         List<Menu> filteredMenus = backendPortalService.filterMenus(
@@ -119,14 +119,14 @@ class BackendPortalServiceTest {
         assertFalse(menuIds.contains("MENU_MT_APP_ORDER"));
         assertFalse(menuIds.contains("MENU_USER_BEHAVIOR_ANALYTICS"));
         assertEquals(
-                Set.of("shop:master-console:list", "shop:binding:list", "comment:merchant-knowledge:list"),
+                Set.of("shop:master-console:list", "shop:binding:list", "knowledge:list"),
                 backendPortalService.filterPermissions(
                         Set.of(
                                 "shop:master-console:list",
                                 "shop:binding:list",
                                 "shop:power-management:list",
                                 "shop:mt-app-order:list",
-                                "comment:merchant-knowledge:list",
+                                "knowledge:list",
                                 "analytics:user-behavior:list"
                         ),
                         BackendPortalType.ORDINARY

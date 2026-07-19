@@ -50,7 +50,7 @@ class MtImMessageCryptoServiceTest {
 
     private MtImMessageCryptoService service(String secret) {
         MtProperties properties = new MtProperties();
-        properties.getComment().getImFollowUp().setImSecret(secret);
+        properties.getIm().setSecret(secret);
         return new MtImMessageCryptoService(properties);
     }
 }

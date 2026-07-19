@@ -14,7 +14,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * 美团评价匿名群聊消息加密服务。
+ * 美团 IM 消息加密服务。
  */
 @Service
 @RequiredArgsConstructor
@@ -63,7 +63,7 @@ public class MtImMessageCryptoService {
     }
 
     byte[] resolveSecretBytes() {
-        String secret = mtProperties.getComment().getImFollowUp().getImSecret();
+        String secret = mtProperties.getIm().getSecret();
         byte[] bytes = StringUtils.defaultString(secret).getBytes(StandardCharsets.UTF_8);
         if (bytes.length != 16) {
             throw new IllegalStateException("MT_IM_SECRET_MUST_BE_16_UTF8_BYTES");

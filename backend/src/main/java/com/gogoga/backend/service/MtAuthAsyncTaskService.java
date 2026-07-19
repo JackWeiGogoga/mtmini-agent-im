@@ -1,11 +1,13 @@
 package com.gogoga.backend.service;
 
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.client.MtImConfigurationClient;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.async.MtAsyncTaskEnqueueResult;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
+import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +32,8 @@ public class MtAuthAsyncTaskService {
     private final MtShopRightService mtShopRightService;
     private final MtShopPoiIdBackfillService mtShopPoiIdBackfillService;
     private final MtOrderPushControlService mtOrderPushControlService;
+    private final MtImConfigurationClient mtImConfigurationClient;
+    private final ShopOperationSettingsService shopOperationSettingsService;
 
     public void enqueuePostAuthorizationTasks(Long shopId, String accessToken) {
         if (shopId == null || StringUtils.isBlank(accessToken)) {
@@ -41,7 +45,7 @@ public class MtAuthAsyncTaskService {
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH, payload);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID, payload);
         enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS, payload);
-        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL, payload);
+        enqueueSafely(shopId, authEventKey, MtAsyncTaskTypeEnum.AUTH_CONFIGURE_IM, payload);
     }
 
     public void executeAuthSyncRightsTask(MtAuthPostProcessTaskPayload payload) {
@@ -66,6 +70,56 @@ public class MtAuthAsyncTaskService {
         }
         log.info("授权后异步停止订单推送成功，shopId={}, opBizCode={}",
                 context.shop().getId(), context.token().getOpBizCode());
+    }
+
+    public void executeAuthConfigureImTask(MtAuthPostProcessTaskPayload payload) {
+        ShopContext context = loadContext(payload);
+        Long shopId = context.shop().getId();
+        MtImConfigurationClient.ImConfigurationResult imResult =
+                mtImConfigurationClient.enablePoiIm(context.token().getAccessToken());
+        logConfigurationResult(shopId, imResult);
+        if (!imResult.success()) {
+            keepLocalImAutoReplyDisabled(shopId, imResult.stage());
+            throw new IllegalStateException("AUTH_CONFIGURE_IM_FAILED:" + imResult.stage() + ":" + imResult.errorCode());
+        }
+
+        MtImConfigurationClient.ImConfigurationResult robotResult =
+                mtImConfigurationClient.disableAllSmartReplies(context.token().getAccessToken());
+        logConfigurationResult(shopId, robotResult);
+        if (!robotResult.success()) {
+            keepLocalImAutoReplyDisabled(shopId, robotResult.stage());
+            throw new IllegalStateException("AUTH_CONFIGURE_IM_FAILED:" + robotResult.stage() + ":" + robotResult.errorCode());
+        }
+
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(true);
+        shopOperationSettingsService.updateSettings(
+                shopId,
+                param,
+                ShopOperationSettingsService.CHANGE_SOURCE_AUTH,
+                "AUTH_IM_CONFIGURED"
+        );
+    }
+
+    private void keepLocalImAutoReplyDisabled(Long shopId, String failedStage) {
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(false);
+        shopOperationSettingsService.updateSettings(
+                shopId,
+                param,
+                ShopOperationSettingsService.CHANGE_SOURCE_AUTH,
+                "AUTH_IM_CONFIG_FAILED:" + failedStage
+        );
+    }
+
+    private void logConfigurationResult(Long shopId, MtImConfigurationClient.ImConfigurationResult result) {
+        if (result.success()) {
+            log.info("授权后门店IM配置完成，shopId={}, stage={}, summary={}",
+                    shopId, result.stage(), result.responseSummary());
+            return;
+        }
+        log.warn("授权后门店IM配置失败，shopId={}, stage={}, errorCode={}, summary={}",
+                shopId, result.stage(), result.errorCode(), result.responseSummary());
     }
 
     private void enqueue(Long shopId, String authEventKey, MtAsyncTaskTypeEnum taskType, MtAuthPostProcessTaskPayload payload) {
@@ -99,7 +153,7 @@ public class MtAuthAsyncTaskService {
             case AUTH_BLOCK_ORDER_PUSH -> 0;
             case AUTH_SYNC_RIGHTS -> mtProperties.getAsyncTask().getAuthSyncRights().getMaxRetryCount();
             case AUTH_BACKFILL_POI_ID -> mtProperties.getAsyncTask().getAuthBackfillPoiId().getMaxRetryCount();
-            case AUTH_COMMENT_BACKFILL -> mtProperties.getAsyncTask().getAuthCommentBackfill().getMaxRetryCount();
+            case AUTH_CONFIGURE_IM -> mtProperties.getAsyncTask().getAuthConfigureIm().getMaxRetryCount();
             default -> throw new IllegalArgumentException("不支持的授权后任务类型: " + taskType);
         };
     }

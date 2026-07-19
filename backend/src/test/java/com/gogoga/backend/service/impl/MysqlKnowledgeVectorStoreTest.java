@@ -2,10 +2,9 @@ package com.gogoga.backend.service.impl;
 
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.dto.KnowledgeSearchHitDTO;
-import com.gogoga.backend.entity.mt.MtReplyKnowledgeChunk;
-import com.gogoga.backend.enums.CommentReplyKnowledgeSourceTypeEnum;
-import com.gogoga.backend.enums.CommentReplySentimentEnum;
-import com.gogoga.backend.mapper.MtReplyKnowledgeChunkMapper;
+import com.gogoga.backend.entity.mt.MtKnowledgeChunk;
+import com.gogoga.backend.enums.KnowledgeSourceTypeEnum;
+import com.gogoga.backend.mapper.MtKnowledgeChunkMapper;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,40 +20,39 @@ import static org.mockito.Mockito.when;
 class MysqlKnowledgeVectorStoreTest {
 
     @Mock
-    private MtReplyKnowledgeChunkMapper mtReplyKnowledgeChunkMapper;
+    private MtKnowledgeChunkMapper chunkMapper;
 
     @Test
-    void searchTopKSortsByCosineSentimentAndQaBonus() {
+    void searchTopKAppliesThresholdTopKAndQaBonus() {
         MtProperties properties = new MtProperties();
-        properties.getComment().getKnowledge().setTopK(2);
-        properties.getComment().getKnowledge().setMaxSearchCandidates(10);
-        MysqlKnowledgeVectorStore store = new MysqlKnowledgeVectorStore(mtReplyKnowledgeChunkMapper, properties);
+        properties.getKnowledge().setTopK(2);
+        properties.getKnowledge().setMaxSearchCandidates(10);
+        properties.getKnowledge().setMinContextCosineScore(0.5D);
+        MysqlKnowledgeVectorStore store = new MysqlKnowledgeVectorStore(chunkMapper, properties);
 
-        MtReplyKnowledgeChunk qaSameSentiment = chunk(1L, CommentReplyKnowledgeSourceTypeEnum.QA.name(), "GOOD", new float[]{0.95F, 0F});
-        MtReplyKnowledgeChunk docUnknown = chunk(2L, CommentReplyKnowledgeSourceTypeEnum.DOCUMENT.name(), "UNKNOWN", new float[]{1F, 0F});
-        MtReplyKnowledgeChunk docSameSentiment = chunk(3L, CommentReplyKnowledgeSourceTypeEnum.DOCUMENT.name(), "GOOD", new float[]{0.96F, 0F});
-        when(mtReplyKnowledgeChunkMapper.selectSearchCandidates(
+        MtKnowledgeChunk qa = chunk(1L, KnowledgeSourceTypeEnum.QA.name(), new float[]{0.95F, 0F});
+        MtKnowledgeChunk doc = chunk(2L, KnowledgeSourceTypeEnum.DOCUMENT.name(), new float[]{1F, 0F});
+        MtKnowledgeChunk belowThreshold = chunk(3L, KnowledgeSourceTypeEnum.DOCUMENT.name(), new float[]{0F, 1F});
+        when(chunkMapper.selectSearchCandidates(
                 100L,
-                "GOOD",
-                properties.getComment().getKnowledge().getEmbeddingProvider(),
-                properties.getComment().getKnowledge().getEmbeddingModel(),
-                properties.getComment().getKnowledge().getEmbeddingDim(),
+                properties.getKnowledge().getEmbeddingProvider(),
+                properties.getKnowledge().getEmbeddingModel(),
+                properties.getKnowledge().getEmbeddingDim(),
                 10
-        )).thenReturn(List.of(docUnknown, docSameSentiment, qaSameSentiment));
+        )).thenReturn(List.of(doc, belowThreshold, qa));
 
-        List<KnowledgeSearchHitDTO> hits = store.searchTopK(100L, CommentReplySentimentEnum.GOOD, new float[]{1F, 0F});
+        List<KnowledgeSearchHitDTO> hits = store.searchTopK(100L, new float[]{1F, 0F});
 
         assertEquals(2, hits.size());
         assertEquals(1L, hits.get(0).getChunk().getId());
-        assertEquals(3L, hits.get(1).getChunk().getId());
+        assertEquals(2L, hits.get(1).getChunk().getId());
     }
 
-    private MtReplyKnowledgeChunk chunk(Long id, String sourceType, String sentiment, float[] embedding) {
-        MtReplyKnowledgeChunk chunk = new MtReplyKnowledgeChunk();
+    private MtKnowledgeChunk chunk(Long id, String sourceType, float[] embedding) {
+        MtKnowledgeChunk chunk = new MtKnowledgeChunk();
         chunk.setId(id);
         chunk.setSourceType(sourceType);
         chunk.setSourceId(id);
-        chunk.setSentiment(sentiment);
         chunk.setChunkText("chunk-" + id);
         chunk.setEmbeddingBlob(EmbeddingVectorUtil.toFloat32Blob(embedding));
         return chunk;

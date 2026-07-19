@@ -15,11 +15,12 @@ class MtPropertiesConfigurationTest {
             .withUserConfiguration(TestConfiguration.class);
 
     @Test
-    void bindsFallbackTemplateWithCommentVariableFromApplicationYaml() {
-        contextRunner.run(context -> assertThat(context.getBean(MtProperties.class)
-                .getComment().getImFollowUp().getFallbackMessage())
-                .contains("[{{commentContent}}]")
-                .contains("核实后给您补偿处理"));
+    void bindsGenericKnowledgeAndImConfigurationFromApplicationYaml() {
+        contextRunner.run(context -> {
+            MtProperties properties = context.getBean(MtProperties.class);
+            assertThat(properties.getKnowledge().getDocumentKeyPrefix()).isEqualTo("knowledge/documents");
+            assertThat(properties.getIm()).isNotNull();
+        });
     }
 
     @Configuration(proxyBeanMethods = false)

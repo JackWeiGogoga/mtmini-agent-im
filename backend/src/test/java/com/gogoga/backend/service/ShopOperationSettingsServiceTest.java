@@ -1,20 +1,24 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.entity.mt.MtCommentReplySetting;
-import com.gogoga.backend.entity.mt.MtCommentReplySettingHistory;
+import com.gogoga.backend.entity.mt.MtImAutoReplySetting;
+import com.gogoga.backend.entity.mt.MtImAutoReplySettingHistory;
 import com.gogoga.backend.entity.mt.MtShop;
-import com.gogoga.backend.mapper.MtCommentReplySettingHistoryMapper;
-import com.gogoga.backend.mapper.MtCommentReplySettingMapper;
+import com.gogoga.backend.exception.BusinessException;
+import com.gogoga.backend.mapper.MtImAutoReplySettingHistoryMapper;
+import com.gogoga.backend.mapper.MtImAutoReplySettingMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
+import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -27,82 +31,144 @@ class ShopOperationSettingsServiceTest {
     @Mock
     private MtShopMapper mtShopMapper;
     @Mock
-    private MtCommentReplySettingMapper mtCommentReplySettingMapper;
+    private MtImAutoReplySettingMapper settingMapper;
     @Mock
-    private MtCommentReplySettingHistoryMapper mtCommentReplySettingHistoryMapper;
+    private MtImAutoReplySettingHistoryMapper historyMapper;
 
     @InjectMocks
     private ShopOperationSettingsService service;
 
     @Test
-    void buildSettingsEnablesBothSwitchesByDefaultWhenNoSettingExists() {
-        when(mtCommentReplySettingMapper.selectByShopId(100L)).thenReturn(null);
+    void missingSettingDefaultsToDisabled() {
+        when(settingMapper.selectByShopId(100L)).thenReturn(null);
 
         ShopOperationSettingsVO settings = service.buildSettings(100L);
 
-        assertTrue(settings.getAutoReplyEnabled());
-        assertTrue(settings.getNegativeCommentAppealEnabled());
+        assertFalse(settings.getAutoReplyEnabled());
     }
 
     @Test
-    void buildSettingsPreservesSavedNegativeCommentAppealChoice() {
-        MtCommentReplySetting saved = new MtCommentReplySetting();
-        saved.setShopId(100L);
-        saved.setAutoReplyEnabled(true);
-        saved.setNegativeCommentAppealEnabled(false);
-        when(mtCommentReplySettingMapper.selectByShopId(100L)).thenReturn(saved);
-
-        ShopOperationSettingsVO settings = service.buildSettings(100L);
-
-        assertTrue(settings.getAutoReplyEnabled());
-        assertFalse(settings.getNegativeCommentAppealEnabled());
-    }
-
-    @Test
-    void insufficientPowerDisablesBothSwitchesAndAppendsSystemHistory() {
-        MtCommentReplySetting saved = new MtCommentReplySetting();
-        saved.setId(7L);
-        saved.setShopId(100L);
-        saved.setAutoReplyEnabled(true);
-        saved.setNegativeCommentAppealEnabled(true);
-        when(mtCommentReplySettingMapper.selectByShopId(100L)).thenReturn(saved);
+    void authorizationCanEnableAndRecordsAuthHistory() {
         MtShop shop = new MtShop();
         shop.setId(100L);
         when(mtShopMapper.selectById(100L)).thenReturn(shop);
-        when(mtCommentReplySettingMapper.updateById(any())).thenReturn(1);
-        when(mtCommentReplySettingHistoryMapper.selectMaxVersionNoByShopId(100L)).thenReturn(2);
+        when(settingMapper.selectByShopId(100L)).thenReturn(null);
+        when(settingMapper.insert(any())).thenAnswer(invocation -> {
+            MtImAutoReplySetting setting = invocation.getArgument(0);
+            setting.setId(7L);
+            return 1;
+        });
+        when(historyMapper.selectMaxVersionNoByShopId(100L)).thenReturn(null);
 
-        ShopOperationSettingsVO result = service.disableCommentProcessingForInsufficientPower(100L);
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(true);
+        ShopOperationSettingsVO result = service.updateSettings(
+                100L, param, ShopOperationSettingsService.CHANGE_SOURCE_AUTH, "AUTH_IM_CONFIGURED");
 
-        assertFalse(result.getAutoReplyEnabled());
-        assertFalse(result.getNegativeCommentAppealEnabled());
-        ArgumentCaptor<MtCommentReplySetting> settingCaptor = ArgumentCaptor.forClass(MtCommentReplySetting.class);
-        verify(mtCommentReplySettingMapper).updateById(settingCaptor.capture());
-        assertFalse(settingCaptor.getValue().getAutoReplyEnabled());
-        assertFalse(settingCaptor.getValue().getNegativeCommentAppealEnabled());
-        ArgumentCaptor<MtCommentReplySettingHistory> historyCaptor =
-                ArgumentCaptor.forClass(MtCommentReplySettingHistory.class);
-        verify(mtCommentReplySettingHistoryMapper).insert(historyCaptor.capture());
-        assertTrue(ShopOperationSettingsService.CHANGE_SOURCE_SYSTEM.equals(historyCaptor.getValue().getChangeSource()));
-        assertTrue(ShopOperationSettingsService.CHANGE_REASON_POWER_BALANCE_NOT_ENOUGH
-                .equals(historyCaptor.getValue().getChangeReason()));
+        assertTrue(result.getAutoReplyEnabled());
+        ArgumentCaptor<MtImAutoReplySettingHistory> history =
+                ArgumentCaptor.forClass(MtImAutoReplySettingHistory.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(ShopOperationSettingsService.CHANGE_SOURCE_AUTH, history.getValue().getChangeSource());
+        assertEquals("AUTH_IM_CONFIGURED", history.getValue().getChangeReason());
+        assertEquals(1, history.getValue().getVersionNo());
     }
 
     @Test
-    void insufficientPowerShutdownIsIdempotentWhenBothSwitchesAreAlreadyOff() {
-        MtCommentReplySetting saved = new MtCommentReplySetting();
-        saved.setId(7L);
-        saved.setShopId(100L);
-        saved.setAutoReplyEnabled(false);
-        saved.setNegativeCommentAppealEnabled(false);
-        when(mtCommentReplySettingMapper.selectByShopId(100L)).thenReturn(saved);
+    void explicitH5ChangeRecordsH5History() {
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        MtImAutoReplySetting saved = enabledSetting();
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+        when(settingMapper.selectByShopId(100L)).thenReturn(saved);
+        when(settingMapper.updateById(any())).thenReturn(1);
+        when(historyMapper.selectMaxVersionNoByShopId(100L)).thenReturn(3);
 
-        ShopOperationSettingsVO result = service.disableCommentProcessingForInsufficientPower(100L);
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(false);
+        service.updateSettings(100L, param, ShopOperationSettingsService.CHANGE_SOURCE_H5);
+
+        ArgumentCaptor<MtImAutoReplySettingHistory> history =
+                ArgumentCaptor.forClass(MtImAutoReplySettingHistory.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(ShopOperationSettingsService.CHANGE_SOURCE_H5, history.getValue().getChangeSource());
+        assertEquals(4, history.getValue().getVersionNo());
+    }
+
+    @Test
+    void explicitAdminChangeRecordsAdminHistory() {
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+        when(settingMapper.selectByShopId(100L)).thenReturn(enabledSetting());
+        when(settingMapper.updateById(any())).thenReturn(1);
+        when(historyMapper.selectMaxVersionNoByShopId(100L)).thenReturn(1);
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(false);
+
+        service.updateSettings(100L, param, ShopOperationSettingsService.CHANGE_SOURCE_ADMIN);
+
+        ArgumentCaptor<MtImAutoReplySettingHistory> history =
+                ArgumentCaptor.forClass(MtImAutoReplySettingHistory.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(ShopOperationSettingsService.CHANGE_SOURCE_ADMIN, history.getValue().getChangeSource());
+    }
+
+    @Test
+    void rejectsUnknownShopWithoutReadingOrWritingAnotherShopSetting() {
+        when(mtShopMapper.selectById(999L)).thenReturn(null);
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(true);
+
+        assertThrows(BusinessException.class,
+                () -> service.updateSettings(999L, param, ShopOperationSettingsService.CHANGE_SOURCE_H5));
+
+        verify(settingMapper, never()).selectByShopId(any());
+        verify(settingMapper, never()).insert(any());
+        verify(settingMapper, never()).updateById(any());
+    }
+
+    @Test
+    void insufficientPowerDisablesSwitchWithSystemHistory() {
+        MtShop shop = new MtShop();
+        shop.setId(100L);
+        when(mtShopMapper.selectById(100L)).thenReturn(shop);
+        when(settingMapper.selectByShopId(100L)).thenReturn(enabledSetting());
+        when(settingMapper.updateById(any())).thenReturn(1);
+        when(historyMapper.selectMaxVersionNoByShopId(100L)).thenReturn(2);
+
+        ShopOperationSettingsVO result = service.disableImAutoReplyForInsufficientPower(100L);
 
         assertFalse(result.getAutoReplyEnabled());
-        assertFalse(result.getNegativeCommentAppealEnabled());
-        verify(mtShopMapper, never()).selectById(any());
-        verify(mtCommentReplySettingMapper, never()).updateById(any());
-        verify(mtCommentReplySettingHistoryMapper, never()).insert(any());
+        ArgumentCaptor<MtImAutoReplySettingHistory> history =
+                ArgumentCaptor.forClass(MtImAutoReplySettingHistory.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(ShopOperationSettingsService.CHANGE_SOURCE_SYSTEM, history.getValue().getChangeSource());
+        assertEquals(ShopOperationSettingsService.CHANGE_REASON_POWER_BALANCE_NOT_ENOUGH,
+                history.getValue().getChangeReason());
+    }
+
+    @Test
+    void repeatedSameStateDoesNotWriteOrAppendHistory() {
+        when(mtShopMapper.selectById(100L)).thenReturn(new MtShop());
+        when(settingMapper.selectByShopId(100L)).thenReturn(enabledSetting());
+        ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
+        param.setAutoReplyEnabled(true);
+
+        ShopOperationSettingsVO result = service.updateSettings(
+                100L, param, ShopOperationSettingsService.CHANGE_SOURCE_ADMIN);
+
+        assertTrue(result.getAutoReplyEnabled());
+        verify(settingMapper, never()).insert(any());
+        verify(settingMapper, never()).updateById(any());
+        verify(historyMapper, never()).insert(any());
+    }
+
+    private MtImAutoReplySetting enabledSetting() {
+        MtImAutoReplySetting setting = new MtImAutoReplySetting();
+        setting.setId(7L);
+        setting.setShopId(100L);
+        setting.setAutoReplyEnabled(true);
+        return setting;
     }
 }

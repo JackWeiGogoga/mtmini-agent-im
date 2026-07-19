@@ -117,14 +117,14 @@ class MtAsyncTaskServiceTest {
         MtAsyncTask task = buildProcessingTask(8L, 0, 3);
         LocalDateTime now = LocalDateTime.of(2026, 7, 16, 0, 35);
 
-        mtAsyncTaskService.markTerminalFailure(task, "COMMENT_IM_CREATE_GROUP_FAILED", now);
+        mtAsyncTaskService.markTerminalFailure(task, "AUTH_CONFIGURE_IM_FAILED", now);
 
         verify(mtAsyncTaskMapper).markDead(
                 8L,
                 MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS.name(),
                 1,
                 now,
-                "COMMENT_IM_CREATE_GROUP_FAILED"
+                "AUTH_CONFIGURE_IM_FAILED"
         );
         verify(mtAsyncTaskMapper, never()).rescheduleFromProcessing(any(), any(), any(), any(), any(), any());
     }
@@ -205,11 +205,11 @@ class MtAsyncTaskServiceTest {
     void shouldPassScopeCursorToFairSelection() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 18, 10, 0);
         when(mtAsyncTaskMapper.selectExecutableFairIds(
-                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY.name(), now, "shop-100", 2
+                MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE.name(), now, "shop-100", 2
         )).thenReturn(List.of(11L, 12L));
 
         List<Long> taskIds = mtAsyncTaskService.selectExecutableFairTaskIds(
-                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
+                MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
                 "shop-100",
                 2,
                 now
@@ -223,22 +223,22 @@ class MtAsyncTaskServiceTest {
         MtAsyncTask existing = new MtAsyncTask();
         existing.setId(21L);
         existing.setStatus("DEAD");
-        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("COMMENT_AUTO_REPLY", "comment:9001"))
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("KNOWLEDGE_DOCUMENT_PARSE", "document:9001"))
                 .thenReturn(existing);
-        when(mtAsyncTaskMapper.resetForManualRetry(eq(21L), eq("COMMENT_AUTO_REPLY"), eq(3), any()))
+        when(mtAsyncTaskMapper.resetForManualRetry(eq(21L), eq("KNOWLEDGE_DOCUMENT_PARSE"), eq(3), any()))
                 .thenReturn(1);
 
         MtAsyncTaskEnqueueResult result = mtAsyncTaskService.enqueueOrResetForManualRetry(
-                MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
-                "comment:9001",
+                MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
+                "document:9001",
                 "100",
-                java.util.Map.of("commentId", 9001L),
+                java.util.Map.of("documentId", 9001L),
                 3
         );
 
         assertEquals(21L, result.getTaskId());
         assertFalse(result.isCreated());
-        verify(mtAsyncTaskMapper).resetForManualRetry(eq(21L), eq("COMMENT_AUTO_REPLY"), eq(3), any());
+        verify(mtAsyncTaskMapper).resetForManualRetry(eq(21L), eq("KNOWLEDGE_DOCUMENT_PARSE"), eq(3), any());
     }
 
     @Test
@@ -246,15 +246,15 @@ class MtAsyncTaskServiceTest {
         MtAsyncTask existing = new MtAsyncTask();
         existing.setId(22L);
         existing.setStatus("PROCESSING");
-        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("COMMENT_AUTO_REPLY", "comment:9002"))
+        when(mtAsyncTaskMapper.selectByTaskTypeAndBizKey("KNOWLEDGE_DOCUMENT_PARSE", "document:9002"))
                 .thenReturn(existing);
 
         assertThrows(com.gogoga.backend.exception.BusinessException.class,
                 () -> mtAsyncTaskService.enqueueOrResetForManualRetry(
-                        MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
-                        "comment:9002",
+                        MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
+                        "document:9002",
                         "100",
-                        java.util.Map.of("commentId", 9002L),
+                        java.util.Map.of("documentId", 9002L),
                         3
                 ));
 

@@ -15,7 +15,7 @@ endef
 help:
 	@echo "Local development targets:"
 	@echo "  make env-copy       Create .env.local from .env.local.example if missing"
-	@echo "  make env-check      Print key local environment values"
+	@echo "  make env-check      Print key local environment status"
 	@echo "  make backend-dev    Start Spring Boot backend on :8080"
 	@echo "  make h5-dev         Start uni-app H5 on :5173"
 	@echo "  make admin-dev      Start React admin on :5174"
@@ -43,13 +43,9 @@ env-check:
 		echo "SPRING_DATA_REDIS_PORT=$${SPRING_DATA_REDIS_PORT:-6379}"; \
 		echo "COS_ENABLED=$${COS_ENABLED:-false}"; \
 		echo "SCHEDULED_ENABLED=$${SCHEDULED_ENABLED:-false}"; \
-		echo "MT_COMMENT_QUERY_DRY_RUN=$${MT_COMMENT_QUERY_DRY_RUN:-true}"; \
-		echo "MT_COMMENT_REPLY_DRY_RUN=$${MT_COMMENT_REPLY_DRY_RUN:-true}"; \
-		if [ -n "$${DASHSCOPE_API_KEY:-$${MT_COMMENT_KNOWLEDGE_EMBEDDING_API_KEY:-}}" ]; then echo "Embedding key: configured"; else echo "Embedding key: missing"; fi; \
-		if [ -n "$${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:-}" ]; then echo "Chat model key: configured"; else echo "Chat model key: missing"; fi; \
-		echo "MT_COMMENT_KNOWLEDGE_VISION_ENABLED=$${MT_COMMENT_KNOWLEDGE_VISION_ENABLED:-true}"; \
-		echo "MT_COMMENT_KNOWLEDGE_VISION_MODEL=$${MT_COMMENT_KNOWLEDGE_VISION_MODEL:-qwen3.5-flash}"; \
-		if [ -n "$${MT_COMMENT_KNOWLEDGE_VISION_MODEL_API_KEY:-$${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:-}}" ]; then echo "Vision model key: configured"; else echo "Vision model key: missing"; fi \
+		if [ -n "$${MT_IM_SECRET:-}" ]; then echo "IM callback secret: configured"; else echo "IM callback secret: missing"; fi; \
+		if [ -n "$${MT_KNOWLEDGE_EMBEDDING_API_KEY:-$${DASHSCOPE_API_KEY:-}}" ]; then echo "Embedding key: configured"; else echo "Embedding key: missing"; fi; \
+		if [ -n "$${MT_KNOWLEDGE_MODEL_API_KEY:-}" ]; then echo "Chat model key: configured"; else echo "Chat model key: missing"; fi \
 	)
 
 backend-dev:
@@ -73,4 +69,4 @@ h5-build:
 test-all: backend-test admin-test h5-build validate
 
 validate:
-	@openspec validate add-comment-reply-knowledge-rag --strict
+	@openspec validate replace-comment-reply-with-im-auto-reply-foundation --strict

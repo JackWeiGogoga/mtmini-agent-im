@@ -1,6 +1,6 @@
 -- =====================================================
--- Initialization data for mtmini-agent-reply
--- Generated from old online export auth_init_data.sql and filtered for reply-project menus.
+-- Initialization data for mtmini-agent-im
+-- Contains only reusable platform menus and the generic merchant knowledge base.
 -- Excludes business/runtime data: shops, tokens, orders, payments, logs, analytics events.
 -- =====================================================
 
@@ -55,20 +55,13 @@ INSERT IGNORE INTO `ai_menu` (`id`, `menu_id`, `parent_id`, `menu_name`, `path`,
   (42,'MENU_YOUZAN_APP_ORDER','0','有赞订单','/youzan-app-orders','pages/youzan-app-order-manage/YouzanAppOrderManage','youzan:app-order:list','ProfileOutlined','C',9,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
   (43,'MENU_YOUZAN_APP_ORDER_REDEEM','MENU_YOUZAN_APP_ORDER','核销有赞订单',NULL,NULL,'youzan:app-order:redeem',NULL,'F',0,1,1,'2026-04-29 22:58:57','2026-04-29 22:58:57'),
   (45,'MENU_USER_BEHAVIOR_ANALYTICS','0','行为统计','/analytics/user-behavior','pages/user-behavior-analytics/UserBehaviorAnalytics','analytics:user-behavior:list','LineChartOutlined','C',11,1,1,'2026-05-24 12:32:34','2026-05-24 12:32:34'),
-  (46,'MENU_COMMENT_REPLY_KNOWLEDGE','0','回复文案','/comment-reply-knowledge','pages/comment-reply-knowledge/CommentReplyKnowledgeManage','comment:reply-knowledge:list','MessageOutlined','C',12,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
-  (47,'MENU_COMMENT_REPLY_KNOWLEDGE_ADD','MENU_COMMENT_REPLY_KNOWLEDGE','新增回复文案',NULL,NULL,'comment:reply-knowledge:add',NULL,'F',0,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
-  (48,'MENU_COMMENT_REPLY_KNOWLEDGE_EDIT','MENU_COMMENT_REPLY_KNOWLEDGE','编辑回复文案',NULL,NULL,'comment:reply-knowledge:edit',NULL,'F',1,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
-  (49,'MENU_COMMENT_REPLY_KNOWLEDGE_DELETE','MENU_COMMENT_REPLY_KNOWLEDGE','删除回复文案',NULL,NULL,'comment:reply-knowledge:delete',NULL,'F',2,1,1,'2026-06-23 01:00:00','2026-06-23 01:00:00'),
-  (50,'MENU_MERCHANT_KNOWLEDGE','0','知识库管理','/merchant-knowledge','pages/merchant-knowledge/MerchantKnowledgeManage','comment:merchant-knowledge:list','DatabaseOutlined','C',13,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
-  (51,'MENU_MERCHANT_KNOWLEDGE_ADD','MENU_MERCHANT_KNOWLEDGE','新增知识',NULL,NULL,'comment:merchant-knowledge:add',NULL,'F',0,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
-  (52,'MENU_MERCHANT_KNOWLEDGE_EDIT','MENU_MERCHANT_KNOWLEDGE','编辑知识',NULL,NULL,'comment:merchant-knowledge:edit',NULL,'F',1,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
-  (53,'MENU_MERCHANT_KNOWLEDGE_DELETE','MENU_MERCHANT_KNOWLEDGE','删除知识',NULL,NULL,'comment:merchant-knowledge:delete',NULL,'F',2,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
+  (50,'MENU_MERCHANT_KNOWLEDGE','0','知识库管理','/merchant-knowledge','pages/merchant-knowledge/MerchantKnowledgeManage','knowledge:list','DatabaseOutlined','C',13,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
+  (51,'MENU_MERCHANT_KNOWLEDGE_ADD','MENU_MERCHANT_KNOWLEDGE','新增知识',NULL,NULL,'knowledge:add',NULL,'F',0,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
+  (52,'MENU_MERCHANT_KNOWLEDGE_EDIT','MENU_MERCHANT_KNOWLEDGE','编辑知识',NULL,NULL,'knowledge:edit',NULL,'F',1,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
+  (53,'MENU_MERCHANT_KNOWLEDGE_DELETE','MENU_MERCHANT_KNOWLEDGE','删除知识',NULL,NULL,'knowledge:delete',NULL,'F',2,1,1,'2026-06-23 02:00:00','2026-06-23 02:00:00'),
   (54,'MENU_SYSTEM_PROMPT','MENU_SYSTEM','系统提示词','/system/prompts','pages/system-prompt/SystemPromptManage','system:prompt:list','MessageOutlined','C',3,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
   (55,'MENU_SYSTEM_PROMPT_QUERY','MENU_SYSTEM_PROMPT','查看提示词',NULL,NULL,'system:prompt:query',NULL,'F',0,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
-  (56,'MENU_SYSTEM_PROMPT_EDIT','MENU_SYSTEM_PROMPT','编辑提示词',NULL,NULL,'system:prompt:edit',NULL,'F',1,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
-  (57,'MENU_COMMENT_PROCESSING_LOG','0','评价处理日志','/comment-processing-logs','pages/comment-processing-log/CommentProcessingLog','comment:processing-log:list','FileSearchOutlined','C',14,1,1,'2026-07-14 00:00:00','2026-07-14 00:00:00'),
-  (58,'MENU_COMMENT_PROCESSING_LOG_QUERY','MENU_COMMENT_PROCESSING_LOG','查看评价处理详情',NULL,NULL,'comment:processing-log:query',NULL,'F',0,1,1,'2026-07-14 00:00:00','2026-07-14 00:00:00'),
-  (59,'MENU_COMMENT_PROCESSING_LOG_RETRY','MENU_COMMENT_PROCESSING_LOG','重试评价处理任务',NULL,NULL,'comment:processing-log:retry',NULL,'F',1,1,1,'2026-07-16 00:00:00','2026-07-16 00:00:00');
+  (56,'MENU_SYSTEM_PROMPT_EDIT','MENU_SYSTEM_PROMPT','编辑提示词',NULL,NULL,'system:prompt:edit',NULL,'F',1,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00');
 /*!40000 ALTER TABLE `ai_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `ai_role` DISABLE KEYS */;
@@ -145,10 +138,6 @@ INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VA
   (92,'ROLE_ADMIN','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
   (93,'ROLE_SUPER','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
   (94,'ROLE_SALES','MENU_USER_BEHAVIOR_ANALYTICS','2026-05-24 12:32:34'),
-  (95,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE','2026-06-23 01:00:00'),
-  (96,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_ADD','2026-06-23 01:00:00'),
-  (97,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_EDIT','2026-06-23 01:00:00'),
-  (98,'ROLE_SUPER','MENU_COMMENT_REPLY_KNOWLEDGE_DELETE','2026-06-23 01:00:00'),
   (99,'ROLE_SUPER','MENU_MERCHANT_KNOWLEDGE','2026-06-23 02:00:00'),
   (100,'ROLE_SUPER','MENU_MERCHANT_KNOWLEDGE_ADD','2026-06-23 02:00:00'),
   (101,'ROLE_SUPER','MENU_MERCHANT_KNOWLEDGE_EDIT','2026-06-23 02:00:00'),
@@ -166,13 +155,7 @@ INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VA
   (113,'ROLE_SUPER','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00'),
   (114,'ROLE_ADMIN','MENU_SYSTEM_PROMPT','2026-06-27 00:00:00'),
   (115,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_QUERY','2026-06-27 00:00:00'),
-  (116,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00'),
-  (117,'ROLE_SUPER','MENU_COMMENT_PROCESSING_LOG','2026-07-14 00:00:00'),
-  (118,'ROLE_SUPER','MENU_COMMENT_PROCESSING_LOG_QUERY','2026-07-14 00:00:00'),
-  (119,'ROLE_ADMIN','MENU_COMMENT_PROCESSING_LOG','2026-07-14 00:00:00'),
-  (120,'ROLE_ADMIN','MENU_COMMENT_PROCESSING_LOG_QUERY','2026-07-14 00:00:00'),
-  (121,'ROLE_SUPER','MENU_COMMENT_PROCESSING_LOG_RETRY','2026-07-16 00:00:00'),
-  (122,'ROLE_ADMIN','MENU_COMMENT_PROCESSING_LOG_RETRY','2026-07-16 00:00:00');
+  (116,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00');
 /*!40000 ALTER TABLE `ai_role_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `mt_version_service_mapping` DISABLE KEYS */;

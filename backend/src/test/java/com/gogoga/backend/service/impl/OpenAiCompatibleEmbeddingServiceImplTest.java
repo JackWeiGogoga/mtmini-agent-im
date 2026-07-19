@@ -42,9 +42,9 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
                             }
                             """));
             MtProperties properties = new MtProperties();
-            properties.getComment().getKnowledge().setEmbeddingBaseUrl(server.url("/compatible-mode/v1").toString());
-            properties.getComment().getKnowledge().setEmbeddingApiKey("dashscope-key");
-            properties.getComment().getKnowledge().setEmbeddingDim(3);
+            properties.getKnowledge().setEmbeddingBaseUrl(server.url("/compatible-mode/v1").toString());
+            properties.getKnowledge().setEmbeddingApiKey("dashscope-key");
+            properties.getKnowledge().setEmbeddingDim(3);
             OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
                     properties,
                     new OpenAiCompatibleClientFactory(),
@@ -68,9 +68,9 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
     @Test
     void rejectsBlankTextBeforeCallingProvider() {
         MtProperties properties = new MtProperties();
-        properties.getComment().getKnowledge().setEmbeddingBaseUrl("https://example.com/compatible-mode/v1");
-        properties.getComment().getKnowledge().setEmbeddingApiKey("dashscope-key");
-        properties.getComment().getKnowledge().setEmbeddingDim(1024);
+        properties.getKnowledge().setEmbeddingBaseUrl("https://example.com/compatible-mode/v1");
+        properties.getKnowledge().setEmbeddingApiKey("dashscope-key");
+        properties.getKnowledge().setEmbeddingDim(1024);
         OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
                 properties,
                 new OpenAiCompatibleClientFactory(),
@@ -86,8 +86,8 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
     @Test
     void preservesCapacityDeferredException() {
         MtProperties properties = new MtProperties();
-        properties.getComment().getKnowledge().setEmbeddingBaseUrl("https://example.com/compatible-mode/v1");
-        properties.getComment().getKnowledge().setEmbeddingApiKey("dashscope-key");
+        properties.getKnowledge().setEmbeddingBaseUrl("https://example.com/compatible-mode/v1");
+        properties.getKnowledge().setEmbeddingApiKey("dashscope-key");
         LlmRateLimitedRestExecutor executor = mock(LlmRateLimitedRestExecutor.class);
         when(executor.execute(any(), any())).thenThrow(new LlmCapacityDeferredException(1200L));
         OpenAiCompatibleEmbeddingServiceImpl service = new OpenAiCompatibleEmbeddingServiceImpl(
@@ -96,7 +96,7 @@ class OpenAiCompatibleEmbeddingServiceImplTest {
                 executor
         );
 
-        assertThrows(LlmCapacityDeferredException.class, () -> service.embed("评价知识"));
+        assertThrows(LlmCapacityDeferredException.class, () -> service.embed("门店知识"));
     }
 
     private LlmRateLimitedRestExecutor rateLimitedRestExecutor() {

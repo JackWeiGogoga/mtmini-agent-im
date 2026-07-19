@@ -1,11 +1,11 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.entity.mt.MtCommentReplySetting;
-import com.gogoga.backend.entity.mt.MtCommentReplySettingHistory;
+import com.gogoga.backend.entity.mt.MtImAutoReplySetting;
+import com.gogoga.backend.entity.mt.MtImAutoReplySettingHistory;
 import com.gogoga.backend.entity.mt.MtShop;
 import com.gogoga.backend.exception.BusinessException;
-import com.gogoga.backend.mapper.MtCommentReplySettingHistoryMapper;
-import com.gogoga.backend.mapper.MtCommentReplySettingMapper;
+import com.gogoga.backend.mapper.MtImAutoReplySettingHistoryMapper;
+import com.gogoga.backend.mapper.MtImAutoReplySettingMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.JsonUtil;
@@ -25,16 +25,16 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ShopOperationSettingsService {
 
+    public static final String CHANGE_SOURCE_AUTH = "AUTH";
     public static final String CHANGE_SOURCE_H5 = "H5";
     public static final String CHANGE_SOURCE_ADMIN = "ADMIN";
     public static final String CHANGE_SOURCE_SYSTEM = "SYSTEM";
     public static final String CHANGE_REASON_POWER_BALANCE_NOT_ENOUGH = "POWER_BALANCE_NOT_ENOUGH";
-    private static final boolean DEFAULT_AUTO_REPLY_ENABLED = true;
-    private static final boolean DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED = true;
+    private static final boolean DEFAULT_AUTO_REPLY_ENABLED = false;
 
     private final MtShopMapper mtShopMapper;
-    private final MtCommentReplySettingMapper mtCommentReplySettingMapper;
-    private final MtCommentReplySettingHistoryMapper mtCommentReplySettingHistoryMapper;
+    private final MtImAutoReplySettingMapper mtImAutoReplySettingMapper;
+    private final MtImAutoReplySettingHistoryMapper mtImAutoReplySettingHistoryMapper;
 
     public ShopOperationSettingsVO buildSettings(MtShop shop) {
         if (shop == null) {
@@ -54,30 +54,23 @@ public class ShopOperationSettingsService {
         return isAutoReplyEnabled(resolveSetting(shopId));
     }
 
-    public boolean isAutoReplyEnabled(MtCommentReplySetting setting) {
-        return setting == null || !Boolean.FALSE.equals(setting.getAutoReplyEnabled());
-    }
-
-    public boolean isNegativeCommentAppealEnabled(Long shopId) {
-        MtCommentReplySetting setting = resolveSetting(shopId);
-        return setting != null && Boolean.TRUE.equals(setting.getNegativeCommentAppealEnabled());
+    public boolean isAutoReplyEnabled(MtImAutoReplySetting setting) {
+        return setting != null && Boolean.TRUE.equals(setting.getAutoReplyEnabled());
     }
 
     /**
-     * 算力不足时关闭评价自动回复和差评处理开关。
+     * 算力不足时只关闭本地 IM 自动回复开关。
      *
      * <p>使用独立事务，确保调用方的算力消费事务回滚时，关停结果仍能保留。</p>
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public ShopOperationSettingsVO disableCommentProcessingForInsufficientPower(Long shopId) {
-        MtCommentReplySetting current = resolveSetting(shopId);
-        if (!isAutoReplyEnabled(current)
-                && !Boolean.TRUE.equals(current.getNegativeCommentAppealEnabled())) {
+    public ShopOperationSettingsVO disableImAutoReplyForInsufficientPower(Long shopId) {
+        MtImAutoReplySetting current = resolveSetting(shopId);
+        if (!isAutoReplyEnabled(current)) {
             return toVO(current);
         }
         ShopOperationSettingsUpdateParam param = new ShopOperationSettingsUpdateParam();
         param.setAutoReplyEnabled(false);
-        param.setNegativeCommentAppealEnabled(false);
         return updateSettings(
                 shopId,
                 param,
@@ -107,17 +100,20 @@ public class ShopOperationSettingsService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        MtCommentReplySetting before = resolveSetting(shopId);
-        MtCommentReplySetting after = copySetting(before);
-        after.setAutoReplyEnabled(Boolean.TRUE.equals(param.getAutoReplyEnabled()));
-        after.setNegativeCommentAppealEnabled(Boolean.TRUE.equals(param.getNegativeCommentAppealEnabled()));
+        MtImAutoReplySetting before = resolveSetting(shopId);
+        boolean desiredEnabled = Boolean.TRUE.equals(param.getAutoReplyEnabled());
+        if (isAutoReplyEnabled(before) == desiredEnabled) {
+            return toVO(before);
+        }
+        MtImAutoReplySetting after = copySetting(before);
+        after.setAutoReplyEnabled(desiredEnabled);
         after.setUpdateTime(now);
 
         if (after.getId() == null) {
             after.setCreateTime(now);
-            mtCommentReplySettingMapper.insert(after);
+            mtImAutoReplySettingMapper.insert(after);
         } else {
-            int updated = mtCommentReplySettingMapper.updateById(after);
+            int updated = mtImAutoReplySettingMapper.updateById(after);
             if (updated <= 0) {
                 throw new BusinessException("更新门店开关失败");
             }
@@ -126,60 +122,55 @@ public class ShopOperationSettingsService {
         return toVO(after);
     }
 
-    private MtCommentReplySetting resolveSetting(Long shopId) {
+    private MtImAutoReplySetting resolveSetting(Long shopId) {
         if (shopId == null) {
             return null;
         }
-        MtCommentReplySetting setting = mtCommentReplySettingMapper.selectByShopId(shopId);
+        MtImAutoReplySetting setting = mtImAutoReplySettingMapper.selectByShopId(shopId);
         if (setting != null) {
             return setting;
         }
-        MtCommentReplySetting defaults = new MtCommentReplySetting();
+        MtImAutoReplySetting defaults = new MtImAutoReplySetting();
         defaults.setShopId(shopId);
         defaults.setAutoReplyEnabled(DEFAULT_AUTO_REPLY_ENABLED);
-        defaults.setNegativeCommentAppealEnabled(DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED);
         return defaults;
     }
 
-    private MtCommentReplySetting copySetting(MtCommentReplySetting source) {
-        MtCommentReplySetting copy = new MtCommentReplySetting();
+    private MtImAutoReplySetting copySetting(MtImAutoReplySetting source) {
+        MtImAutoReplySetting copy = new MtImAutoReplySetting();
         if (source == null) {
             copy.setAutoReplyEnabled(DEFAULT_AUTO_REPLY_ENABLED);
-            copy.setNegativeCommentAppealEnabled(DEFAULT_NEGATIVE_COMMENT_APPEAL_ENABLED);
             return copy;
         }
         copy.setId(source.getId());
         copy.setShopId(source.getShopId());
         copy.setAutoReplyEnabled(source.getAutoReplyEnabled());
-        copy.setNegativeCommentAppealEnabled(source.getNegativeCommentAppealEnabled());
         copy.setCreateTime(source.getCreateTime());
         copy.setUpdateTime(source.getUpdateTime());
         return copy;
     }
 
-    private ShopOperationSettingsVO toVO(MtCommentReplySetting setting) {
+    private ShopOperationSettingsVO toVO(MtImAutoReplySetting setting) {
         if (setting == null) {
             return null;
         }
         ShopOperationSettingsVO vo = new ShopOperationSettingsVO();
         vo.setShopId(setting.getShopId());
         vo.setAutoReplyEnabled(isAutoReplyEnabled(setting));
-        vo.setNegativeCommentAppealEnabled(Boolean.TRUE.equals(setting.getNegativeCommentAppealEnabled()));
         return vo;
     }
 
-    private void appendHistory(MtCommentReplySetting before,
-                               MtCommentReplySetting after,
+    private void appendHistory(MtImAutoReplySetting before,
+                               MtImAutoReplySetting after,
                                String changeSource,
                                String changeReason,
                                LocalDateTime now) {
-        Integer currentMaxVersion = mtCommentReplySettingHistoryMapper.selectMaxVersionNoByShopId(after.getShopId());
-        MtCommentReplySettingHistory history = new MtCommentReplySettingHistory();
+        Integer currentMaxVersion = mtImAutoReplySettingHistoryMapper.selectMaxVersionNoByShopId(after.getShopId());
+        MtImAutoReplySettingHistory history = new MtImAutoReplySettingHistory();
         history.setSettingId(after.getId());
         history.setShopId(after.getShopId());
         history.setVersionNo((currentMaxVersion == null ? 0 : currentMaxVersion) + 1);
         history.setAutoReplyEnabled(Boolean.TRUE.equals(after.getAutoReplyEnabled()));
-        history.setNegativeCommentAppealEnabled(Boolean.TRUE.equals(after.getNegativeCommentAppealEnabled()));
         history.setChangeSource(changeSource == null || changeSource.isBlank() ? CHANGE_SOURCE_SYSTEM : changeSource);
         history.setOperatorUserId(UserContext.getUserId());
         history.setOperatorName(UserContext.getUserName());
@@ -187,6 +178,6 @@ public class ShopOperationSettingsService {
         history.setBeforeSnapshotJson(JsonUtil.toJson(toVO(before)));
         history.setAfterSnapshotJson(JsonUtil.toJson(toVO(after)));
         history.setCreateTime(now);
-        mtCommentReplySettingHistoryMapper.insert(history);
+        mtImAutoReplySettingHistoryMapper.insert(history);
     }
 }

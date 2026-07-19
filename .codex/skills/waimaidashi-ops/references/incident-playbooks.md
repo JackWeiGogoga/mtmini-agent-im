@@ -54,13 +54,12 @@
 
 重点任务名：
 
-- `MtCommentAutoReplyTask`
 - `MtAsyncTaskWorkerTask`
 - `MtAppOrderPullTask`
 - `MtAccessTokenRefreshTask`
 - `YouzanAccessTokenRefreshTask`
 
-如果授权回调正常但后续没有关闭订单推送、同步权益、回补评价或自动回复，优先检查 `MT_ASYNC_TASK_ENABLED` 和 `MT_ASYNC_TASK_WORKER_ENABLED` 是否开启，再查 `mt_async_task` 的状态分布。
+如果授权回调正常但后续没有关闭订单推送、同步权益或完成门店 IM 配置，优先检查 `MT_ASYNC_TASK_ENABLED` 和 `MT_ASYNC_TASK_WORKER_ENABLED` 是否开启，再查 `mt_async_task` 的状态分布。
 
 ## Redis 排查
 

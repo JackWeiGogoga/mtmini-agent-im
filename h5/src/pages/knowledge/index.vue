@@ -23,13 +23,13 @@
       </view>
 
       <view class="qa-card">
-        <view class="card-action" @tap="openQaForm()">+添加回复内容</view>
+        <view class="card-action" @tap="openQaForm()">+添加知识问答</view>
         <text class="qa-tip">(输入文字内容)</text>
 
         <view v-if="knowledgeRows.length === 0" class="empty-state">
           <view class="empty-icon">?</view>
           <text class="empty-title">暂无知识内容</text>
-          <text class="empty-desc">可以上传文档，或手工添加顾客问题和回复内容。</text>
+          <text class="empty-desc">可以上传文档，或手工添加顾客问题和知识答案。</text>
         </view>
 
         <scroll-view v-else class="knowledge-list" scroll-y>
@@ -46,7 +46,6 @@
               <text class="row-question">Q：{{ row.question }}</text>
               <text v-if="row.type === 'QA' && expandedQaId === row.id" class="row-answer">A：{{ row.answer }}</text>
               <view class="row-foot">
-                <text class="sentiment-badge" :class="sentimentClass(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</text>
                 <text v-if="row.statusText" class="status-text">{{ row.statusText }}</text>
                 <text v-if="row.type === 'QA'" class="edit-link" @tap="openQaForm(row.raw)">编辑</text>
               </view>
@@ -67,15 +66,6 @@
         <view class="form-line">
           <text class="form-label">标题：</text>
           <input v-model="qaForm.title" class="form-input" maxlength="10" placeholder="请输入（10字内）" />
-        </view>
-        <view class="form-line">
-          <text class="form-label">评分：</text>
-          <picker class="form-picker" :range="sentimentOptions" range-key="label" :value="sentimentIndex" @change="changeSentiment">
-            <view class="picker-value">
-              <text>{{ sentimentOptions[sentimentIndex].label }}</text>
-              <text class="picker-arrow">▼</text>
-            </view>
-          </picker>
         </view>
         <view class="form-line form-line-top">
           <text class="form-label">问题Q：</text>
@@ -124,10 +114,7 @@
           </view>
           <scroll-view v-if="uploadPreviewChunks.length > 0" class="preview-chunk-list" scroll-y>
             <view v-for="chunk in uploadPreviewChunks" :key="chunk.index" class="preview-chunk-card">
-              <view class="chunk-head">
-                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
-                <text class="chunk-enabled">片段 {{ chunk.index }}</text>
-              </view>
+              <view class="chunk-head"><text class="chunk-enabled">片段 {{ chunk.index }}</text></view>
               <text class="chunk-text">{{ chunk.chunkText }}</text>
             </view>
           </scroll-view>
@@ -211,13 +198,9 @@
           <view v-else-if="documentChunks.length === 0" class="chunk-empty">暂无可用片段</view>
           <view v-else>
             <view v-for="chunk in documentChunks" :key="chunk.id" class="chunk-card" :class="{ 'chunk-disabled': !chunk.enabled }">
-              <view class="chunk-head">
-                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
-                <text class="chunk-enabled">{{ chunk.enabled ? '启用中' : '已停用' }}</text>
-              </view>
+              <view class="chunk-head"><text class="chunk-enabled">{{ chunk.enabled ? '启用中' : '已停用' }}</text></view>
               <text class="chunk-text">{{ chunk.chunkText }}</text>
               <view class="chunk-actions">
-                <text class="chunk-action" @tap="changeChunkSentiment(chunk)">改类型</text>
                 <text class="chunk-action" @tap="toggleChunkEnabled(chunk)">{{ chunk.enabled ? '停用' : '启用' }}</text>
                 <text class="chunk-action danger" @tap="removeChunk(chunk)">删除</text>
               </view>
@@ -238,28 +221,21 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import AppSubpageHeader from '@/components/app-subpage-header.vue'
 import {
-  clearCommentReplyKnowledge,
-  createCommentReplyQaItem,
-  deleteCommentReplyDocument,
-  deleteCommentReplyChunk,
-  deleteCommentReplyQaItem,
-  getCommentReplyDocumentChunks,
-  getCommentReplyDocuments,
-  getCommentReplyQaItems,
-  previewCommentReplyDocument,
+  clearKnowledge,
+  createKnowledgeQaItem,
+  deleteKnowledgeDocument,
+  deleteKnowledgeChunk,
+  deleteKnowledgeQaItem,
+  getKnowledgeDocumentChunks,
+  getKnowledgeDocuments,
+  getKnowledgeQaItems,
+  previewKnowledgeDocument,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
-  updateCommentReplyChunkEnabled,
-  updateCommentReplyChunkSentiment,
-  updateCommentReplyQaItem,
-  uploadCommentReplyDocument,
+  updateKnowledgeChunkEnabled,
+  updateKnowledgeQaItem,
+  uploadKnowledgeDocument,
 } from '@/utils/mt-auth'
-
-const sentimentOptions = [
-  { label: '好评（4-5星）', value: 'GOOD' },
-  { label: '中评（3星）', value: 'NEUTRAL' },
-  { label: '差评（1-2星）', value: 'BAD' },
-]
 
 const qaItems = ref([])
 const documents = ref([])
@@ -278,10 +254,8 @@ const uploadPreviewResult = ref(null)
 const pendingPreviewHint = ref('')
 const editingQaId = ref(null)
 const expandedQaId = ref(null)
-const sentimentIndex = ref(0)
 const qaForm = reactive({
   title: '',
-  sentiment: 'GOOD',
   question: '',
   answer: '',
 })
@@ -291,10 +265,9 @@ const knowledgeRows = computed(() => {
     rowKey: `qa-${item.id}`,
     type: 'QA',
     id: item.id,
-    title: item.title || '回复内容',
+    title: item.title || '知识问答',
     question: item.question || '',
     answer: item.answer || '',
-    sentiment: item.sentiment,
     raw: item,
   }))
 })
@@ -320,8 +293,8 @@ onMounted(() => {
 async function refresh() {
   try {
     const [qa, docs] = await Promise.all([
-      getCommentReplyQaItems(),
-      getCommentReplyDocuments(),
+      getKnowledgeQaItems(),
+      getKnowledgeDocuments(),
     ])
     qaItems.value = qa || []
     documents.value = docs || []
@@ -354,7 +327,7 @@ async function openUploadPreview(file) {
   uploadPreviewVisible.value = true
   previewingUpload.value = true
   try {
-    uploadPreviewResult.value = await previewCommentReplyDocument(file.path)
+    uploadPreviewResult.value = await previewKnowledgeDocument(file.path)
     reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
       actionCode: 'DOCUMENT_PREVIEW_RESULT',
       result: 'SUCCESS',
@@ -399,7 +372,7 @@ async function confirmUploadDocument() {
   })
   uploading.value = true
   try {
-    const uploaded = await uploadCommentReplyDocument(pendingUploadFile.value.path)
+    const uploaded = await uploadKnowledgeDocument(pendingUploadFile.value.path)
     resetUploadPreview()
     uni.showToast({ title: '上传成功，解析中', icon: 'none' })
     await refresh()
@@ -459,7 +432,7 @@ function confirmRemoveDocument(doc) {
         return
       }
       try {
-        await deleteCommentReplyDocument(doc.id)
+        await deleteKnowledgeDocument(doc.id)
         if (selectedDocument.value?.id === doc.id) {
           closeDocumentDetail()
         }
@@ -540,7 +513,7 @@ async function reloadDocumentDetail() {
 async function loadDocumentChunks(documentId) {
   loadingChunks.value = true
   try {
-    documentChunks.value = await getCommentReplyDocumentChunks(documentId) || []
+    documentChunks.value = await getKnowledgeDocumentChunks(documentId) || []
   } catch (error) {
     uni.showToast({ title: error.message || '加载片段失败', icon: 'none' })
   } finally {
@@ -548,33 +521,9 @@ async function loadDocumentChunks(documentId) {
   }
 }
 
-function changeChunkSentiment(chunk) {
-  const options = [
-    { label: '好评', value: 'GOOD' },
-    { label: '中评', value: 'NEUTRAL' },
-    { label: '差评', value: 'BAD' },
-    { label: '通用', value: 'UNKNOWN' },
-  ]
-  uni.showActionSheet({
-    itemList: options.map((item) => item.label),
-    success: async (res) => {
-      const sentiment = options[res.tapIndex]?.value
-      if (!sentiment || sentiment === chunk.sentiment) {
-        return
-      }
-      try {
-        await updateCommentReplyChunkSentiment(chunk.id, sentiment)
-        await reloadDocumentDetail()
-      } catch (error) {
-        uni.showToast({ title: error.message || '修改失败', icon: 'none' })
-      }
-    },
-  })
-}
-
 async function toggleChunkEnabled(chunk) {
   try {
-    await updateCommentReplyChunkEnabled(chunk.id, !chunk.enabled)
+    await updateKnowledgeChunkEnabled(chunk.id, !chunk.enabled)
     await reloadDocumentDetail()
   } catch (error) {
     uni.showToast({ title: error.message || '操作失败', icon: 'none' })
@@ -592,7 +541,7 @@ function removeChunk(chunk) {
         return
       }
       try {
-        await deleteCommentReplyChunk(chunk.id)
+        await deleteKnowledgeChunk(chunk.id)
         await reloadDocumentDetail()
       } catch (error) {
         uni.showToast({ title: error.message || '删除失败', icon: 'none' })
@@ -608,10 +557,8 @@ function openQaForm(item) {
   })
   editingQaId.value = item?.id || null
   qaForm.title = item?.title || ''
-  qaForm.sentiment = item?.sentiment || 'GOOD'
   qaForm.question = item?.question || ''
   qaForm.answer = item?.answer || ''
-  sentimentIndex.value = Math.max(0, sentimentOptions.findIndex((option) => option.value === qaForm.sentiment))
   qaFormVisible.value = true
 }
 
@@ -620,12 +567,6 @@ function closeQaForm() {
     return
   }
   qaFormVisible.value = false
-}
-
-function changeSentiment(event) {
-  const index = Number(event.detail.value || 0)
-  sentimentIndex.value = index
-  qaForm.sentiment = sentimentOptions[index].value
 }
 
 async function submitQaForm() {
@@ -640,15 +581,14 @@ async function submitQaForm() {
   try {
     const payload = {
       title,
-      sentiment: qaForm.sentiment,
       question,
       answer,
       enabled: true,
     }
     if (editingQaId.value) {
-      await updateCommentReplyQaItem(editingQaId.value, payload)
+      await updateKnowledgeQaItem(editingQaId.value, payload)
     } else {
-      await createCommentReplyQaItem(payload)
+      await createKnowledgeQaItem(payload)
     }
     qaFormVisible.value = false
     await refresh()
@@ -662,7 +602,7 @@ async function submitQaForm() {
 function removeQa(id) {
   uni.showModal({
     title: '确认删除这条知识？',
-    content: '删除后 AI 将不再使用这条回复内容。',
+    content: '删除后 AI 将不再使用这条知识问答。',
     confirmText: '确认',
     cancelText: '取消',
     success: async (res) => {
@@ -670,7 +610,7 @@ function removeQa(id) {
         return
       }
       try {
-        await deleteCommentReplyQaItem(id)
+        await deleteKnowledgeQaItem(id)
         await refresh()
       } catch (error) {
         uni.showToast({ title: error.message || '删除失败', icon: 'none' })
@@ -682,7 +622,7 @@ function removeQa(id) {
 function confirmClearKnowledge() {
   uni.showModal({
     title: '确认要删除AI所有知识吗？',
-    content: '删除后已上传文档和回复内容都会清空。',
+    content: '删除后已上传文档和知识问答都会清空。',
     confirmText: '确认',
     cancelText: '取消',
     success: async (res) => {
@@ -690,7 +630,7 @@ function confirmClearKnowledge() {
         return
       }
       try {
-        await clearCommentReplyKnowledge()
+        await clearKnowledge()
         expandedQaId.value = null
         await refresh()
       } catch (error) {
@@ -702,23 +642,6 @@ function confirmClearKnowledge() {
 
 function toggleAnswer(id) {
   expandedQaId.value = expandedQaId.value === id ? null : id
-}
-
-function sentimentLabel(value) {
-  return {
-    GOOD: '好评',
-    NEUTRAL: '中评',
-    BAD: '差评',
-    UNKNOWN: '文档',
-  }[value] || '文档'
-}
-
-function sentimentClass(value) {
-  return {
-    GOOD: 'sentiment-good',
-    NEUTRAL: 'sentiment-neutral',
-    BAD: 'sentiment-bad',
-  }[value] || 'sentiment-doc'
 }
 
 function parseStatusText(value) {
@@ -1060,32 +983,6 @@ function formatFileSize(value) {
   justify-content: flex-start;
   gap: 7px;
   margin-top: 8px;
-}
-
-.sentiment-badge {
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-}
-
-.sentiment-good {
-  color: #138a3d;
-  background: #eaf8ef;
-}
-
-.sentiment-neutral {
-  color: #9a6a00;
-  background: #fff4d8;
-}
-
-.sentiment-bad {
-  color: #cf2d23;
-  background: #ffecea;
-}
-
-.sentiment-doc {
-  color: #555555;
-  background: #f0f0f0;
 }
 
 .status-text {

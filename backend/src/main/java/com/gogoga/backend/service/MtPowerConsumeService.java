@@ -68,9 +68,9 @@ public class MtPowerConsumeService {
         }
         if (defaultInt(account.getBalance()) < request.getPowerAmount()) {
             try {
-                shopOperationSettingsService.disableCommentProcessingForInsufficientPower(request.getShopId());
+                shopOperationSettingsService.disableImAutoReplyForInsufficientPower(request.getShopId());
             } catch (RuntimeException e) {
-                throw new PowerInsufficientException("当前算力余额不足，自动关闭评价处理开关失败", e);
+                throw new PowerInsufficientException("当前算力余额不足，自动关闭 IM 自动回复开关失败", e);
             }
             throw new PowerInsufficientException();
         }

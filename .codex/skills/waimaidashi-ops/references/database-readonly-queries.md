@@ -81,7 +81,8 @@ LIMIT 20;
 - 门店：`mt_shop`
 - 美团 token：`mt_access_token`、`mt_access_token_history`
 - 门店权益：`mt_shop_right`
-- 评价：`mt_comment`
+- IM 消息：`mt_im_message`
+- IM 自动回复开关：`mt_im_auto_reply_setting`、`mt_im_auto_reply_setting_history`
 - 异步任务：`mt_async_task`
 - 算力：`mt_power_account`、`mt_power_consume`、`mt_power_consume_detail`、`mt_power_recharge`、`mt_power_grant`
 - 美团订阅订单/权益辅助：`mt_app_order`
@@ -129,34 +130,36 @@ ORDER BY update_time DESC
 LIMIT 20;
 ```
 
-最近评价自动回复状态：
+最近 IM 消息接收状态：
 
 ```sql
-SELECT shop_id, reply_status, auto_reply_status, COUNT(*) AS cnt, MAX(update_time) AS latest_update_time
-FROM mt_comment
-WHERE create_time >= NOW() - INTERVAL 7 DAY
-GROUP BY shop_id, reply_status, auto_reply_status
-ORDER BY latest_update_time DESC
+SELECT shop_id, parse_status, decrypt_status, COUNT(*) AS cnt, MAX(received_at) AS latest_received_at
+FROM mt_im_message
+WHERE received_at >= NOW() - INTERVAL 1 DAY
+GROUP BY shop_id, parse_status, decrypt_status
+ORDER BY latest_received_at DESC
 LIMIT 30;
 ```
 
-最近评价自动回复失败：
+最近 IM 消息解析或解密失败：
 
 ```sql
-SELECT id, shop_id, comment_id, reply_status, auto_reply_status, LEFT(auto_reply_error, 300) AS auto_reply_error, create_time, update_time
-FROM mt_comment
-WHERE auto_reply_status = 'FAILED'
-ORDER BY update_time DESC
+SELECT id, shop_id, callback_msg_id, platform_msg_id, parse_status, decrypt_status,
+       error_code, LEFT(error_summary, 300) AS error_summary, received_at
+FROM mt_im_message
+WHERE parse_status = 'PARSE_FAILED' OR decrypt_status = 'FAILED'
+ORDER BY received_at DESC
 LIMIT 30;
 ```
 
-按门店查评价：
+按门店查 IM 消息：
 
 ```sql
-SELECT id, shop_id, comment_id, result, order_comment_score, reply_status, auto_reply_status, comment_time, update_time
-FROM mt_comment
+SELECT id, shop_id, callback_msg_id, platform_msg_id, msg_type, msg_source, has_reply,
+       parse_status, decrypt_status, received_at
+FROM mt_im_message
 WHERE shop_id = <shopId>
-ORDER BY update_time DESC
+ORDER BY received_at DESC
 LIMIT 30;
 ```
 

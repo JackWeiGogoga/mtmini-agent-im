@@ -2,10 +2,9 @@ package com.gogoga.backend.service.impl;
 
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.dto.KnowledgeSearchHitDTO;
-import com.gogoga.backend.entity.mt.MtReplyKnowledgeChunk;
-import com.gogoga.backend.enums.CommentReplyKnowledgeSourceTypeEnum;
-import com.gogoga.backend.enums.CommentReplySentimentEnum;
-import com.gogoga.backend.mapper.MtReplyKnowledgeChunkMapper;
+import com.gogoga.backend.entity.mt.MtKnowledgeChunk;
+import com.gogoga.backend.enums.KnowledgeSourceTypeEnum;
+import com.gogoga.backend.mapper.MtKnowledgeChunkMapper;
 import com.gogoga.backend.service.KnowledgeVectorStore;
 import com.gogoga.backend.util.EmbeddingVectorUtil;
 import lombok.RequiredArgsConstructor;
@@ -24,26 +23,25 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
 
-    private static final double SENTIMENT_MATCH_BONUS = 0.05D;
     private static final double QA_SOURCE_BONUS = 0.03D;
 
-    private final MtReplyKnowledgeChunkMapper mtReplyKnowledgeChunkMapper;
+    private final MtKnowledgeChunkMapper mtKnowledgeChunkMapper;
     private final MtProperties mtProperties;
 
     @Override
-    public void upsertChunk(MtReplyKnowledgeChunk chunk) {
+    public void upsertChunk(MtKnowledgeChunk chunk) {
         if (chunk == null) {
             return;
         }
-        mtReplyKnowledgeChunkMapper.insert(chunk);
+        mtKnowledgeChunkMapper.insert(chunk);
     }
 
     @Override
-    public void upsertChunks(List<MtReplyKnowledgeChunk> chunks) {
+    public void upsertChunks(List<MtKnowledgeChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        mtReplyKnowledgeChunkMapper.insertBatch(chunks);
+        mtKnowledgeChunkMapper.insertBatch(chunks);
     }
 
     @Override
@@ -51,28 +49,27 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
         if (StringUtils.isBlank(sourceType) || sourceId == null) {
             return;
         }
-        mtReplyKnowledgeChunkMapper.disableBySource(sourceType, sourceId, LocalDateTime.now());
+        mtKnowledgeChunkMapper.disableBySource(sourceType, sourceId, LocalDateTime.now());
     }
 
     @Override
-    public List<KnowledgeSearchHitDTO> searchTopK(Long shopId, CommentReplySentimentEnum sentiment, float[] queryEmbedding) {
-        if (shopId == null || sentiment == null || sentiment == CommentReplySentimentEnum.UNKNOWN
-                || queryEmbedding == null || queryEmbedding.length == 0) {
+    public List<KnowledgeSearchHitDTO> searchTopK(Long shopId, float[] queryEmbedding) {
+        if (shopId == null || queryEmbedding == null || queryEmbedding.length == 0) {
             return List.of();
         }
-        MtProperties.Knowledge knowledge = mtProperties.getComment().getKnowledge();
+        MtProperties.Knowledge knowledge = mtProperties.getKnowledge();
         int limit = Math.max(1, knowledge.getMaxSearchCandidates());
         int topK = Math.max(1, knowledge.getTopK());
-        List<MtReplyKnowledgeChunk> candidates = mtReplyKnowledgeChunkMapper.selectSearchCandidates(
+        List<MtKnowledgeChunk> candidates = mtKnowledgeChunkMapper.selectSearchCandidates(
                 shopId,
-                sentiment.name(),
                 knowledge.getEmbeddingProvider(),
                 knowledge.getEmbeddingModel(),
                 knowledge.getEmbeddingDim(),
                 limit
         );
         return candidates.stream()
-                .map(chunk -> toHit(chunk, sentiment, queryEmbedding))
+                .map(chunk -> toHit(chunk, queryEmbedding))
+                .filter(hit -> hit.getCosineScore() >= knowledge.getMinContextCosineScore())
                 .sorted(Comparator.comparing(KnowledgeSearchHitDTO::getScore).reversed())
                 .limit(topK)
                 .collect(Collectors.toList());
@@ -80,17 +77,14 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
 
     @Override
     public boolean hasShopKnowledge(Long shopId) {
-        return shopId != null && mtReplyKnowledgeChunkMapper.countAvailableByShopId(shopId) > 0;
+        return shopId != null && mtKnowledgeChunkMapper.countAvailableByShopId(shopId) > 0;
     }
 
-    private KnowledgeSearchHitDTO toHit(MtReplyKnowledgeChunk chunk, CommentReplySentimentEnum sentiment, float[] queryEmbedding) {
+    private KnowledgeSearchHitDTO toHit(MtKnowledgeChunk chunk, float[] queryEmbedding) {
         float[] embedding = EmbeddingVectorUtil.fromFloat32Blob(chunk.getEmbeddingBlob());
         double cosine = EmbeddingVectorUtil.cosineSimilarity(queryEmbedding, embedding);
         double score = cosine;
-        if (StringUtils.equals(chunk.getSentiment(), sentiment.name())) {
-            score += SENTIMENT_MATCH_BONUS;
-        }
-        if (StringUtils.equals(chunk.getSourceType(), CommentReplyKnowledgeSourceTypeEnum.QA.name())) {
+        if (StringUtils.equals(chunk.getSourceType(), KnowledgeSourceTypeEnum.QA.name())) {
             score += QA_SOURCE_BONUS;
         }
         KnowledgeSearchHitDTO hit = new KnowledgeSearchHitDTO();

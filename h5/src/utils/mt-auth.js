@@ -78,63 +78,55 @@ export function updateMtH5OperationSettings(settings) {
   return request('/api/h5/shop/operation-settings', 'PUT', settings)
 }
 
-export function getMtH5CommentReplyLogs(pageNum = 1, pageSize = 20) {
-  return request('/api/h5/comment-reply/logs', 'GET', { pageNum, pageSize })
+export function getKnowledgeQaItems() {
+  return request('/api/h5/knowledge/items', 'GET')
 }
 
-export function getCommentReplyQaItems() {
-  return request('/api/h5/comment-reply-knowledge/items', 'GET')
+export function createKnowledgeQaItem(payload) {
+  return request('/api/h5/knowledge/items', 'POST', payload)
 }
 
-export function createCommentReplyQaItem(payload) {
-  return request('/api/h5/comment-reply-knowledge/items', 'POST', payload)
+export function updateKnowledgeQaItem(id, payload) {
+  return request(`/api/h5/knowledge/items/${id}`, 'PUT', payload)
 }
 
-export function updateCommentReplyQaItem(id, payload) {
-  return request(`/api/h5/comment-reply-knowledge/items/${id}`, 'PUT', payload)
+export function deleteKnowledgeQaItem(id) {
+  return request(`/api/h5/knowledge/items/${id}`, 'DELETE')
 }
 
-export function deleteCommentReplyQaItem(id) {
-  return request(`/api/h5/comment-reply-knowledge/items/${id}`, 'DELETE')
+export function clearKnowledge() {
+  return request('/api/h5/knowledge/items/all', 'DELETE')
 }
 
-export function clearCommentReplyKnowledge() {
-  return request('/api/h5/comment-reply-knowledge/items/all', 'DELETE')
+export function getKnowledgeDocuments() {
+  return request('/api/h5/knowledge/documents', 'GET')
 }
 
-export function getCommentReplyDocuments() {
-  return request('/api/h5/comment-reply-knowledge/documents', 'GET')
+export function deleteKnowledgeDocument(id) {
+  return request(`/api/h5/knowledge/documents/${id}`, 'DELETE')
 }
 
-export function deleteCommentReplyDocument(id) {
-  return request(`/api/h5/comment-reply-knowledge/documents/${id}`, 'DELETE')
+export function getKnowledgeDocumentChunks(id) {
+  return request(`/api/h5/knowledge/documents/${id}/chunks`, 'GET')
 }
 
-export function getCommentReplyDocumentChunks(id) {
-  return request(`/api/h5/comment-reply-knowledge/documents/${id}/chunks`, 'GET')
+export function updateKnowledgeChunkEnabled(chunkId, enabled) {
+  return request(`/api/h5/knowledge/documents/chunks/${chunkId}/enabled?enabled=${enabled ? 'true' : 'false'}`, 'PUT')
 }
 
-export function updateCommentReplyChunkSentiment(chunkId, sentiment) {
-  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}/sentiment`, 'PUT', { sentiment })
+export function deleteKnowledgeChunk(chunkId) {
+  return request(`/api/h5/knowledge/documents/chunks/${chunkId}`, 'DELETE')
 }
 
-export function updateCommentReplyChunkEnabled(chunkId, enabled) {
-  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}/enabled?enabled=${enabled ? 'true' : 'false'}`, 'PUT')
+export function uploadKnowledgeDocument(filePath, name = 'file') {
+  return uploadKnowledgeFile('/api/h5/knowledge/documents/upload', filePath, name, '上传失败')
 }
 
-export function deleteCommentReplyChunk(chunkId) {
-  return request(`/api/h5/comment-reply-knowledge/documents/chunks/${chunkId}`, 'DELETE')
+export function previewKnowledgeDocument(filePath, name = 'file') {
+  return uploadKnowledgeFile('/api/h5/knowledge/documents/preview', filePath, name, '解析预览失败')
 }
 
-export function uploadCommentReplyDocument(filePath, name = 'file') {
-  return uploadCommentReplyKnowledgeFile('/api/h5/comment-reply-knowledge/documents/upload', filePath, name, '上传失败')
-}
-
-export function previewCommentReplyDocument(filePath, name = 'file') {
-  return uploadCommentReplyKnowledgeFile('/api/h5/comment-reply-knowledge/documents/preview', filePath, name, '解析预览失败')
-}
-
-function uploadCommentReplyKnowledgeFile(url, filePath, name, defaultErrorMessage) {
+function uploadKnowledgeFile(url, filePath, name, defaultErrorMessage) {
   const token = getToken()
   return new Promise((resolve, reject) => {
     uni.uploadFile({
