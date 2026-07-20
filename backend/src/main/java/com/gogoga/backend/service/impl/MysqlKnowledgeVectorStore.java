@@ -83,6 +83,27 @@ public class MysqlKnowledgeVectorStore implements KnowledgeVectorStore {
     }
 
     @Override
+    public List<KnowledgeSearchHitDTO> diagnoseCandidates(Long shopId, float[] queryEmbedding, int topN) {
+        if (shopId == null || queryEmbedding == null || queryEmbedding.length == 0) {
+            return List.of();
+        }
+        MtProperties.Knowledge knowledge = mtProperties.getKnowledge();
+        int limit = Math.max(1, knowledge.getMaxSearchCandidates());
+        List<MtKnowledgeChunk> candidates = mtKnowledgeChunkMapper.selectSearchCandidates(
+                shopId,
+                knowledge.getEmbeddingProvider(),
+                knowledge.getEmbeddingModel(),
+                knowledge.getEmbeddingDim(),
+                limit
+        );
+        return candidates.stream()
+                .map(chunk -> toHit(chunk, queryEmbedding, null))
+                .sorted(Comparator.comparing(KnowledgeSearchHitDTO::getCosineScore).reversed())
+                .limit(Math.max(1, topN))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public boolean hasShopKnowledge(Long shopId) {
         return shopId != null && mtKnowledgeChunkMapper.countAvailableByShopId(shopId) > 0;
     }

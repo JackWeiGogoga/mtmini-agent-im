@@ -37,6 +37,7 @@ import {
 } from "@/services/knowledge-api";
 import { getBoundShops } from "@/services/shop-manage-api";
 import type { KnowledgeChunk, KnowledgeDocument, KnowledgeItem, KnowledgeQaParam, UserShopBinding } from "@/types";
+import TestChatPanel from "./TestChatPanel";
 
 const parseStatusText: Record<string, string> = {
   PENDING: "待解析",
@@ -189,6 +190,11 @@ export default function MerchantKnowledgeManage() {
                 {hasPermission("knowledge:add") && <Upload showUploadList={false} beforeUpload={selectUpload}><Button style={{ marginBottom: 12 }} loading={uploading} icon={<UploadOutlined />}>上传文档</Button></Upload>}
                 <Table rowKey="id" loading={loading} columns={documentColumns} dataSource={documents} pagination={false} />
               </>,
+            },
+            {
+              key: "test-chat",
+              label: "测试聊天",
+              children: <TestChatPanel shopId={shopId} />,
             },
           ]} />
         )}

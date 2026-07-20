@@ -641,6 +641,30 @@ CREATE TABLE `mt_im_auto_reply` (
   KEY `idx_mt_im_auto_reply_status_time` (`status`,`create_time`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='IM自动回复编排与计费记录';
 
+CREATE TABLE `mt_im_test_chat_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `shop_id` bigint NOT NULL COMMENT '本地门店ID',
+  `session_id` varchar(64) DEFAULT NULL COMMENT '测试会话ID（前端每轮对话生成，用于按会话分组）',
+  `operator_user_id` varchar(64) DEFAULT NULL COMMENT '发起测试的管理员用户ID',
+  `operator_name` varchar(128) DEFAULT NULL COMMENT '发起测试的管理员姓名',
+  `user_message` text COMMENT '测试用户输入文本',
+  `ai_reply` text COMMENT 'AI回复文本',
+  `user_message_category` varchar(32) DEFAULT NULL COMMENT '用户消息分类 GENERAL/DELIVERY/AFTER_SALE',
+  `rag_used` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否使用RAG上下文',
+  `rag_chunk_count` int NOT NULL DEFAULT '0' COMMENT '采用知识片段数',
+  `rag_max_score` decimal(8,6) DEFAULT NULL COMMENT '最高知识相似度',
+  `rewrite_count` int NOT NULL DEFAULT '0' COMMENT '敏感词改写次数',
+  `blocked` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否被敏感词兜底拦截',
+  `model_provider` varchar(64) DEFAULT NULL COMMENT 'Chat模型供应商',
+  `model_name` varchar(128) DEFAULT NULL COMMENT 'Chat模型名称',
+  `prompt_tokens` int DEFAULT NULL COMMENT '输入token数',
+  `completion_tokens` int DEFAULT NULL COMMENT '输出token数',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_mt_im_test_chat_log_shop_time` (`shop_id`,`create_time`),
+  KEY `idx_mt_im_test_chat_log_shop_session` (`shop_id`,`session_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='IM知识库测试聊天审计与限流记录';
+
 CREATE TABLE `mt_h5_guide_state` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `shop_id` bigint NOT NULL COMMENT '店铺ID',

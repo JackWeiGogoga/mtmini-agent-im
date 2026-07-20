@@ -2,10 +2,14 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
+import com.gogoga.backend.param.ImTestChatParam;
 import com.gogoga.backend.param.KnowledgeQaParam;
+import com.gogoga.backend.service.ImTestChatService;
 import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.KnowledgeService;
 import com.gogoga.backend.service.UserShopBindingService;
+import com.gogoga.backend.vo.ImTestChatLogVO;
+import com.gogoga.backend.vo.ImTestChatReplyVO;
 import com.gogoga.backend.vo.KnowledgeChunkVO;
 import com.gogoga.backend.vo.KnowledgeDocumentPreviewVO;
 import com.gogoga.backend.vo.KnowledgeDocumentVO;
@@ -39,6 +43,7 @@ public class AdminMerchantKnowledgeController {
     private final UserShopBindingService userShopBindingService;
     private final KnowledgeService knowledgeService;
     private final KnowledgeDocumentService knowledgeDocumentService;
+    private final ImTestChatService imTestChatService;
 
     @GetMapping("/items")
     public ResultVO<List<KnowledgeItemVO>> listQa(@RequestParam Long shopId) {
@@ -130,6 +135,19 @@ public class AdminMerchantKnowledgeController {
         requireVisibleShop(shopId);
         knowledgeDocumentService.deleteShopChunk(shopId, chunkId);
         return ResultVO.success();
+    }
+
+    @PostMapping("/test-chat")
+    public ResultVO<ImTestChatReplyVO> testChat(@RequestParam Long shopId,
+                                                @Valid @RequestBody ImTestChatParam param) {
+        requireVisibleShop(shopId);
+        return ResultVO.success(imTestChatService.chat(shopId, param));
+    }
+
+    @GetMapping("/test-chat/logs")
+    public ResultVO<List<ImTestChatLogVO>> testChatLogs(@RequestParam Long shopId) {
+        requireVisibleShop(shopId);
+        return ResultVO.success(imTestChatService.listLogs(shopId));
     }
 
     private void requireVisibleShop(Long shopId) {

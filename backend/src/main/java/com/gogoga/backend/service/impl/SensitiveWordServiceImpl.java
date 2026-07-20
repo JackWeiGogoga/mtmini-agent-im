@@ -44,6 +44,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
             return result;
         }
         Set<String> categories = new LinkedHashSet<>();
+        Set<String> hitWords = new LinkedHashSet<>();
         List<String> severities = new ArrayList<>();
         int hitCount = 0;
         for (SensitiveWordEntry entry : enabledEntries()) {
@@ -54,6 +55,9 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
                 hitCount++;
                 categories.add(entry.getCategoryName());
                 severities.add(entry.getSeverity());
+                if (StringUtils.isNotBlank(entry.getOriginalWord())) {
+                    hitWords.add(entry.getOriginalWord());
+                }
             }
         }
         if (hitCount <= 0) {
@@ -61,6 +65,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         }
         result.setHit(true);
         result.setCategories(new ArrayList<>(categories));
+        result.setHitWords(new ArrayList<>(hitWords));
         result.setHitCount(hitCount);
         result.setHighestSeverity(severities.stream()
                 .min(Comparator.comparingInt(this::severityRank))
@@ -105,7 +110,8 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
                 entries.add(new SensitiveWordEntry(
                         categoryName,
                         StringUtils.upperCase(StringUtils.defaultIfBlank(word.getSeverity(), categorySeverity), Locale.ROOT),
-                        normalize(word.getText())
+                        normalize(word.getText()),
+                        StringUtils.trim(word.getText())
                 ));
             }
         }
@@ -153,5 +159,6 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         String categoryName;
         String severity;
         String normalizedWord;
+        String originalWord;
     }
 }

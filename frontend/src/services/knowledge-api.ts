@@ -5,6 +5,9 @@ import type {
   KnowledgeDocumentPreview,
   KnowledgeItem,
   KnowledgeQaParam,
+  TestChatLog,
+  TestChatMessage,
+  TestChatReply,
 } from "@/types";
 
 const BASE_URL = "/system/knowledge/merchant";
@@ -94,4 +97,25 @@ export async function updateKnowledgeChunkEnabled(
 
 export async function deleteKnowledgeChunk(shopId: number, chunkId: number): Promise<void> {
   await request.delete(`${BASE_URL}/documents/chunks/${chunkId}`, { params: { shopId } });
+}
+
+export async function sendTestChat(
+  shopId: number,
+  sessionId: string,
+  message: string,
+  history: TestChatMessage[],
+): Promise<TestChatReply> {
+  const response = await request.post<unknown, { data: TestChatReply }>(
+    `${BASE_URL}/test-chat`,
+    { sessionId, message, history },
+    { params: { shopId } },
+  );
+  return response.data;
+}
+
+export async function listTestChatLogs(shopId: number): Promise<TestChatLog[]> {
+  const response = await request.get<unknown, { data: TestChatLog[] }>(`${BASE_URL}/test-chat/logs`, {
+    params: { shopId },
+  });
+  return response.data;
 }
