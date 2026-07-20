@@ -86,7 +86,13 @@ public class MtProperties {
         /**
          * 是否阻断全部美团 SDK 出站调用。安全起见默认开启。
          */
-        private boolean dryRun = true;
+        private boolean dryRun = false;
+
+        /**
+         * 是否单独阻断 IM 消息发送调用。在总开关之上额外收紧，默认关闭；
+         * 总开关开启时 IM 发送同样被阻断，与此开关取值无关。
+         */
+        private boolean imSendDryRun = true;
 
         /**
          * 数据库异步任务因 dry run 跳过后的无损重排秒数。

@@ -82,6 +82,32 @@ class MtImConfigurationClientTest {
         verifyNoMoreInteractions(meituanClient);
     }
 
+    @Test
+    void treatsZeroCodeAsSuccessForAutoSendConfig() throws Exception {
+        MeituanResponse<String> response = new MeituanResponse<>();
+        response.setCode("0");
+        when(meituanClient.invokeApi(any(SetAutoSendConfigInfoRequest.class), eq("token")))
+                .thenReturn(response);
+
+        MtImConfigurationClient.ImConfigurationResult result = client.disableAllSmartReplies("token");
+
+        assertTrue(result.success());
+        assertEquals("SET_AUTO_SEND_CONFIG", result.stage());
+    }
+
+    @Test
+    void keepsZeroCodeAsFailureForPoiImStatus() throws Exception {
+        MeituanResponse<String> response = new MeituanResponse<>();
+        response.setCode("0");
+        when(meituanClient.invokeApi(any(SetPoiImStatusRequest.class), eq("token")))
+                .thenReturn(response);
+
+        MtImConfigurationClient.ImConfigurationResult result = client.enablePoiIm("token");
+
+        assertFalse(result.success());
+        assertEquals("0", result.errorCode());
+    }
+
     private MeituanResponse<String> successResponse() {
         MeituanResponse<String> response = new MeituanResponse<>();
         response.setCode("OP_SUCCESS");

@@ -8,6 +8,7 @@ import com.meituan.sdk.MeituanRequest;
 import com.meituan.sdk.MeituanResponse;
 import com.meituan.sdk.auth.MeituanTokenResponse;
 import com.meituan.sdk.internal.exceptions.MtSdkException;
+import com.meituan.sdk.model.wmoperNg.im.sendImMsgWmoper.SendImMsgWmoperRequest;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Type;
@@ -82,15 +83,29 @@ public class MtDryRunMeituanClient implements MeituanClient {
 
     private void checkDryRun(String method, Object request) {
         MtProperties.Api api = mtProperties.getApi();
-        if (api != null && !api.isDryRun()) {
+        String reason = blockReason(api, request);
+        if (reason == null) {
             return;
         }
         String requestType = request == null ? "NONE" : request.getClass().getSimpleName();
         String operation = method + ":" + requestType;
-        log.warn("美团 SDK 调用被 dry run 阻断，method={}, requestType={}", method, requestType);
+        log.warn("美团 SDK 调用被 dry run 阻断，method={}, requestType={}, reason={}", method, requestType, reason);
         long rescheduleSeconds = api == null
                 ? DEFAULT_DRY_RUN_RESCHEDULE_SECONDS
                 : api.getDryRunRescheduleSeconds();
         throw new MtApiDryRunException(operation, rescheduleSeconds);
+    }
+
+    /**
+     * 返回阻断原因；返回 {@code null} 表示放行。IM 发送开关只在总开关之上额外收紧。
+     */
+    private String blockReason(MtProperties.Api api, Object request) {
+        if (api == null || api.isDryRun()) {
+            return "GLOBAL_DRY_RUN";
+        }
+        if (api.isImSendDryRun() && request instanceof SendImMsgWmoperRequest) {
+            return "IM_SEND_DRY_RUN";
+        }
+        return null;
     }
 }

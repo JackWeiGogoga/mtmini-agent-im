@@ -165,7 +165,8 @@ mt:
   business-id: ${MT_BUSINESS_ID:16}
   callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aic.waimaidashi.com/#/}
   api:
-    dry-run: ${MT_API_DRY_RUN:true}
+    dry-run: ${MT_API_DRY_RUN:false}
+    im-send-dry-run: ${MT_API_IM_SEND_DRY_RUN:true}
     dry-run-reschedule-seconds: ${MT_API_DRY_RUN_RESCHEDULE_SECONDS:3600}
   h5:
     app-key: ${MT_H5_APP_KEY:}
