@@ -48,8 +48,10 @@ public class MtImMessageIngestionService {
     public IngestionResult ingest(Map<String, String> parameters) {
         VerificationResult verification = verify(parameters);
         if (!verification.valid()) {
-            log.warn("美团IM回调验签失败，callbackMsgId={}, errorCode={}",
-                    safeId(parameters == null ? null : parameters.get("msgId")), verification.errorCode());
+            log.warn("美团IM回调验签失败，callbackMsgId={}, errorCode={}, {}",
+                    safeId(parameters == null ? null : parameters.get("msgId")),
+                    verification.errorCode(),
+                    verificationDiagnostics(parameters));
             return IngestionResult.failure(verification.errorCode());
         }
 
@@ -96,6 +98,58 @@ public class MtImMessageIngestionService {
         return IngestionResult.success(message.getId());
     }
 
+    /**
+     * 验签失败时的排障信息。
+     *
+     * <p>默认只输出控制字段的期望值与实际值、参与签名的参数名集合，以及 sign 和 message 的
+     * 指纹；不输出 signKey、message 密文和完整 sign。需要逐字节复核签名算法时，可临时把
+     * {@code mt.im.callback-debug-log} 打开，输出完整原始参数——该模式会把消息密文写入日志，
+     * 只应在测试门店联调期间短暂启用。</p>
+     */
+    private String verificationDiagnostics(Map<String, String> parameters) {
+        if (parameters == null || parameters.isEmpty()) {
+            return "parameters=EMPTY";
+        }
+        MtProperties.Im im = mtProperties.getIm();
+        if (im != null && im.isCallbackDebugLog()) {
+            return "rawParameters=" + JsonUtil.toJson(new java.util.TreeMap<>(parameters));
+        }
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("expectedDeveloperId", mtProperties.getDeveloperId());
+        diagnostics.put("actualDeveloperId", parameters.get("developerId"));
+        diagnostics.put("expectedBusinessId", callbackBusinessId());
+        diagnostics.put("actualBusinessId", parameters.get("businessId"));
+        diagnostics.put("ePoiId", parameters.get("ePoiId"));
+        diagnostics.put("opBizCode", parameters.get("opBizCode"));
+        diagnostics.put("msgType", parameters.get("msgType"));
+        diagnostics.put("timestamp", parameters.get("timestamp"));
+        diagnostics.put("signKeyConfigured", StringUtils.isNotBlank(mtProperties.getSignKey()));
+        diagnostics.put("parameterNames", new java.util.TreeSet<>(parameters.keySet()));
+        diagnostics.put("signFingerprint", fingerprint(parameters.get("sign")));
+        diagnostics.put("messageLength", StringUtils.length(parameters.get("message")));
+        diagnostics.put("messageFingerprint", fingerprint(parameters.get("message")));
+        return "diagnostics=" + JsonUtil.toJson(diagnostics);
+    }
+
+    /**
+     * 取 SHA-256 前 8 个十六进制字符，够用于比对两次回调是否同值，不足以还原原文。
+     */
+    private String fingerprint(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        return StringUtils.substring(cryptoService.sha256(value), 0, 8);
+    }
+
+    /**
+     * IM 回调的 businessId 与 {@code mt.business-id}（OAuth / token 刷新 / H5 鉴权）不同源，
+     * 必须走 {@code mt.im.callback-business-id}。
+     */
+    private Integer callbackBusinessId() {
+        MtProperties.Im im = mtProperties.getIm();
+        return im == null ? null : im.getCallbackBusinessId();
+    }
+
     private VerificationResult verify(Map<String, String> parameters) {
         if (parameters == null || parameters.isEmpty()) {
             return VerificationResult.failure("CALLBACK_PARAMETERS_EMPTY");
@@ -108,8 +162,9 @@ public class MtImMessageIngestionService {
                 || !StringUtils.equals(String.valueOf(mtProperties.getDeveloperId()), parameters.get("developerId"))) {
             return VerificationResult.failure("CALLBACK_DEVELOPER_MISMATCH");
         }
-        if (mtProperties.getBusinessId() == null
-                || !StringUtils.equals(String.valueOf(mtProperties.getBusinessId()), parameters.get("businessId"))) {
+        Integer expectedBusinessId = callbackBusinessId();
+        if (expectedBusinessId == null
+                || !StringUtils.equals(String.valueOf(expectedBusinessId), parameters.get("businessId"))) {
             return VerificationResult.failure("CALLBACK_BUSINESS_MISMATCH");
         }
         Map<String, String> signingParameters = new LinkedHashMap<>();

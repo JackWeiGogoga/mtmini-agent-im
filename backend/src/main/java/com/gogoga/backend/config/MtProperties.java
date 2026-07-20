@@ -106,6 +106,23 @@ public class MtProperties {
          * 美团 IM 消息 AES 密钥，UTF-8 编码必须恰好 16 字节。
          */
         private String secret;
+
+        /**
+         * IM 回调携带的 businessId。
+         *
+         * <p>与 OAuth / token 刷新 / H5 鉴权使用的 {@code mt.business-id} 不是同一个值：
+         * 后者是外卖业务线（16），而 IM 回调走独立业务线（2）。两者必须分开配置，
+         * 否则改动一侧会连带破坏另一侧。</p>
+         */
+        private Integer callbackBusinessId = 2;
+
+        /**
+         * 验签失败时是否输出完整原始回调参数。默认关闭。
+         *
+         * <p>开启后日志会包含消息密文和完整 sign，只应在测试门店联调期间短暂启用，
+         * 排查结束必须关回 false。</p>
+         */
+        private boolean callbackDebugLog = false;
     }
 
     @Data

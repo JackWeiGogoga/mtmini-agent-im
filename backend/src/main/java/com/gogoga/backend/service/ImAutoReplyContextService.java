@@ -4,6 +4,7 @@ import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.dto.ImAutoReplyChatMessage;
 import com.gogoga.backend.entity.mt.MtImMessage;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
+import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.mapper.MtImMessageMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -34,6 +35,10 @@ public class ImAutoReplyContextService {
         int selectedUserRounds = 0;
         List<MtImMessage> selected = new ArrayList<>();
         for (MtImMessage message : newestFirst) {
+            // CARD 正文是“其他消息”这类占位串，IMAGE/OTHER 没有可用文本，计入会污染 prompt
+            if (!ImMessageTypeEnum.isConversational(message.getMsgType())) {
+                continue;
+            }
             String content = StringUtils.trimToNull(message.getMsgContentPlaintext());
             if (content == null) {
                 continue;

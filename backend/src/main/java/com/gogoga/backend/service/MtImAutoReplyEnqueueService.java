@@ -88,7 +88,7 @@ public class MtImAutoReplyEnqueueService {
                 || !ImMessageDecryptStatusEnum.SUCCESS.name().equals(message.getDecryptStatus())
                 || !ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
                 || !Integer.valueOf(1).equals(message.getBizType())
-                || !Integer.valueOf(ImMessageTypeEnum.TEXT.getCode()).equals(message.getMsgType())
+                || !ImMessageTypeEnum.isConversational(message.getMsgType())
                 || Integer.valueOf(2).equals(message.getHasReply())
                 || StringUtils.isBlank(message.getMsgContentPlaintext())
                 || message.getShopId() == null || message.getConversationId() == null

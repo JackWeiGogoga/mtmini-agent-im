@@ -19,7 +19,7 @@ class MtPropertiesConfigurationTest {
         contextRunner.run(context -> {
             MtProperties properties = context.getBean(MtProperties.class);
             assertThat(properties.getApi().isDryRun()).isFalse();
-            assertThat(properties.getApi().isImSendDryRun()).isTrue();
+            assertThat(properties.getApi().isImSendDryRun()).isFalse();
             assertThat(properties.getApi().getDryRunRescheduleSeconds()).isEqualTo(3600L);
             assertThat(properties.getKnowledge().getDocumentKeyPrefix()).isEqualTo("knowledge/documents");
             assertThat(properties.getIm()).isNotNull();

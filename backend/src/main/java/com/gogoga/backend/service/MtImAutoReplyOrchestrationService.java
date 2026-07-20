@@ -259,10 +259,16 @@ public class MtImAutoReplyOrchestrationService {
             return null;
         }
         for (MtImMessage message : newer) {
-            if (ImMessageSenderRoleEnum.MERCHANT.name().equals(message.getSenderRole())) {
+            // 商家侧只排除卡片：卡片由平台推送，不是人工回复。图片等其它类型仍视为人工已介入，
+            // 判错的代价是顾客同时收到人工回复和自动回复，因此这里不收窄成 isConversational
+            if (ImMessageSenderRoleEnum.MERCHANT.name().equals(message.getSenderRole())
+                    && !ImMessageTypeEnum.isCard(message.getMsgType())) {
                 return SkipDecision.skipped("MANUAL_REPLY_AFTER_TRIGGER");
             }
-            if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())) {
+            // 只有能自己触发回复的用户消息才可以顶掉本次回复；否则 CARD 之类顶掉后无人接手，
+            // 用户的提问会静默地得不到任何答复
+            if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
+                    && ImMessageTypeEnum.isConversational(message.getMsgType())) {
                 return new SkipDecision(MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
             }
         }

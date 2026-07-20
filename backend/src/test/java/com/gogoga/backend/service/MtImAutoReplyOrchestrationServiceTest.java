@@ -12,6 +12,7 @@ import com.gogoga.backend.entity.mt.MtImAutoReply;
 import com.gogoga.backend.entity.mt.MtImMessage;
 import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
+import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.enums.MtImAutoReplyStatusEnum;
 import com.gogoga.backend.mapper.MtImAutoReplyMapper;
@@ -79,6 +80,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         MtImMessage trigger = trigger();
         MtImMessage newer = new MtImMessage();
         newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
         when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
         when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
         when(messageMapper.selectById(31L)).thenReturn(trigger);
@@ -88,6 +90,88 @@ class MtImAutoReplyOrchestrationServiceTest {
         service.execute(payload());
 
         verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+    }
+
+    @Test
+    void doesNotSupersedeWhenNewerUserMessageIsOnlyACard() {
+        MtImAutoReply autoReply = autoReply();
+        autoReply.setReplyMessageId(32L);
+        autoReply.setBilledAt(LocalDateTime.now());
+        autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        MtImMessage card = new MtImMessage();
+        card.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        card.setMsgType(ImMessageTypeEnum.CARD.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(card));
+        mockReadyShop();
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        // CARD 自身不会触发回复，若允许它顶掉本次回复，用户提问将永远无人应答
+        verify(stateService, never())
+                .markStatus(9L, MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void doesNotTreatMerchantCardAsManualReply() {
+        MtImAutoReply autoReply = autoReply();
+        autoReply.setReplyMessageId(32L);
+        autoReply.setBilledAt(LocalDateTime.now());
+        autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        MtImMessage merchantCard = new MtImMessage();
+        merchantCard.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchantCard.setMsgType(ImMessageTypeEnum.CARD.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchantCard));
+        mockReadyShop();
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        verify(stateService, never())
+                .markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void stillTreatsMerchantImageAsManualReply() {
+        MtImAutoReply autoReply = autoReply();
+        MtImMessage merchantImage = new MtImMessage();
+        merchantImage.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchantImage.setMsgType(ImMessageTypeEnum.IMAGE.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchantImage));
+
+        service.execute(payload());
+
+        // 商家发图片是真实的人工介入，放行会让顾客同时收到人工回复和自动回复
+        verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
         verify(chatService, never()).generate(anyString(), anyString(), any());
     }
 
@@ -115,6 +199,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         when(messageMapper.selectById(31L)).thenReturn(trigger);
         MtImMessage newer = new MtImMessage();
         newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
         when(messageMapper.selectAfterMessageInConversation(11L, 31L))
                 .thenReturn(List.of())
                 .thenReturn(List.of(newer));

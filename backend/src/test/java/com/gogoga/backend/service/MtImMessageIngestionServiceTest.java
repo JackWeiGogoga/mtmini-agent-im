@@ -47,7 +47,9 @@ class MtImMessageIngestionServiceTest {
         MtProperties properties = new MtProperties();
         properties.setSignKey(SIGN_KEY);
         properties.setDeveloperId(123L);
-        properties.setBusinessId(1);
+        // 故意与回调 businessId 取不同值，钉住两者互不影响
+        properties.setBusinessId(16);
+        properties.getIm().setCallbackBusinessId(1);
         service = new MtImMessageIngestionService(
                 properties, messageMapper, shopMapper, cryptoService, conversationService, autoReplyEnqueueService);
     }
@@ -183,6 +185,23 @@ class MtImMessageIngestionServiceTest {
         when(messageMapper.insert(any())).thenThrow(new TransientDataAccessResourceException("db unavailable"));
         assertThrows(TransientDataAccessResourceException.class,
                 () -> service.ingest(signedParameters("callback-6", envelope)));
+    }
+
+    @Test
+    void rejectsCallbackCarryingOauthBusinessIdInsteadOfCallbackBusinessId() throws Exception {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        parameters.put("msgType", "210069");
+        parameters.put("developerId", "123");
+        parameters.put("businessId", "16");
+        parameters.put("msgId", "callback-oauth-business");
+        parameters.put("timestamp", "1784374003");
+        parameters.put("sign", SignerUtil.getSign(SIGN_KEY, parameters));
+
+        MtImMessageIngestionService.IngestionResult result = service.ingest(parameters);
+
+        assertFalse(result.success());
+        assertEquals("CALLBACK_BUSINESS_MISMATCH", result.errorCode());
+        verify(messageMapper, never()).insert(any());
     }
 
     private Map<String, String> signedParameters(String callbackMsgId, String message) throws Exception {
