@@ -40,6 +40,7 @@ const RoleManage = lazy(() => import("@/pages/role-manage"));
 const MenuManage = lazy(() => import("@/pages/menu-manage"));
 const SystemPromptManage = lazy(() => import("@/pages/system-prompt"));
 const ImAutoReplyManage = lazy(() => import("@/pages/im-auto-replies"));
+const ImBroadcastManage = lazy(() => import("@/pages/im-broadcasts"));
 const Forbidden = lazy(() => import("@/pages/error/Forbidden"));
 
 /**
@@ -249,6 +250,16 @@ const router = createBrowserRouter(
             <AuthLayout permission="system:im-auto-reply:list">
               <LazyWrapper>
                 <ImAutoReplyManage />
+              </LazyWrapper>
+            </AuthLayout>
+          ),
+        },
+        {
+          path: "/im-broadcasts",
+          element: (
+            <AuthLayout permission="system:im-broadcast:list">
+              <LazyWrapper>
+                <ImBroadcastManage />
               </LazyWrapper>
             </AuthLayout>
           ),

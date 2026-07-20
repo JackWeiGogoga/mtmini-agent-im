@@ -107,6 +107,25 @@
               >门店授权已失效，请重新授权后继续自动回复。</text
             >
           </view>
+
+          <view class="broadcast-entry" @tap="openBroadcastDialog">
+            <view class="broadcast-entry-copy">
+              <text class="broadcast-entry-title">消息群发</text>
+              <text class="broadcast-entry-count"
+                >（已群发{{ broadcastTotalSentCount }}条）</text
+              >
+            </view>
+            <image
+              class="broadcast-entry-icon"
+              src="/static/icons/msg.svg"
+              mode="aspectFit"
+            ></image>
+            <image
+              class="broadcast-entry-badge"
+              src="/static/icons/hot.svg"
+              mode="aspectFit"
+            ></image>
+          </view>
         </view>
 
         <view class="section-card feature-card">
@@ -275,6 +294,121 @@
         >
       </view>
     </view>
+
+    <view
+      v-if="broadcastDialogVisible"
+      class="modal-mask"
+      @tap="closeBroadcastDialog"
+    >
+      <view class="broadcast-modal" @tap.stop>
+        <text class="broadcast-modal-title">群发设置</text>
+
+        <view class="broadcast-field">
+          <text class="broadcast-field-label">日期：</text>
+          <view
+            class="broadcast-select broadcast-select-grow"
+            @tap="toggleWeekDayPanel"
+          >
+            <text class="broadcast-select-text">{{ weekDaysText }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+          <picker
+            class="broadcast-select"
+            mode="selector"
+            :range="repeatModeLabels"
+            :value="selectedRepeatModeIndex"
+            @change="handleRepeatModeChange"
+          >
+            <view class="broadcast-select-inner">
+              <text class="broadcast-select-text">{{ repeatModeText }}</text>
+              <text class="broadcast-select-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <view v-if="weekDayPanelVisible" class="broadcast-weekday-panel">
+          <view
+            v-for="option in weekDayOptions"
+            :key="option.value"
+            class="broadcast-weekday-item"
+            @tap="toggleWeekDay(option.value)"
+          >
+            <view
+              class="broadcast-weekday-checkbox"
+              :class="{
+                'broadcast-weekday-checkbox-checked': isWeekDaySelected(
+                  option.value,
+                ),
+              }"
+            >
+              <text v-if="isWeekDaySelected(option.value)">✓</text>
+            </view>
+            <text class="broadcast-weekday-label">{{ option.label }}</text>
+          </view>
+        </view>
+
+        <view class="broadcast-field">
+          <text class="broadcast-field-label">时间：</text>
+          <picker
+            class="broadcast-select broadcast-select-grow"
+            mode="multiSelector"
+            :range="timePickerRange"
+            :value="timePickerValue"
+            @change="handleSendTimeChange"
+          >
+            <view class="broadcast-select-inner">
+              <text class="broadcast-select-text">{{ form.sendTime }}</text>
+              <text class="broadcast-select-arrow">▼</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="broadcast-field broadcast-field-top">
+          <text class="broadcast-field-label">内容：</text>
+          <view class="broadcast-textarea-wrap">
+            <textarea
+              class="broadcast-textarea"
+              v-model="form.content"
+              placeholder="请填写发送的内容…"
+              placeholder-class="broadcast-textarea-placeholder"
+              :maxlength="broadcastContentMaxLength"
+            ></textarea>
+            <view class="broadcast-textarea-footer">
+              <text class="broadcast-textarea-rule"
+                >规则：禁止发送敏感词信息！</text
+              >
+              <text class="broadcast-textarea-counter"
+                >{{ broadcastContentLength }}/{{
+                  broadcastContentMaxLength
+                }}</text
+              >
+            </view>
+          </view>
+        </view>
+
+        <view class="broadcast-modal-actions">
+          <view
+            class="broadcast-modal-button broadcast-modal-button-primary"
+            :class="{ 'broadcast-modal-button-disabled': broadcastSubmitting }"
+            @tap="submitBroadcastSetting"
+            >发送</view
+          >
+          <view
+            v-if="broadcastConfigured"
+            class="broadcast-modal-button"
+            :class="{ 'broadcast-modal-button-disabled': broadcastSubmitting }"
+            @tap="deleteBroadcastSetting"
+            >删除</view
+          >
+          <view
+            v-else
+            class="broadcast-modal-button"
+            @tap="closeBroadcastDialog"
+            >取消</view
+          >
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -282,10 +416,12 @@
 import AppTabbar from "../../components/app-tabbar.vue";
 import AppTopNotice from "../../components/app-top-notice.vue";
 import {
+  deleteMtH5BroadcastSetting,
   getMtH5HomeDashboard,
   getShopInfo,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
+  saveMtH5BroadcastSetting,
   updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
 import { openMtExternalPage } from "../../utils/ui";
@@ -298,6 +434,36 @@ const RENEWAL_PAGE_URL =
 // 临时关闭首页引流弹窗；恢复展示时改为 true。
 const ACTIVITY_POPUP_ENABLED = false;
 let activityPopupShownInCurrentApp = false;
+
+const BROADCAST_CONTENT_MAX_LENGTH = 100;
+const BROADCAST_WEEK_DAY_OPTIONS = [
+  { value: 1, label: "周一" },
+  { value: 2, label: "周二" },
+  { value: 3, label: "周三" },
+  { value: 4, label: "周四" },
+  { value: 5, label: "周五" },
+  { value: 6, label: "周六" },
+  { value: 7, label: "周日" },
+];
+const BROADCAST_REPEAT_MODE_OPTIONS = [
+  { value: "EVERY", label: "每次" },
+  { value: "ONCE", label: "一次" },
+];
+
+function padTwoDigits(value) {
+  return String(value).padStart(2, "0");
+}
+
+function buildRangeLabels(size) {
+  return Array.from({ length: size }, (_, index) => padTwoDigits(index));
+}
+
+function parseTimeParts(timeText) {
+  const [hour = 10, minute = 0, second = 0] = String(timeText || "10:00:00")
+    .split(":")
+    .map((part) => Number(part) || 0);
+  return [hour, minute, second];
+}
 
 function toNumber(value, fallback = 0) {
   const result = Number(value);
@@ -391,6 +557,18 @@ export default {
       hasPowerStats: true,
       supportPromptVisible: false,
       activityPopupVisible: false,
+      broadcastDialogVisible: false,
+      broadcastSubmitting: false,
+      broadcastConfigured: false,
+      broadcastTotalSentCount: 0,
+      weekDayPanelVisible: false,
+      weekDayOptions: BROADCAST_WEEK_DAY_OPTIONS,
+      form: {
+        weekDays: [],
+        repeatMode: "EVERY",
+        sendTime: "10:00:00",
+        content: "",
+      },
       statsRange: "TODAY",
       statsRangeOptions: [
         { label: "今日", value: "TODAY", compareLabel: "较昨日" },
@@ -530,6 +708,46 @@ export default {
     knowledgeStatusText() {
       return "已配置";
     },
+    broadcastContentMaxLength() {
+      return BROADCAST_CONTENT_MAX_LENGTH;
+    },
+    broadcastContentLength() {
+      return String(this.form.content || "").length;
+    },
+    weekDaysText() {
+      if (!this.form.weekDays.length) {
+        return "请选择日期";
+      }
+      return this.form.weekDays
+        .map(
+          (day) =>
+            BROADCAST_WEEK_DAY_OPTIONS.find((item) => item.value === day)
+              ?.label,
+        )
+        .filter(Boolean)
+        .join("、");
+    },
+    repeatModeLabels() {
+      return BROADCAST_REPEAT_MODE_OPTIONS.map((item) => item.label);
+    },
+    selectedRepeatModeIndex() {
+      const index = BROADCAST_REPEAT_MODE_OPTIONS.findIndex(
+        (item) => item.value === this.form.repeatMode,
+      );
+      return index === -1 ? 0 : index;
+    },
+    repeatModeText() {
+      return (
+        BROADCAST_REPEAT_MODE_OPTIONS[this.selectedRepeatModeIndex]?.label ||
+        "每次"
+      );
+    },
+    timePickerRange() {
+      return [buildRangeLabels(24), buildRangeLabels(60), buildRangeLabels(60)];
+    },
+    timePickerValue() {
+      return parseTimeParts(this.form.sendTime);
+    },
     powerBalanceAmount() {
       return Math.max(0, Number(this.powerStats.balance || 0));
     },
@@ -621,6 +839,7 @@ export default {
       this.reauthRequired = Boolean(dashboard.authorization?.reauthRequired);
       const operationSettings = dashboard.operationSettings || {};
       this.autoReplyEnabled = operationSettings.autoReplyEnabled !== false;
+      this.applyBroadcastSetting(dashboard.broadcastSetting);
       this.messageStats = {
         ...this.messageStats,
         ...(dashboard.messageStats || {}),
@@ -674,6 +893,97 @@ export default {
         });
       } finally {
         this.operationSettingsSubmitting = false;
+      }
+    },
+    applyBroadcastSetting(setting = {}) {
+      const broadcastSetting = setting || {};
+      this.broadcastConfigured = Boolean(broadcastSetting.configured);
+      this.broadcastTotalSentCount = Number(
+        broadcastSetting.totalSentCount || 0,
+      );
+      this.form = {
+        weekDays: Array.isArray(broadcastSetting.weekDays)
+          ? [...broadcastSetting.weekDays]
+          : [],
+        repeatMode: broadcastSetting.repeatMode || "EVERY",
+        sendTime: broadcastSetting.sendTime || "10:00:00",
+        content: broadcastSetting.content || "",
+      };
+    },
+    openBroadcastDialog() {
+      this.weekDayPanelVisible = false;
+      this.broadcastDialogVisible = true;
+    },
+    closeBroadcastDialog() {
+      this.broadcastDialogVisible = false;
+      this.weekDayPanelVisible = false;
+    },
+    toggleWeekDayPanel() {
+      this.weekDayPanelVisible = !this.weekDayPanelVisible;
+    },
+    isWeekDaySelected(day) {
+      return this.form.weekDays.includes(day);
+    },
+    toggleWeekDay(day) {
+      const selected = this.form.weekDays.includes(day)
+        ? this.form.weekDays.filter((item) => item !== day)
+        : [...this.form.weekDays, day];
+      this.form.weekDays = selected.sort((left, right) => left - right);
+    },
+    handleRepeatModeChange(event) {
+      const index = Number(event?.detail?.value || 0);
+      this.form.repeatMode =
+        BROADCAST_REPEAT_MODE_OPTIONS[index]?.value || "EVERY";
+    },
+    handleSendTimeChange(event) {
+      const [hour = 0, minute = 0, second = 0] = event?.detail?.value || [];
+      this.form.sendTime = `${padTwoDigits(hour)}:${padTwoDigits(
+        minute,
+      )}:${padTwoDigits(second)}`;
+    },
+    async submitBroadcastSetting() {
+      if (this.broadcastSubmitting) {
+        return;
+      }
+      if (!this.form.weekDays.length) {
+        uni.showToast({ title: "请至少选择一个发送日期", icon: "none" });
+        return;
+      }
+      if (!String(this.form.content).trim()) {
+        uni.showToast({ title: "请填写发送的内容", icon: "none" });
+        return;
+      }
+      this.broadcastSubmitting = true;
+      try {
+        const saved = await saveMtH5BroadcastSetting({
+          weekDays: this.form.weekDays,
+          repeatMode: this.form.repeatMode,
+          sendTime: this.form.sendTime,
+          content: String(this.form.content).trim(),
+        });
+        this.applyBroadcastSetting(saved);
+        this.closeBroadcastDialog();
+        uni.showToast({ title: "已保存", icon: "none" });
+      } catch (error) {
+        uni.showToast({ title: error?.message || "保存失败", icon: "none" });
+      } finally {
+        this.broadcastSubmitting = false;
+      }
+    },
+    async deleteBroadcastSetting() {
+      if (this.broadcastSubmitting) {
+        return;
+      }
+      this.broadcastSubmitting = true;
+      try {
+        const cleared = await deleteMtH5BroadcastSetting();
+        this.applyBroadcastSetting(cleared);
+        this.closeBroadcastDialog();
+        uni.showToast({ title: "已删除定时群发", icon: "none" });
+      } catch (error) {
+        uni.showToast({ title: error?.message || "删除失败", icon: "none" });
+      } finally {
+        this.broadcastSubmitting = false;
       }
     },
     goToLogPage() {
@@ -1435,5 +1745,233 @@ export default {
   font-weight: 700;
   line-height: 84rpx;
   text-align: center;
+}
+
+/* 消息群发入口：负边距抵消 ai-card 的内边距，让行尾角标贴齐卡片边缘 */
+.broadcast-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 24rpx -28rpx -28rpx;
+  padding: 24rpx 28rpx;
+  overflow: hidden;
+}
+
+.broadcast-entry-copy {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.broadcast-entry-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.broadcast-entry-count {
+  font-size: 26rpx;
+  color: #8a9099;
+}
+
+.broadcast-entry-icon {
+  width: 56rpx;
+  height: 56rpx;
+  margin-right: 36rpx;
+}
+
+.broadcast-entry-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.broadcast-modal {
+  width: 100%;
+  max-width: 620rpx;
+  padding: 36rpx 32rpx 28rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.broadcast-modal-title {
+  display: block;
+  margin-bottom: 32rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2329;
+  text-align: center;
+  text-decoration: underline;
+}
+
+.broadcast-field {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.broadcast-field-top {
+  align-items: flex-start;
+}
+
+.broadcast-field-label {
+  width: 96rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2329;
+  text-decoration: underline;
+}
+
+.broadcast-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  min-width: 168rpx;
+  padding: 12rpx 16rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+.broadcast-select-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* picker 内部需要再包一层，才能让选中文案与箭头在 picker 内左右分布 */
+.broadcast-select-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  width: 100%;
+}
+
+.broadcast-select-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #1f2329;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.broadcast-select-arrow {
+  font-size: 20rpx;
+  color: #8a9099;
+}
+
+.broadcast-weekday-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 20rpx;
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+.broadcast-weekday-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  width: 152rpx;
+}
+
+.broadcast-weekday-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid #c9ced6;
+  border-radius: 6rpx;
+  background: #ffffff;
+  font-size: 22rpx;
+  color: #ffffff;
+}
+
+.broadcast-weekday-checkbox-checked {
+  border-color: #f5c73c;
+  background: #f5c73c;
+}
+
+.broadcast-weekday-label {
+  font-size: 26rpx;
+  color: #1f2329;
+}
+
+.broadcast-textarea-wrap {
+  flex: 1;
+  min-width: 0;
+  padding: 16rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+.broadcast-textarea {
+  width: 100%;
+  height: 132rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  box-sizing: border-box;
+}
+
+.broadcast-textarea-placeholder {
+  color: #b6bbc3;
+}
+
+.broadcast-textarea-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.broadcast-textarea-rule {
+  font-size: 22rpx;
+  color: #8a9099;
+}
+
+.broadcast-textarea-counter {
+  font-size: 22rpx;
+  color: #b6bbc3;
+}
+
+.broadcast-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32rpx;
+  margin-top: 32rpx;
+}
+
+.broadcast-modal-button {
+  min-width: 128rpx;
+  padding: 0 32rpx;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 68rpx;
+  color: #5a6069;
+  text-align: center;
+}
+
+.broadcast-modal-button-primary {
+  background: #f5c73c;
+  color: #1f2329;
+}
+
+.broadcast-modal-button-disabled {
+  opacity: 0.6;
 }
 </style>

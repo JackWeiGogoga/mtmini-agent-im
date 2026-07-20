@@ -47,6 +47,9 @@ export * from "./system-prompt-types";
 // IM 自动回复记录
 export * from "./im-auto-reply-types";
 
+// IM 消息群发类型
+export * from "./im-broadcast-types";
+
 // 菜单管理类型
 export type {
   Menu,

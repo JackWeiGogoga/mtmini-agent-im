@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImBroadcastRecordMapper">
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImBroadcastRecord">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="conversation_id" property="conversationId"/>
+        <result column="open_user_id" property="openUserId"/>
+        <result column="shard_no" property="shardNo"/>
+        <result column="outbound_message_id" property="outboundMessageId"/>
+        <result column="status" property="status"/>
+        <result column="error_code" property="errorCode"/>
+        <result column="error_summary" property="errorSummary"/>
+        <result column="sent_at" property="sentAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="batchInsertIgnore">
+        INSERT IGNORE INTO mt_im_broadcast_record (
+            task_id, shop_id, conversation_id, open_user_id, shard_no,
+            outbound_message_id, status, create_time, update_time
+        ) VALUES
+        <foreach collection="records" item="item" separator=",">
+            (#{item.taskId}, #{item.shopId}, #{item.conversationId}, #{item.openUserId}, #{item.shardNo},
+             #{item.outboundMessageId}, #{item.status}, #{item.createTime}, #{item.updateTime})
+        </foreach>
+    </insert>
+
+    <select id="selectPendingByShard" resultMap="BaseResultMap">
+        SELECT id, task_id, shop_id, conversation_id, open_user_id, shard_no,
+               outbound_message_id, status, error_code, error_summary, sent_at,
+               create_time, update_time
+        FROM mt_im_broadcast_record
+        WHERE task_id = #{taskId}
+          AND shard_no = #{shardNo}
+          AND status &lt;&gt; 'SENT'
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <update id="markSent">
+        UPDATE mt_im_broadcast_record
+        SET status = 'SENT',
+            error_code = NULL,
+            error_summary = NULL,
+            sent_at = #{sentAt},
+            update_time = NOW()
+        WHERE id = #{id} AND status &lt;&gt; 'SENT'
+    </update>
+
+    <update id="markFailed">
+        UPDATE mt_im_broadcast_record
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            error_summary = #{errorSummary},
+            update_time = NOW()
+        WHERE id = #{id} AND status &lt;&gt; 'SENT'
+    </update>
+
+    <select id="countByTask" resultType="long">
+        SELECT COUNT(*) FROM mt_im_broadcast_record
+        WHERE task_id = #{taskId}
+        <if test="status != null and status != ''">AND status = #{status}</if>
+    </select>
+
+    <select id="selectAdminPageByTask" resultType="com.gogoga.backend.vo.ImBroadcastRecordVO">
+        SELECT id AS recordId,
+               task_id AS taskId,
+               shop_id AS shopId,
+               conversation_id AS conversationId,
+               open_user_id AS openUserId,
+               shard_no AS shardNo,
+               outbound_message_id AS outboundMessageId,
+               status,
+               error_code AS errorCode,
+               error_summary AS errorSummary,
+               sent_at AS sentAt,
+               create_time AS createTime
+        FROM mt_im_broadcast_record
+        WHERE task_id = #{taskId}
+        <if test="status != null and status != ''">AND status = #{status}</if>
+        ORDER BY id
+    </select>
+</mapper>

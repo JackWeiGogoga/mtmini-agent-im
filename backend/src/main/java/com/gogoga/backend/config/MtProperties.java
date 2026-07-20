@@ -71,6 +71,11 @@ public class MtProperties {
     private ImAutoReply imAutoReply = new ImAutoReply();
 
     /**
+     * IM 定时消息群发配置。
+     */
+    private ImBroadcast imBroadcast = new ImBroadcast();
+
+    /**
      * 通用敏感词配置。
      */
     private SensitiveWord sensitiveWord = new SensitiveWord();
@@ -179,6 +184,95 @@ public class MtProperties {
          * 敏感词改写仍失败时使用的固定安全回复。
          */
         private String safeFallbackReply = "抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。";
+    }
+
+    @Data
+    public static class ImBroadcast {
+
+        /**
+         * 群发总开关。安全起见默认关闭。
+         */
+        private boolean enabled = false;
+
+        /**
+         * 调度扫描 cron，默认每分钟。
+         */
+        private String scheduleCron = "0 * * * * ?";
+
+        /**
+         * 调度锁租约秒数。
+         */
+        private long scheduleLockSeconds = 50L;
+
+        /**
+         * 单轮调度最多处理的门店配置数。
+         */
+        private int schedulePageSize = 200;
+
+        /**
+         * 目标人群活跃回溯天数。
+         */
+        private int activeWithinDays = 30;
+
+        /**
+         * 单批次目标人数上限，超出部分按最近活跃截断。
+         */
+        private int maxTargetsPerBatch = 5000;
+
+        /**
+         * 目标人群游标翻页大小。
+         */
+        private int planPageSize = 500;
+
+        /**
+         * 每个发送分片的目标人数。
+         */
+        private int shardSize = 500;
+
+        /**
+         * 触发时按 shopId 哈希打散的最大抖动秒数，用于削平整点洪峰。
+         */
+        private int triggerJitterSeconds = 60;
+
+        /**
+         * 群发独立线程池并发度。
+         */
+        private int executorConcurrency = 4;
+
+        /**
+         * 单门店同时执行的发送分片数，控制单店对美团的并发。
+         */
+        private int shopConcurrency = 1;
+
+        /**
+         * 全局发送 QPS 上限。频控未知时保守取值。
+         */
+        private int globalQps = 20;
+
+        /**
+         * 命中上游频控后的退避毫秒数。
+         */
+        private long throttleBackoffMillis = 2000L;
+
+        /**
+         * 是否把群发消息写入会话时间线，保证顾客回复时 AI 上下文完整。
+         */
+        private boolean persistTimelineMessage = true;
+
+        /**
+         * 单条文案最大字数。
+         */
+        private int maxContentLength = 100;
+
+        /**
+         * 编排任务策略。
+         */
+        private TaskPolicy planTask = new TaskPolicy();
+
+        /**
+         * 分片发送任务策略。
+         */
+        private TaskPolicy sendTask = new TaskPolicy();
     }
 
     @Data

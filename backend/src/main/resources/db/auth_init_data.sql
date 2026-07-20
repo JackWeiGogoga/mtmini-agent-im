@@ -62,7 +62,8 @@ INSERT IGNORE INTO `ai_menu` (`id`, `menu_id`, `parent_id`, `menu_name`, `path`,
   (54,'MENU_SYSTEM_PROMPT','MENU_SYSTEM','系统提示词','/system/prompts','pages/system-prompt/SystemPromptManage','system:prompt:list','MessageOutlined','C',3,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
   (55,'MENU_SYSTEM_PROMPT_QUERY','MENU_SYSTEM_PROMPT','查看提示词',NULL,NULL,'system:prompt:query',NULL,'F',0,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
   (56,'MENU_SYSTEM_PROMPT_EDIT','MENU_SYSTEM_PROMPT','编辑提示词',NULL,NULL,'system:prompt:edit',NULL,'F',1,1,1,'2026-06-27 00:00:00','2026-06-27 00:00:00'),
-  (57,'MENU_IM_AUTO_REPLY_RECORD','0','自动回复记录','/im-auto-replies','pages/im-auto-replies/ImAutoReplyManage','system:im-auto-reply:list','MessageOutlined','C',14,1,1,'2026-07-19 00:00:00','2026-07-19 00:00:00');
+  (57,'MENU_IM_AUTO_REPLY_RECORD','0','自动回复记录','/im-auto-replies','pages/im-auto-replies/ImAutoReplyManage','system:im-auto-reply:list','MessageOutlined','C',14,1,1,'2026-07-19 00:00:00','2026-07-19 00:00:00'),
+  (58,'MENU_IM_BROADCAST_RECORD','0','群发管理','/im-broadcasts','pages/im-broadcasts/ImBroadcastManage','system:im-broadcast:list','NotificationOutlined','C',15,1,1,'2026-07-20 00:00:00','2026-07-20 00:00:00');
 /*!40000 ALTER TABLE `ai_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `ai_role` DISABLE KEYS */;
@@ -158,7 +159,9 @@ INSERT IGNORE INTO `ai_role_menu` (`id`, `role_id`, `menu_id`, `create_time`) VA
   (115,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_QUERY','2026-06-27 00:00:00'),
   (116,'ROLE_ADMIN','MENU_SYSTEM_PROMPT_EDIT','2026-06-27 00:00:00'),
   (117,'ROLE_SUPER','MENU_IM_AUTO_REPLY_RECORD','2026-07-19 00:00:00'),
-  (118,'ROLE_ADMIN','MENU_IM_AUTO_REPLY_RECORD','2026-07-19 00:00:00');
+  (118,'ROLE_ADMIN','MENU_IM_AUTO_REPLY_RECORD','2026-07-19 00:00:00'),
+  (119,'ROLE_SUPER','MENU_IM_BROADCAST_RECORD','2026-07-20 00:00:00'),
+  (120,'ROLE_ADMIN','MENU_IM_BROADCAST_RECORD','2026-07-20 00:00:00');
 /*!40000 ALTER TABLE `ai_role_menu` ENABLE KEYS */;
 
 /*!40000 ALTER TABLE `mt_version_service_mapping` DISABLE KEYS */;

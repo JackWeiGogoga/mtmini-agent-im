@@ -53,4 +53,23 @@ public class AsyncConfig {
         log.info("Async executor initialized, name=mtLlmTaskExecutor, concurrency={}, queueCapacity=0", concurrency);
         return executor;
     }
+
+    /**
+     * 群发任务独立线程池：群发洪峰不得挤占授权任务与 AI 回复的执行资源。
+     */
+    @Bean("mtBroadcastTaskExecutor")
+    public ThreadPoolTaskExecutor mtBroadcastTaskExecutor(MtProperties mtProperties) {
+        int concurrency = Math.max(mtProperties.getImBroadcast().getExecutorConcurrency(), 1);
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(concurrency);
+        executor.setMaxPoolSize(concurrency);
+        executor.setQueueCapacity(0);
+        executor.setThreadNamePrefix("mt-broadcast-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        log.info("Async executor initialized, name=mtBroadcastTaskExecutor, concurrency={}, queueCapacity=0", concurrency);
+        return executor;
+    }
 }

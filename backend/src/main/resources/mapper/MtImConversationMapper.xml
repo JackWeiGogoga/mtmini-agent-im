@@ -59,6 +59,24 @@
             update_time = #{updateTime}
         WHERE id = #{id}
     </update>
+    <select id="selectBroadcastTargets" resultType="com.gogoga.backend.dto.ImBroadcastTargetDTO">
+        SELECT id AS conversationId, open_user_id AS openUserId, last_user_message_at AS lastUserMessageAt
+        FROM mt_im_conversation
+        WHERE shop_id = #{shopId}
+          AND last_user_message_at IS NOT NULL
+          AND last_user_message_at &gt;= #{activeSince}
+        <if test="cursorLastUserMessageAt != null">
+          AND (last_user_message_at, id) &lt; (#{cursorLastUserMessageAt}, #{cursorId})
+        </if>
+        ORDER BY last_user_message_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+    <select id="countBroadcastTargets" resultType="long">
+        SELECT COUNT(*) FROM mt_im_conversation
+        WHERE shop_id = #{shopId}
+          AND last_user_message_at IS NOT NULL
+          AND last_user_message_at &gt;= #{activeSince}
+    </select>
     <update id="incrementMessageAggregate">
         UPDATE mt_im_conversation
         SET last_message_id = IF(last_message_at IS NULL OR #{eventTime} &gt;= last_message_at, #{messageId}, last_message_id),

@@ -2,10 +2,10 @@
 
 ## 1. 目标拓扑
 
-| 实例名 | 角色 | SSH alias | 公网 IP | 内网 IP | 服务 |
-| --- | --- | --- | --- | --- | --- |
-| AI-Agent-IM-Private | private data + backend | `mt5` | `81.70.204.198` | `172.21.16.5` | MySQL、Redis、backend |
-| AI-Agent-IM-Web | web + backend | `mt6` | `49.232.40.179` | `172.21.16.2` | Caddy、H5、管理后台、backend |
+| 实例名              | 角色                   | SSH alias | 公网 IP         | 内网 IP       | 服务                         |
+| ------------------- | ---------------------- | --------- | --------------- | ------------- | ---------------------------- |
+| AI-Agent-IM-Private | private data + backend | `mt5`     | `81.70.204.198` | `172.21.16.5` | MySQL、Redis、backend        |
+| AI-Agent-IM-Web     | web + backend          | `mt6`     | `49.232.40.179` | `172.21.16.2` | Caddy、H5、管理后台、backend |
 
 两台 backend 使用相同 JAR，连接 `mt5` 上的同一套 MySQL 和 Redis。Caddy 只在
 `mt6` 运行，并把 `/api/*` 转发到 `mt6` 本机的 `127.0.0.1:8080`。
@@ -30,22 +30,22 @@ aicapi.waimaidashi.com
 
 ### mt5
 
-| 端口 | 来源 | 用途 |
-| --- | --- | --- |
-| TCP 22 | 固定办公公网 IP `/32`、VPN 或堡垒机 | SSH |
-| TCP 31306 | `172.21.16.2/32` | mt6 访问 MySQL |
-| TCP 6379 | `172.21.16.2/32` | mt6 访问 Redis |
+| 端口      | 来源                                | 用途           |
+| --------- | ----------------------------------- | -------------- |
+| TCP 22    | 固定办公公网 IP `/32`、VPN 或堡垒机 | SSH            |
+| TCP 31306 | `172.21.16.2/32`                    | mt6 访问 MySQL |
+| TCP 6379  | `172.21.16.2/32`                    | mt6 访问 Redis |
 
 不要向公网开放 `80/443/8080/31306/6379`。
 
 ### mt6
 
-| 端口 | 来源 | 用途 |
-| --- | --- | --- |
-| TCP 22 | 固定办公公网 IP `/32`、VPN 或堡垒机 | SSH |
-| TCP 80 | `0.0.0.0/0` | HTTP 和证书签发 |
-| TCP 443 | `0.0.0.0/0` | HTTPS |
-| UDP 443 | `0.0.0.0/0`，可选 | HTTP/3 |
+| 端口    | 来源                                | 用途            |
+| ------- | ----------------------------------- | --------------- |
+| TCP 22  | 固定办公公网 IP `/32`、VPN 或堡垒机 | SSH             |
+| TCP 80  | `0.0.0.0/0`                         | HTTP 和证书签发 |
+| TCP 443 | `0.0.0.0/0`                         | HTTPS           |
+| UDP 443 | `0.0.0.0/0`，可选                   | HTTP/3          |
 
 不要向公网开放 `8080/31306/6379`。初始化阶段出站可暂时全放行，稳定后再按
 美团、微信、腾讯云、软件源和 DNS/NTP 的实际依赖收紧。
@@ -269,6 +269,12 @@ POWER_WECHAT_PAY_WAP_URL=https://aic.waimaidashi.com/#/pages/power/index
 ```bash
 LOCAL_WECHAT_KEY_FILE=/absolute/path/to/apiclient_key.pem \
 LOCAL_WECHAT_PUB_KEY_FILE=/absolute/path/to/pub_key.pem \
+./deploy-local/deploy.sh --upload-env --upload-certs
+```
+
+```
+LOCAL_WECHAT_KEY_FILE=/Users/jackwei/data/outsourcing/takeout-master-ai/cert/1740114730_20260323_cert/apiclient_key.pem \
+LOCAL_WECHAT_PUB_KEY_FILE=/Users/jackwei/data/outsourcing/takeout-master-ai/cert/1740114730_20260323_cert/pub_key.pem \
 ./deploy-local/deploy.sh --upload-env --upload-certs
 ```
 

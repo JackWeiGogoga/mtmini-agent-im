@@ -244,6 +244,32 @@ mt:
     model-api-key: ${MT_IM_AUTO_REPLY_MODEL_API_KEY:${MT_KNOWLEDGE_MODEL_API_KEY:}}
     chat-model: ${MT_IM_AUTO_REPLY_CHAT_MODEL:${MT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}}
     safe-fallback-reply: ${MT_IM_AUTO_REPLY_SAFE_FALLBACK_REPLY:抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。}
+  im-broadcast:
+    enabled: ${MT_IM_BROADCAST_ENABLED:false}
+    schedule-cron: ${MT_IM_BROADCAST_SCHEDULE_CRON:0 * * * * ?}
+    schedule-lock-seconds: ${MT_IM_BROADCAST_SCHEDULE_LOCK_SECONDS:50}
+    schedule-page-size: ${MT_IM_BROADCAST_SCHEDULE_PAGE_SIZE:200}
+    active-within-days: ${MT_IM_BROADCAST_ACTIVE_WITHIN_DAYS:30}
+    max-targets-per-batch: ${MT_IM_BROADCAST_MAX_TARGETS_PER_BATCH:5000}
+    plan-page-size: ${MT_IM_BROADCAST_PLAN_PAGE_SIZE:500}
+    shard-size: ${MT_IM_BROADCAST_SHARD_SIZE:500}
+    trigger-jitter-seconds: ${MT_IM_BROADCAST_TRIGGER_JITTER_SECONDS:60}
+    executor-concurrency: ${MT_IM_BROADCAST_EXECUTOR_CONCURRENCY:4}
+    shop-concurrency: ${MT_IM_BROADCAST_SHOP_CONCURRENCY:1}
+    global-qps: ${MT_IM_BROADCAST_GLOBAL_QPS:20}
+    throttle-backoff-millis: ${MT_IM_BROADCAST_THROTTLE_BACKOFF_MILLIS:2000}
+    persist-timeline-message: ${MT_IM_BROADCAST_PERSIST_TIMELINE_MESSAGE:true}
+    max-content-length: ${MT_IM_BROADCAST_MAX_CONTENT_LENGTH:100}
+    plan-task:
+      max-retry-count: ${MT_IM_BROADCAST_PLAN_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_IM_BROADCAST_PLAN_TIMEOUT_SECONDS:600}
+      initial-backoff-seconds: ${MT_IM_BROADCAST_PLAN_INITIAL_BACKOFF_SECONDS:30}
+      max-backoff-seconds: ${MT_IM_BROADCAST_PLAN_MAX_BACKOFF_SECONDS:300}
+    send-task:
+      max-retry-count: ${MT_IM_BROADCAST_SEND_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_IM_BROADCAST_SEND_TIMEOUT_SECONDS:1800}
+      initial-backoff-seconds: ${MT_IM_BROADCAST_SEND_INITIAL_BACKOFF_SECONDS:30}
+      max-backoff-seconds: ${MT_IM_BROADCAST_SEND_MAX_BACKOFF_SECONDS:600}
   sensitive-word:
     enabled: ${MT_SENSITIVE_WORD_ENABLED:true}
     max-rewrite-attempts: ${MT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}

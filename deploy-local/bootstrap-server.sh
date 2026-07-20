@@ -22,6 +22,13 @@ LOCAL_CADDYFILE="${LOCAL_CADDYFILE:-${REPO_ROOT}/deploy-local/Caddyfile}"
 LOCAL_WECHAT_KEY_FILE="${LOCAL_WECHAT_KEY_FILE:-}"
 LOCAL_WECHAT_PUB_KEY_FILE="${LOCAL_WECHAT_PUB_KEY_FILE:-}"
 
+SSH_CONNECT_TIMEOUT_SECONDS="${SSH_CONNECT_TIMEOUT_SECONDS:-10}"
+SSH_CONNECTION_ATTEMPTS="${SSH_CONNECTION_ATTEMPTS:-2}"
+SSH_SERVER_ALIVE_INTERVAL_SECONDS="${SSH_SERVER_ALIVE_INTERVAL_SECONDS:-15}"
+SSH_SERVER_ALIVE_COUNT_MAX="${SSH_SERVER_ALIVE_COUNT_MAX:-4}"
+SSH_RETRY_ATTEMPTS="${SSH_RETRY_ATTEMPTS:-5}"
+SSH_RETRY_DELAY_SECONDS="${SSH_RETRY_DELAY_SECONDS:-3}"
+
 UPLOAD_ENV=1
 UPLOAD_CADDY=1
 UPLOAD_SERVICE=1
@@ -63,6 +70,13 @@ Environment variables:
   LOCAL_CADDYFILE             Local Caddyfile path
   LOCAL_WECHAT_KEY_FILE       Local apiclient_key.pem path
   LOCAL_WECHAT_PUB_KEY_FILE   Local pub_key.pem path
+  SSH_CONNECT_TIMEOUT_SECONDS SSH connection timeout, default: 10
+  SSH_CONNECTION_ATTEMPTS     Attempts made by each SSH connection, default: 2
+  SSH_SERVER_ALIVE_INTERVAL_SECONDS
+                              SSH keepalive interval, default: 15
+  SSH_SERVER_ALIVE_COUNT_MAX  Missed keepalives before disconnect, default: 4
+  SSH_RETRY_ATTEMPTS          Retries after SSH transport failures, default: 5
+  SSH_RETRY_DELAY_SECONDS     Initial retry delay, default: 3
 EOF
 }
 
@@ -77,6 +91,83 @@ fail() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+is_positive_integer() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+build_ssh_options() {
+  SSH_OPTIONS=(
+    -o "ConnectTimeout=${SSH_CONNECT_TIMEOUT_SECONDS}"
+    -o "ConnectionAttempts=${SSH_CONNECTION_ATTEMPTS}"
+    -o "ServerAliveInterval=${SSH_SERVER_ALIVE_INTERVAL_SECONDS}"
+    -o "ServerAliveCountMax=${SSH_SERVER_ALIVE_COUNT_MAX}"
+    -o "TCPKeepAlive=yes"
+    -o "ControlMaster=no"
+  )
+}
+
+retry_delay_for_attempt() {
+  local attempt="$1"
+  local delay=$((SSH_RETRY_DELAY_SECONDS * attempt))
+  (( delay <= 30 )) || delay=30
+  printf '%s\n' "${delay}"
+}
+
+ssh_remote() {
+  local remote_command="$1"
+  local attempt=1
+  local exit_code=0
+  local delay=0
+
+  while true; do
+    if ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" "${remote_command}"; then
+      return 0
+    else
+      exit_code=$?
+    fi
+
+    # OpenSSH uses 255 for connection/transport failures. Do not retry a
+    # deterministic non-zero status returned by the remote command itself.
+    if (( exit_code != 255 || attempt >= SSH_RETRY_ATTEMPTS )); then
+      return "${exit_code}"
+    fi
+
+    delay="$(retry_delay_for_attempt "${attempt}")"
+    log "SSH connection to ${REMOTE_HOST} dropped (attempt ${attempt}/${SSH_RETRY_ATTEMPTS}); retrying in ${delay}s"
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
+}
+
+run_transfer_with_retry() {
+  local description="$1"
+  shift
+  local attempt=1
+  local exit_code=0
+  local delay=0
+
+  while true; do
+    if "$@"; then
+      return 0
+    else
+      exit_code=$?
+    fi
+
+    if (( attempt >= SSH_RETRY_ATTEMPTS )); then
+      return "${exit_code}"
+    fi
+
+    delay="$(retry_delay_for_attempt "${attempt}")"
+    log "${description} interrupted (attempt ${attempt}/${SSH_RETRY_ATTEMPTS}); retrying in ${delay}s"
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
+}
+
+scp_transfer() {
+  run_transfer_with_retry "SCP transfer" scp "${SSH_OPTIONS[@]}" "$@"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -144,13 +235,26 @@ esac
 require_cmd ssh
 require_cmd scp
 
+is_positive_integer "${SSH_CONNECT_TIMEOUT_SECONDS}" || fail "SSH_CONNECT_TIMEOUT_SECONDS must be a positive integer"
+is_positive_integer "${SSH_CONNECTION_ATTEMPTS}" || fail "SSH_CONNECTION_ATTEMPTS must be a positive integer"
+is_positive_integer "${SSH_SERVER_ALIVE_INTERVAL_SECONDS}" || fail "SSH_SERVER_ALIVE_INTERVAL_SECONDS must be a positive integer"
+is_positive_integer "${SSH_SERVER_ALIVE_COUNT_MAX}" || fail "SSH_SERVER_ALIVE_COUNT_MAX must be a positive integer"
+is_positive_integer "${SSH_RETRY_ATTEMPTS}" || fail "SSH_RETRY_ATTEMPTS must be a positive integer"
+is_positive_integer "${SSH_RETRY_DELAY_SECONDS}" || fail "SSH_RETRY_DELAY_SECONDS must be a positive integer"
+
+build_ssh_options
+
 upload_env() {
   [[ -f "${LOCAL_ENV_FILE}" ]] || fail "Env file not found: ${LOCAL_ENV_FILE}"
   log "Uploading backend env"
-  scp "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
-  ssh "${REMOTE_HOST}" "
+  scp_transfer "${LOCAL_ENV_FILE}" "${REMOTE_HOST}:/tmp/waimaidashi-backend.env"
+  ssh_remote "
+    set -e
     sudo mkdir -p \"$(dirname "${REMOTE_ENV_PATH}")\"
-    sudo mv /tmp/waimaidashi-backend.env '${REMOTE_ENV_PATH}'
+    # Guarded so an SSH retry after a partially applied mv is still a no-op.
+    if [ -f /tmp/waimaidashi-backend.env ]; then
+      sudo mv /tmp/waimaidashi-backend.env '${REMOTE_ENV_PATH}'
+    fi
     sudo chown root:root '${REMOTE_ENV_PATH}'
     sudo chmod 600 '${REMOTE_ENV_PATH}'
   "
@@ -159,9 +263,12 @@ upload_env() {
 upload_service() {
   [[ -f "${LOCAL_SERVICE_FILE}" ]] || fail "Service file not found: ${LOCAL_SERVICE_FILE}"
   log "Uploading systemd service"
-  scp "${LOCAL_SERVICE_FILE}" "${REMOTE_HOST}:/tmp/${BACKEND_SERVICE_NAME}.service"
-  ssh "${REMOTE_HOST}" "
-    sudo mv /tmp/${BACKEND_SERVICE_NAME}.service '${REMOTE_SERVICE_PATH}'
+  scp_transfer "${LOCAL_SERVICE_FILE}" "${REMOTE_HOST}:/tmp/${BACKEND_SERVICE_NAME}.service"
+  ssh_remote "
+    set -e
+    if [ -f /tmp/${BACKEND_SERVICE_NAME}.service ]; then
+      sudo mv /tmp/${BACKEND_SERVICE_NAME}.service '${REMOTE_SERVICE_PATH}'
+    fi
     sudo chown root:root '${REMOTE_SERVICE_PATH}'
     sudo chmod 644 '${REMOTE_SERVICE_PATH}'
   "
@@ -170,20 +277,25 @@ upload_service() {
 upload_caddy() {
   [[ -f "${LOCAL_CADDYFILE}" ]] || fail "Caddyfile not found: ${LOCAL_CADDYFILE}"
   log "Uploading and validating Caddyfile"
-  scp "${LOCAL_CADDYFILE}" "${REMOTE_HOST}:/tmp/Caddyfile"
-  ssh "${REMOTE_HOST}" "
+  scp_transfer "${LOCAL_CADDYFILE}" "${REMOTE_HOST}:/tmp/Caddyfile"
+  ssh_remote "
     set -e
-    sudo caddy validate --config /tmp/Caddyfile
-    if [ -f '${REMOTE_CADDYFILE_PATH}' ]; then
-      sudo cp -a '${REMOTE_CADDYFILE_PATH}' '${REMOTE_CADDYFILE_PATH}.backup-\$(date +%Y%m%d-%H%M%S)'
-    fi
-    sudo mkdir -p \"\$(dirname '${REMOTE_CADDYFILE_PATH}')\"
     sudo mkdir -p /var/log/caddy
     sudo chown -R caddy:caddy /var/log/caddy || true
     sudo chmod 750 /var/log/caddy || true
-    sudo mv /tmp/Caddyfile '${REMOTE_CADDYFILE_PATH}'
+    # Guarded so an SSH retry after a partially applied mv is still a no-op;
+    # the final validate below then covers the already-installed file.
+    if [ -f /tmp/Caddyfile ]; then
+      sudo caddy validate --config /tmp/Caddyfile
+      if [ -f '${REMOTE_CADDYFILE_PATH}' ]; then
+        sudo cp -a '${REMOTE_CADDYFILE_PATH}' '${REMOTE_CADDYFILE_PATH}.backup-\$(date +%Y%m%d-%H%M%S)'
+      fi
+      sudo mkdir -p \"\$(dirname '${REMOTE_CADDYFILE_PATH}')\"
+      sudo mv /tmp/Caddyfile '${REMOTE_CADDYFILE_PATH}'
+    fi
     sudo chown root:root '${REMOTE_CADDYFILE_PATH}'
     sudo chmod 644 '${REMOTE_CADDYFILE_PATH}'
+    sudo caddy validate --config '${REMOTE_CADDYFILE_PATH}'
   "
 }
 
@@ -193,13 +305,17 @@ upload_certs() {
   [[ -f "${LOCAL_WECHAT_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_KEY_FILE}"
   [[ -f "${LOCAL_WECHAT_PUB_KEY_FILE}" ]] || fail "Cert file not found: ${LOCAL_WECHAT_PUB_KEY_FILE}"
   log "Uploading WeChat cert files"
-  scp "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
-  scp "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
-  ssh "${REMOTE_HOST}" "
+  scp_transfer "${LOCAL_WECHAT_KEY_FILE}" "${REMOTE_HOST}:/tmp/apiclient_key.pem"
+  scp_transfer "${LOCAL_WECHAT_PUB_KEY_FILE}" "${REMOTE_HOST}:/tmp/pub_key.pem"
+  ssh_remote "
     set -e
     sudo mkdir -p '${REMOTE_CERT_DIR}'
-    sudo mv /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
-    sudo mv /tmp/pub_key.pem '${REMOTE_CERT_DIR}/pub_key.pem'
+    if [ -f /tmp/apiclient_key.pem ]; then
+      sudo mv /tmp/apiclient_key.pem '${REMOTE_CERT_DIR}/apiclient_key.pem'
+    fi
+    if [ -f /tmp/pub_key.pem ]; then
+      sudo mv /tmp/pub_key.pem '${REMOTE_CERT_DIR}/pub_key.pem'
+    fi
     sudo chown '${APP_USER}:${APP_GROUP}' '${REMOTE_CERT_DIR}/apiclient_key.pem' '${REMOTE_CERT_DIR}/pub_key.pem'
     sudo chmod 600 '${REMOTE_CERT_DIR}/apiclient_key.pem'
     sudo chmod 644 '${REMOTE_CERT_DIR}/pub_key.pem'
@@ -208,7 +324,7 @@ upload_certs() {
 
 enable_backend() {
   log "Reloading systemd and enabling backend service"
-  ssh "${REMOTE_HOST}" "
+  ssh_remote "
     sudo systemctl daemon-reload
     sudo systemctl enable '${BACKEND_SERVICE_NAME}'
     if [ '${START_BACKEND}' = '1' ]; then
@@ -220,7 +336,7 @@ enable_backend() {
 
 reload_caddy() {
   log "Validating and reloading or starting caddy"
-  ssh "${REMOTE_HOST}" "
+  ssh_remote "
     set -e
     sudo mkdir -p /var/log/caddy
     sudo chown -R caddy:caddy /var/log/caddy || true

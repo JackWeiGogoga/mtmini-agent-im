@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImBroadcastTaskMapper">
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImBroadcastTask">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="setting_id" property="settingId"/>
+        <result column="trigger_date" property="triggerDate"/>
+        <result column="plan_time" property="planTime"/>
+        <result column="content" property="content"/>
+        <result column="week_days" property="weekDays"/>
+        <result column="repeat_mode" property="repeatMode"/>
+        <result column="status" property="status"/>
+        <result column="target_count" property="targetCount"/>
+        <result column="truncated_count" property="truncatedCount"/>
+        <result column="shard_count" property="shardCount"/>
+        <result column="success_count" property="successCount"/>
+        <result column="fail_count" property="failCount"/>
+        <result column="skip_reason" property="skipReason"/>
+        <result column="planned_at" property="plannedAt"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="BaseColumnList">
+        id, shop_id, setting_id, trigger_date, plan_time, content, week_days, repeat_mode,
+        status, target_count, truncated_count, shard_count,
+        success_count, fail_count, skip_reason, planned_at, started_at, finished_at,
+        create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImBroadcastTask"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_broadcast_task (
+            shop_id, setting_id, trigger_date, plan_time, content, week_days, repeat_mode,
+            status, target_count, truncated_count, shard_count,
+            success_count, fail_count, skip_reason, planned_at, started_at, finished_at,
+            create_time, update_time
+        ) VALUES (
+            #{shopId}, #{settingId}, #{triggerDate}, #{planTime}, #{content}, #{weekDays}, #{repeatMode},
+            #{status}, #{targetCount}, #{truncatedCount}, #{shardCount},
+            #{successCount}, #{failCount}, #{skipReason}, #{plannedAt}, #{startedAt}, #{finishedAt},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_broadcast_task WHERE id = #{id} LIMIT 1
+    </select>
+
+    <update id="markPlanned">
+        UPDATE mt_im_broadcast_task
+        SET target_count = #{targetCount},
+            truncated_count = #{truncatedCount},
+            shard_count = #{shardCount},
+            status = 'SENDING',
+            planned_at = #{plannedAt},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markSkipped">
+        UPDATE mt_im_broadcast_task
+        SET status = #{status},
+            skip_reason = #{skipReason},
+            finished_at = #{finishedAt},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markSending">
+        UPDATE mt_im_broadcast_task
+        SET status = 'SENDING',
+            started_at = COALESCE(started_at, #{startedAt}),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateProgress">
+        UPDATE mt_im_broadcast_task
+        SET success_count = #{successCount},
+            fail_count = #{failCount},
+            status = #{status},
+            finished_at = #{finishedAt},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectAdminPage" parameterType="com.gogoga.backend.param.AdminImBroadcastQueryParam"
+            resultType="com.gogoga.backend.vo.ImBroadcastTaskVO">
+        SELECT t.id AS taskId,
+               t.shop_id AS shopId,
+               COALESCE(s.poi_name, s.name) AS shopName,
+               s.poi_id AS poiId,
+               s.epoi_id AS epoiId,
+               t.trigger_date AS triggerDate,
+               t.plan_time AS planTime,
+               t.content,
+               t.week_days AS weekDays,
+               t.repeat_mode AS repeatMode,
+               t.status,
+               t.target_count AS targetCount,
+               t.truncated_count AS truncatedCount,
+               t.shard_count AS shardCount,
+               t.success_count AS successCount,
+               t.fail_count AS failCount,
+               t.skip_reason AS skipReason,
+               t.planned_at AS plannedAt,
+               t.started_at AS startedAt,
+               t.finished_at AS finishedAt,
+               t.create_time AS createTime
+        FROM mt_im_broadcast_task t
+        JOIN mt_shop s ON s.id = t.shop_id
+        <where>
+            <if test="shopId != null">AND t.shop_id = #{shopId}</if>
+            <if test="shopKeyword != null and shopKeyword != ''">
+                AND (s.name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_id LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.epoi_id LIKE CONCAT('%', #{shopKeyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">AND t.status = #{status}</if>
+            <if test="repeatMode != null and repeatMode != ''">AND t.repeat_mode = #{repeatMode}</if>
+            <if test="contentKeyword != null and contentKeyword != ''">
+                AND t.content LIKE CONCAT('%', #{contentKeyword}, '%')
+            </if>
+            <if test="startTime != null">AND t.create_time &gt;= #{startTime}</if>
+            <if test="endTime != null">AND t.create_time &lt;= #{endTime}</if>
+        </where>
+        ORDER BY t.create_time DESC, t.id DESC
+    </select>
+</mapper>

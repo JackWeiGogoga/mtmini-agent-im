@@ -78,6 +78,18 @@ export function updateMtH5OperationSettings(settings) {
   return request('/api/h5/shop/operation-settings', 'PUT', settings)
 }
 
+export function getMtH5BroadcastSetting() {
+  return request('/api/h5/shop/broadcast-setting', 'GET')
+}
+
+export function saveMtH5BroadcastSetting(payload) {
+  return request('/api/h5/shop/broadcast-setting', 'PUT', payload)
+}
+
+export function deleteMtH5BroadcastSetting() {
+  return request('/api/h5/shop/broadcast-setting', 'DELETE')
+}
+
 export function getKnowledgeQaItems() {
   return request('/api/h5/knowledge/items', 'GET')
 }
