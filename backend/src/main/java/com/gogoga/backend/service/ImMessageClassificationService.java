@@ -1,6 +1,7 @@
 package com.gogoga.backend.service;
 
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.enums.KnowledgeCategoryEnum;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
@@ -24,7 +25,10 @@ public class ImMessageClassificationService {
 
     private static final Logger log = LoggerFactory.getLogger(ImMessageClassificationService.class);
 
-    private static final String SYSTEM_PROMPT = "你是外卖门店客服的消息分类器。阅读顾客消息后，只输出一个英文分类标签，"
+    private static final String PROMPT_KEY = "IM_MESSAGE_CLASSIFICATION";
+
+    /** 代码兜底：数据库与资源默认均不可用时使用；日常请在管理后台「系统提示词」中维护。 */
+    private static final String FALLBACK_SYSTEM_PROMPT = "你是外卖门店客服的消息分类器。阅读顾客消息后，只输出一个英文分类标签，"
             + "不要输出任何解释或标点：\n"
             + "GENERAL=普通咨询（菜品、口味、活动、营业时间、门店信息等一般问题）\n"
             + "DELIVERY=配送相关（催单、配送进度、骑手、送达时间、配送地址等）\n"
@@ -33,28 +37,53 @@ public class ImMessageClassificationService {
 
     private final MtProperties mtProperties;
     private final OpenAiCompatibleChatService chatService;
+    private final SystemPromptService systemPromptService;
 
     public KnowledgeCategoryEnum classify(List<String> recentUserMessages) {
+        return classifyDetailed(recentUserMessages).category();
+    }
+
+    /**
+     * 分类并返回诊断细节（模型原始输出、prompt 来源、异常信息），用于测试聊天排查分类为何不符合预期。
+     */
+    public ClassificationResult classifyDetailed(List<String> recentUserMessages) {
         String content = join(recentUserMessages);
         if (StringUtils.isBlank(content)) {
-            return KnowledgeCategoryEnum.GENERAL;
+            return new ClassificationResult(KnowledgeCategoryEnum.GENERAL, null, null, "EMPTY_INPUT");
         }
+        String promptSource = null;
         try {
             MtProperties.ImAutoReply config = mtProperties.getImAutoReply();
+            ResolvedSystemPromptDTO prompt = systemPromptService.resolve(PROMPT_KEY, FALLBACK_SYSTEM_PROMPT);
+            promptSource = prompt.getSource();
+            // 预算需覆盖“思考型”模型的推理 token，过小会出现 content 为空（被截断）而无异常，
+            // 从而恒兜底为普通类；此处与回复生成保持一致的预算，避免分类被截断。
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model(config.getChatModel())
                     .temperature(0D)
-                    .maxCompletionTokens(24)
-                    .addSystemMessage(SYSTEM_PROMPT)
+                    .maxCompletionTokens(Math.max(config.getMaxCompletionTokens(), 64))
+                    .addSystemMessage(prompt.getContent())
                     .addUserMessage(content)
                     .build();
             ChatCompletion completion = chatService.createChatCompletion(
                     config.getModelProvider(), config.getModelBaseUrl(), config.getModelApiKey(), params);
-            return resolve(extractContent(completion));
+            String raw = extractContent(completion);
+            return new ClassificationResult(resolve(raw), raw, promptSource, null);
         } catch (Exception e) {
             log.warn("IM 消息分类失败，兜底为普通类: {}", e.getMessage());
-            return KnowledgeCategoryEnum.GENERAL;
+            return new ClassificationResult(KnowledgeCategoryEnum.GENERAL, null, promptSource,
+                    e.getClass().getSimpleName() + ": " + StringUtils.defaultString(e.getMessage()));
         }
+    }
+
+    /**
+     * @param category    最终分类
+     * @param rawOutput   模型原始返回（兜底时为 null）
+     * @param promptSource 提示词来源 DB/RESOURCE/FALLBACK
+     * @param error       异常摘要（正常为 null）
+     */
+    public record ClassificationResult(KnowledgeCategoryEnum category, String rawOutput,
+                                       String promptSource, String error) {
     }
 
     private String join(List<String> recentUserMessages) {

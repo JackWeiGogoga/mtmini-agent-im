@@ -8,6 +8,7 @@ import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.dto.SensitiveWordHitDTO;
 import com.gogoga.backend.entity.mt.MtImTestChatLog;
 import com.gogoga.backend.entity.mt.MtShop;
+import com.gogoga.backend.enums.BackendPortalType;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtImTestChatLogMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
@@ -69,7 +70,9 @@ public class ImTestChatService {
         List<ImAutoReplyChatMessage> history = buildHistory(param, message);
         List<String> recentUserMessages = latestUserMessages(history,
                 mtProperties.getImAutoReply().getRagRecentUserMessages());
-        String category = messageClassificationService.classify(recentUserMessages).name();
+        ImMessageClassificationService.ClassificationResult classification =
+                messageClassificationService.classifyDetailed(recentUserMessages);
+        String category = classification.category().name();
         ImAutoReplyRagService.RagContext ragContext = ragService.retrieve(shopId, recentUserMessages, category);
 
         MtShop shop = shopMapper.selectById(shopId);
@@ -104,11 +107,40 @@ public class ImTestChatService {
                     triggerHit.getHighestSeverity(), rewriteCount, blocked);
         }
 
-        ImTestChatReplyVO vo = buildReplyVo(content, category, ragContext, rewriteCount, blocked, result);
-        vo.setSensitiveHit(toSensitiveHit(triggerHit));
-        vo.setDiagnostics(buildDiagnostics(shopId, recentUserMessages));
-        saveLog(shopId, StringUtils.trimToNull(param.getSessionId()), message, vo);
-        return vo;
+        // 审计始终全量落库（管理员可见）；返回体按身份裁剪。
+        ImTestChatReplyVO full = buildReplyVo(content, category, ragContext, rewriteCount, blocked, result);
+        full.setSensitiveHit(toSensitiveHit(triggerHit));
+        full.setClassificationDebug(toClassificationDebug(classification));
+        saveLog(shopId, StringUtils.trimToNull(param.getSessionId()), message, full);
+
+        if (!isAdminView()) {
+            // 普通商户只返回回复文本，不下发召回诊断/分类原始输出/命中词等调试信息。
+            ImTestChatReplyVO minimal = new ImTestChatReplyVO();
+            minimal.setReply(full.getReply());
+            return minimal;
+        }
+        full.setDiagnostics(buildDiagnostics(shopId, recentUserMessages));
+        return full;
+    }
+
+    /**
+     * 是否管理员视角：ADMIN 工作台，或总后台（未切工作台）下的超级管理员。普通商户（ORDINARY）不展示调试信息。
+     */
+    private boolean isAdminView() {
+        BackendPortalType portal = UserContext.getActivePortal();
+        return portal == BackendPortalType.ADMIN || (portal == null && UserContext.isSuperAdmin());
+    }
+
+    private ImTestChatReplyVO.ClassificationDebug toClassificationDebug(
+            ImMessageClassificationService.ClassificationResult result) {
+        if (result == null) {
+            return null;
+        }
+        ImTestChatReplyVO.ClassificationDebug debug = new ImTestChatReplyVO.ClassificationDebug();
+        debug.setRawOutput(result.rawOutput());
+        debug.setPromptSource(result.promptSource());
+        debug.setError(result.error());
+        return debug;
     }
 
     private ImTestChatReplyVO.SensitiveHit toSensitiveHit(SensitiveWordHitDTO hit) {
@@ -167,6 +199,9 @@ public class ImTestChatService {
     }
 
     public List<ImTestChatLogVO> listLogs(Long shopId) {
+        if (!isAdminView()) {
+            throw new BusinessException("无权限查看测试记录");
+        }
         return testChatLogMapper.selectByShop(shopId).stream()
                 .map(this::toLogVo)
                 .toList();

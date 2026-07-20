@@ -46,6 +46,17 @@ const parseStatusText: Record<string, string> = {
   FAILED: "解析失败",
 };
 
+const KNOWLEDGE_CATEGORY_OPTIONS = [
+  { value: "GENERAL", label: "普通类" },
+  { value: "DELIVERY", label: "配送类" },
+  { value: "AFTER_SALE", label: "售后类" },
+  { value: "OTHER", label: "其他" },
+];
+
+const knowledgeCategoryText: Record<string, string> = Object.fromEntries(
+  KNOWLEDGE_CATEGORY_OPTIONS.map((option) => [option.value, option.label]),
+);
+
 export default function MerchantKnowledgeManage() {
   const { hasPermission } = useAuth();
   const [form] = Form.useForm<KnowledgeQaParam>();
@@ -126,6 +137,7 @@ export default function MerchantKnowledgeManage() {
 
   const qaColumns: ColumnsType<KnowledgeItem> = [
     { title: "标题", dataIndex: "title", width: 180 },
+    { title: "分类", dataIndex: "category", width: 100, render: (value) => <Tag>{knowledgeCategoryText[value] || "普通类"}</Tag> },
     { title: "问题", dataIndex: "question" },
     { title: "答案", dataIndex: "answer" },
     { title: "状态", dataIndex: "enabled", width: 90, render: (value) => <Tag color={value ? "green" : "default"}>{value ? "启用" : "停用"}</Tag> },
@@ -177,7 +189,7 @@ export default function MerchantKnowledgeManage() {
               label: `知识问答（${items.length}）`,
               children: <>
                 <Space style={{ marginBottom: 12 }}>
-                  {hasPermission("knowledge:add") && <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(undefined); form.resetFields(); form.setFieldsValue({ enabled: true }); setFormOpen(true); }}>新增问答</Button>}
+                  {hasPermission("knowledge:add") && <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(undefined); form.resetFields(); form.setFieldsValue({ enabled: true, category: "GENERAL" }); setFormOpen(true); }}>新增问答</Button>}
                   {hasPermission("knowledge:delete") && <Popconfirm title="确认清空当前门店全部知识？" onConfirm={async () => { await clearKnowledge(shopId); await refresh(); }}><Button danger>清空知识库</Button></Popconfirm>}
                 </Space>
                 <Table rowKey="id" loading={loading} columns={qaColumns} dataSource={items} pagination={false} />
@@ -203,6 +215,9 @@ export default function MerchantKnowledgeManage() {
       <Modal title={editing ? "编辑知识问答" : "新增知识问答"} open={formOpen} onCancel={() => setFormOpen(false)} onOk={() => void submitQa()} destroyOnHidden>
         <Form form={form} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input maxLength={100} /></Form.Item>
+          <Form.Item name="category" label="分类" rules={[{ required: true, message: "请选择分类" }]}>
+            <Select options={KNOWLEDGE_CATEGORY_OPTIONS} placeholder="选择知识分类" />
+          </Form.Item>
           <Form.Item name="question" label="问题" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="answer" label="答案" rules={[{ required: true }]}><Input.TextArea rows={5} /></Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>

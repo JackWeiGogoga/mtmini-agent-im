@@ -3,6 +3,7 @@ import { Button, Drawer, Empty, Input, Space, Table, Tabs, Tag, Tooltip, Typogra
 import type { ColumnsType } from "antd/es/table";
 import { ClearOutlined, HistoryOutlined, SendOutlined } from "@ant-design/icons";
 import { message } from "@/components/AppMessageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { listTestChatLogs, sendTestChat } from "@/services/knowledge-api";
 import type { TestChatLog, TestChatReply } from "@/types";
 
@@ -55,6 +56,22 @@ function DebugPanel({ debug }: { debug: TestChatReply }) {
         {(debug.rewriteCount ?? 0) > 0 && <Tag color="orange">敏感词改写 {debug.rewriteCount} 次</Tag>}
         {debug.blocked && <Tag color="red">已触发安全兜底</Tag>}
       </Space>
+      {debug.classificationDebug && (
+        <div style={{ marginTop: 4, color: "rgba(0,0,0,0.45)" }}>
+          分类模型原始输出：
+          <span style={{ color: "rgba(0,0,0,0.65)" }}>
+            {debug.classificationDebug.error
+              ? "（分类调用异常，已兜底为普通类）"
+              : debug.classificationDebug.rawOutput || "（空）"}
+          </span>
+          {debug.classificationDebug.promptSource && (
+            <span>（提示词来源：{debug.classificationDebug.promptSource}）</span>
+          )}
+          {debug.classificationDebug.error && (
+            <div style={{ color: "#d4380d" }}>分类异常：{debug.classificationDebug.error}</div>
+          )}
+        </div>
+      )}
       {debug.sensitiveHit && (
         <div style={{ marginTop: 4, color: "#d4380d" }}>
           命中敏感词
@@ -128,6 +145,11 @@ function RecallDiagnostics({ diagnostics }: { diagnostics: NonNullable<TestChatR
 }
 
 export default function TestChatPanel({ shopId }: { shopId?: number }) {
+  const { currentUser } = useAuth();
+  // 仅管理员工作台（或总后台超级管理员）展示召回诊断/分类原始输出等调试信息；普通商户只看回复。
+  const isAdminView =
+    currentUser?.activePortal === "ADMIN" ||
+    (!currentUser?.activePortal && (currentUser?.roles?.includes("super_admin") ?? false));
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [sessionId, setSessionId] = useState<string>(() => newSessionId());
   const [input, setInput] = useState("");
@@ -288,9 +310,11 @@ export default function TestChatPanel({ shopId }: { shopId?: number }) {
   return (
     <>
       <Space style={{ marginBottom: 12 }}>
-        <Button icon={<HistoryOutlined />} onClick={() => void openLogs()} disabled={!shopId}>
-          查看测试记录
-        </Button>
+        {isAdminView && (
+          <Button icon={<HistoryOutlined />} onClick={() => void openLogs()} disabled={!shopId}>
+            查看测试记录
+          </Button>
+        )}
         <Button icon={<ClearOutlined />} onClick={clearConversation} disabled={turns.length === 0}>
           清空对话
         </Button>
@@ -336,7 +360,7 @@ export default function TestChatPanel({ shopId }: { shopId?: number }) {
                 >
                   {turn.content}
                 </div>
-                {turn.role === "assistant" && turn.debug && <DebugPanel debug={turn.debug} />}
+                {turn.role === "assistant" && turn.debug && isAdminView && <DebugPanel debug={turn.debug} />}
               </div>
             </div>
           ))

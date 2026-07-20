@@ -1,9 +1,12 @@
+export type KnowledgeCategory = "GENERAL" | "DELIVERY" | "AFTER_SALE" | "OTHER";
+
 export interface KnowledgeItem {
   id: number;
   shopId: number;
   title: string;
   question?: string;
   answer: string;
+  category?: KnowledgeCategory;
   enabled: boolean;
   createTime?: string;
   updateTime?: string;
@@ -46,6 +49,7 @@ export interface KnowledgeQaParam {
   title: string;
   question: string;
   answer: string;
+  category?: KnowledgeCategory;
   enabled: boolean;
 }
 
@@ -82,9 +86,16 @@ export interface TestChatSensitiveHit {
   hitCount?: number;
 }
 
+export interface TestChatClassificationDebug {
+  rawOutput?: string;
+  promptSource?: string;
+  error?: string;
+}
+
 export interface TestChatReply {
   reply: string;
   category?: string;
+  classificationDebug?: TestChatClassificationDebug;
   ragUsed?: boolean;
   ragChunkCount?: number;
   ragMaxScore?: number;

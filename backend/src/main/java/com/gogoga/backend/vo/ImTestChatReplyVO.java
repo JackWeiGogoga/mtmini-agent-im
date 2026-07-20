@@ -22,9 +22,21 @@ public class ImTestChatReplyVO {
     private List<RagHit> ragHits;
 
     /**
+     * 分类诊断：模型原始输出、prompt 来源、异常，用于排查分类为何不符合预期。
+     */
+    private ClassificationDebug classificationDebug;
+
+    /**
      * 召回诊断信息，用于排查“为何未命中”。
      */
     private Diagnostics diagnostics;
+
+    @Data
+    public static class ClassificationDebug {
+        private String rawOutput;
+        private String promptSource;
+        private String error;
+    }
 
     /**
      * 触发敏感词改写/兜底时的命中详情（未触发则为 null），仅供后台排查。
