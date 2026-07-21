@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import AppSubpageHeader from '@/components/app-subpage-header.vue'
 import AppTabbar from '@/components/app-tabbar.vue'
@@ -127,6 +127,8 @@ const historyHasMore = ref(false)
 const historyLoading = ref(false)
 const historyCursor = ref({})
 const scrollIntoView = ref('')
+// null 表示未锁；锁定时存下被冻结前的滚动位置，用于关闭时还原
+let lockedScrollTop = null
 
 const currentRows = computed(() => activeView.value === 'messages' ? messageRows.value : conversationRows.value)
 
@@ -134,6 +136,9 @@ onMounted(() => {
   reportMtH5PageView('IM_REPLY_LOG', 'TAB')
   refresh()
 })
+
+// 弹窗开着时被返回/切页销毁，body 的 fixed 会留在文档上，必须兜底解锁
+onUnmounted(unlockPageScroll)
 
 // 弹窗打开时底层列表不应再翻页/刷新：遮罩已拦住 touchmove，这里兜住各端页面事件的差异
 onPullDownRefresh(async () => {
@@ -181,6 +186,7 @@ async function loadMore() {
 async function openConversation(row) {
   selectedConversation.value = row
   detailVisible.value = true
+  lockPageScroll()
   historyRows.value = []
   historyCursor.value = {}
   historyHasMore.value = false
@@ -225,10 +231,45 @@ function closeDetail() {
   selectedConversation.value = null
   historyRows.value = []
   scrollIntoView.value = ''
+  unlockPageScroll()
 }
 
-// 挂在遮罩 touchmove 上，只为拿到 .prevent 修饰符去锁底层页面滚动
+// 挂在遮罩 touchmove 上，只为拿到 .prevent 修饰符去挡住落在遮罩/标题栏上的拖动
 function noop() {}
+
+/**
+ * 弹窗期间冻结底层页面滚动。
+ *
+ * 只靠遮罩上的 touchmove.prevent 不够：对话区是 scroll-view，它必须放行 touchmove，
+ * 而浏览器在内层滚动到边界后会把手势「链」给外层文档继续滚，表现就是底下的日志列表跟着动。
+ * 这里把文档滚动整体停掉，位置用 top 负偏移保住，关闭时再还原，滚动链就没有外层可去了。
+ */
+function lockPageScroll() {
+  if (typeof document === 'undefined' || lockedScrollTop !== null) {
+    return
+  }
+  const scroller = document.scrollingElement || document.documentElement
+  lockedScrollTop = scroller.scrollTop
+  document.body.style.position = 'fixed'
+  document.body.style.top = `-${lockedScrollTop}px`
+  document.body.style.left = '0'
+  document.body.style.right = '0'
+  document.body.style.overflow = 'hidden'
+}
+
+function unlockPageScroll() {
+  if (typeof document === 'undefined' || lockedScrollTop === null) {
+    return
+  }
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.overflow = ''
+  const scroller = document.scrollingElement || document.documentElement
+  scroller.scrollTop = lockedScrollTop
+  lockedScrollTop = null
+}
 
 function isNewSession(item, index) {
   return index === 0 || historyRows.value[index - 1]?.sessionId !== item.sessionId
@@ -282,6 +323,9 @@ function formatTime(value) {
 .detail-head { display: flex; align-items: center; justify-content: space-between; padding: 28rpx; border-bottom: 2rpx solid #f0f0f0; }
 .detail-title { display: block; color: #222; font-size: 30rpx; font-weight: 700; }.detail-subtitle { display: block; margin-top: 6rpx; color: #999; font-size: 21rpx; }.detail-close { padding: 10rpx; color: #777; font-size: 44rpx; }
 .history-scroll { height: calc(88vh - 110rpx); padding: 0 24rpx 40rpx; box-sizing: border-box; }
+/* 真正带 overflow 的是 scroll-view 内层的 .uni-scroll-view，类名挂在外层宿主上，所以要 deep 进去。
+   contain：滚到顶/底后不把手势链给外层文档，避免橡皮筋回弹时带动底层日志列表 */
+.history-scroll :deep(.uni-scroll-view) { overscroll-behavior: contain; }
 .history-tip { padding: 20rpx; text-align: center; color: #999; font-size: 21rpx; }
 .session-divider { display: flex; align-items: center; gap: 12rpx; padding: 22rpx 0; color: #aaa; font-size: 19rpx; }.session-line { flex: 1; height: 2rpx; background: #eee; }
 .bubble-row { display: flex; justify-content: flex-start; margin-bottom: 18rpx; }.bubble-row.mine { justify-content: flex-end; }
