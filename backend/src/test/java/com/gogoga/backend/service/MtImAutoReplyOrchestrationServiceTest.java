@@ -74,7 +74,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         service = new MtImAutoReplyOrchestrationService(
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
                 tokenService, authFailureHandler, lockService, contextService, messageClassificationService,
-                ragService, chatService,
+                ragService, new ShopBasicInfoPromptService(), chatService,
                 promptService, sensitiveWordService, contactSuffixService, stateService, messageClient);
         // 默认无联系方式可拼：正文原样透传，个别用例再覆盖成有联系方式的门店。
         lenient().when(contactSuffixService.append(anyLong(), anyString()))
