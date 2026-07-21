@@ -145,6 +145,20 @@
         LIMIT #{limit}
     </select>
 
+    <!--
+      会话内最近一条商家人工发言。卡片（msg_type=17）由平台推送而非真人编辑，
+      不视为人工介入，因此排除；图片等其它类型均计入。
+    -->
+    <select id="selectLatestMerchantMessageInConversation" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_im_message
+        WHERE conversation_id = #{conversationId}
+          AND sender_role = 'MERCHANT'
+          AND (msg_type IS NULL OR msg_type &lt;&gt; 17)
+        ORDER BY event_time DESC, id DESC
+        LIMIT 1
+    </select>
+
     <select id="selectAfterMessageInConversation" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
         FROM mt_im_message

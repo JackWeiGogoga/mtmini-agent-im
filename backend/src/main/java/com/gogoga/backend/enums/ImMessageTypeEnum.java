@@ -11,17 +11,19 @@ import java.util.Optional;
  */
 public enum ImMessageTypeEnum {
 
-    TEXT(1, true),
-    IMAGE(2, true),
-    OTHER(3, true),
-    CARD(17, false);
+    TEXT(1, true, true),
+    IMAGE(2, true, false),
+    OTHER(3, true, false),
+    CARD(17, false, false);
 
     private final int code;
     private final boolean sendSupported;
+    private final boolean conversational;
 
-    ImMessageTypeEnum(int code, boolean sendSupported) {
+    ImMessageTypeEnum(int code, boolean sendSupported, boolean conversational) {
         this.code = code;
         this.sendSupported = sendSupported;
+        this.conversational = conversational;
     }
 
     public int getCode() {
@@ -30,6 +32,28 @@ public enum ImMessageTypeEnum {
 
     public boolean isSendSupported() {
         return sendSupported;
+    }
+
+    /**
+     * 是否承载真实的用户话语。
+     *
+     * <p>只有此类消息才进入模型上下文、才能触发自动回复、才能顶掉一条待发送的回复。
+     * CARD 的正文是“其他消息”这类占位串，IMAGE/OTHER 也没有可用文本，把它们计入会
+     * 污染 prompt，并且会把用户真实提问的回复顶成 SUPERSEDED 后无人接手。</p>
+     */
+    public boolean isConversational() {
+        return conversational;
+    }
+
+    public static boolean isConversational(Integer code) {
+        return fromCode(code).map(ImMessageTypeEnum::isConversational).orElse(false);
+    }
+
+    /**
+     * 是否为卡片消息。卡片由平台推送而非真人编辑，因此不能视为商家的人工回复。
+     */
+    public static boolean isCard(Integer code) {
+        return code != null && CARD.code == code;
     }
 
     public static Optional<ImMessageTypeEnum> fromCode(Integer code) {

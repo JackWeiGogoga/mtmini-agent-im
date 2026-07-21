@@ -106,6 +106,8 @@ export interface TestChatReply {
   ragHits?: TestChatRagHit[];
   diagnostics?: TestChatDiagnostics;
   sensitiveHit?: TestChatSensitiveHit;
+  /** 本轮测试输入里识别出的手机号（已去分隔符） */
+  userPhones?: string[];
 }
 
 export interface TestChatLog {

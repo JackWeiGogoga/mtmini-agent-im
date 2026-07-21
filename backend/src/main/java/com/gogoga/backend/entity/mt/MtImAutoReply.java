@@ -31,6 +31,11 @@ public class MtImAutoReply {
     private Integer powerAmount;
     private Integer rewriteCount;
     private LocalDateTime generatedAt;
+
+    /**
+     * 最早可发送时间，3-10 秒随机延迟。必须落库，否则任务重排后会重新随机。
+     */
+    private LocalDateTime sendNotBefore;
     private LocalDateTime billedAt;
     private LocalDateTime sentAt;
     private String lastErrorCode;

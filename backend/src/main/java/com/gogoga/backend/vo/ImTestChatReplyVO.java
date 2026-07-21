@@ -21,6 +21,9 @@ public class ImTestChatReplyVO {
     private Integer completionTokens;
     private List<RagHit> ragHits;
 
+    /** 本轮测试输入里识别出的顾客手机号，与线上日志同一套规则，便于验证识别效果。 */
+    private List<String> userPhones;
+
     /**
      * 分类诊断：模型原始输出、prompt 来源、异常，用于排查分类为何不符合预期。
      */

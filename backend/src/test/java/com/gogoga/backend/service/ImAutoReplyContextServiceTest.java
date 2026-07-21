@@ -3,6 +3,7 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtImMessage;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
+import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.mapper.MtImMessageMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,7 @@ class ImAutoReplyContextServiceTest {
             MtImMessage message = new MtImMessage();
             message.setSenderRole(i % 2 == 0
                     ? ImMessageSenderRoleEnum.USER.name() : ImMessageSenderRoleEnum.AI.name());
+            message.setMsgType(ImMessageTypeEnum.TEXT.getCode());
             message.setMsgContentPlaintext("消息" + i);
             newestFirst.add(message);
         }
@@ -78,9 +80,26 @@ class ImAutoReplyContextServiceTest {
         assertEquals("最新", context.userMessages().get(2));
     }
 
+    @Test
+    void excludesCardMessagesFromContext() {
+        MtProperties properties = new MtProperties();
+        properties.getImAutoReply().setMaxContextChars(100000);
+        MtImMessage card = message(ImMessageSenderRoleEnum.USER, "其他消息");
+        card.setMsgType(ImMessageTypeEnum.CARD.getCode());
+        when(messageMapper.selectRecentBySession(9L, 400))
+                .thenReturn(List.of(card, message(ImMessageSenderRoleEnum.USER, "还营业吗")));
+
+        ImAutoReplyContextService.Context context =
+                new ImAutoReplyContextService(properties, messageMapper).build(9L);
+
+        assertEquals(List.of("还营业吗"), context.userMessages());
+        assertEquals(1, context.messages().size());
+    }
+
     private MtImMessage message(ImMessageSenderRoleEnum role, String content) {
         MtImMessage message = new MtImMessage();
         message.setSenderRole(role.name());
+        message.setMsgType(ImMessageTypeEnum.TEXT.getCode());
         message.setMsgContentPlaintext(content);
         return message;
     }

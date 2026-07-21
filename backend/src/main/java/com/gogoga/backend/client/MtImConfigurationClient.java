@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 美团门店 IM 配置客户端。仅封装两个固定写操作，不查询远端开关状态，也不在调用层重试。
@@ -26,13 +27,20 @@ public class MtImConfigurationClient {
     private static final int ALL_SWITCH_TYPES = 0;
     private static final int SWITCH_STATUS_DISABLED = 0;
 
+    /**
+     * SDK 的 {@code MeituanResponse#isSuccess()} 只认 {@code OP_SUCCESS}，
+     * 但 setAutoSendConfigInfo 成功时返回 {@code "0"}，会被误判为失败。
+     * 这里按 stage 显式声明额外的成功码，不全局放宽判定。
+     */
+    private static final Set<String> AUTO_SEND_CONFIG_SUCCESS_CODES = Set.of("0");
+
     private final MeituanClient meituanClient;
 
     public ImConfigurationResult enablePoiIm(String accessToken) {
         requireAccessToken(accessToken);
         SetPoiImStatusRequest request = new SetPoiImStatusRequest();
         request.setImStatus(IM_STATUS_ENABLED);
-        return invoke(request, accessToken, "SET_POI_IM_STATUS");
+        return invoke(request, accessToken, "SET_POI_IM_STATUS", Set.of());
     }
 
     public ImConfigurationResult disableAllSmartReplies(String accessToken) {
@@ -42,19 +50,20 @@ public class MtImConfigurationClient {
         status.setSwitchStatus(SWITCH_STATUS_DISABLED);
         SetAutoSendConfigInfoRequest request = new SetAutoSendConfigInfoRequest();
         request.setAllStatus(List.of(status));
-        return invoke(request, accessToken, "SET_AUTO_SEND_CONFIG");
+        return invoke(request, accessToken, "SET_AUTO_SEND_CONFIG", AUTO_SEND_CONFIG_SUCCESS_CODES);
     }
 
     private ImConfigurationResult invoke(com.meituan.sdk.MeituanRequest<String> request,
                                          String accessToken,
-                                         String stage) {
+                                         String stage,
+                                         Set<String> extraSuccessCodes) {
         try {
             MeituanResponse<String> response = meituanClient.invokeApi(request, accessToken);
             if (response == null) {
                 return ImConfigurationResult.failure(stage, "EMPTY_RESPONSE", null);
             }
             String summary = responseSummary(response);
-            if (!response.isSuccess()) {
+            if (!isSuccess(response, extraSuccessCodes)) {
                 return ImConfigurationResult.failure(
                         stage,
                         StringUtils.defaultIfBlank(response.getCode(), "UPSTREAM_FAILED"),
@@ -65,6 +74,10 @@ public class MtImConfigurationClient {
         } catch (MtSdkException e) {
             return ImConfigurationResult.failure(stage, "SDK_ERROR", null);
         }
+    }
+
+    private boolean isSuccess(MeituanResponse<?> response, Set<String> extraSuccessCodes) {
+        return response.isSuccess() || extraSuccessCodes.contains(response.getCode());
     }
 
     private void requireAccessToken(String accessToken) {

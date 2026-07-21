@@ -28,9 +28,11 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * IM 自动回复的防抖、生成、RAG、安全、计费和幂等发送编排。
@@ -40,7 +42,9 @@ import java.util.Map;
 public class MtImAutoReplyOrchestrationService {
 
     private static final String PROMPT_KEY = "IM_AUTO_REPLY_SYSTEM";
-    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史简洁、礼貌地回复；信息不足时建议联系人工客服，不得虚构。";
+    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史与门店知识片段简洁、礼貌地回复。"
+            + "联系方式、营业时间、门店地址、价格与订单进度等信息，只有知识片段中有明确内容时才可回复，"
+            + "否则说明没有确切信息并建议联系人工客服，严禁猜测或编造任何可能误导顾客的内容。";
 
     private final MtProperties mtProperties;
     private final MtImAutoReplyMapper autoReplyMapper;
@@ -54,9 +58,11 @@ public class MtImAutoReplyOrchestrationService {
     private final ImAutoReplyContextService contextService;
     private final ImMessageClassificationService messageClassificationService;
     private final ImAutoReplyRagService ragService;
+    private final ShopBasicInfoPromptService shopBasicInfoPromptService;
     private final ImAutoReplyChatService chatService;
     private final SystemPromptService systemPromptService;
     private final SensitiveWordService sensitiveWordService;
+    private final ImReplyContactSuffixService contactSuffixService;
     private final MtImAutoReplyStateService stateService;
     private final MtImMessageClient messageClient;
 
@@ -112,6 +118,9 @@ public class MtImAutoReplyOrchestrationService {
             stateService.markStatus(autoReplyId, decision.status(), decision.reason());
             return;
         }
+        // 必须排在 checkNewerMessages 之后：商家在本条之后发言属于「亲自接手本条」，
+        // 走上面的 SKIPPED 终态；此处只处理「商家在本条之前说过话」的静默窗口。
+        awaitMerchantHoldWindow(trigger);
 
         if (autoReply.getReplyMessageId() == null) {
             generateAndPersist(autoReply, trigger);
@@ -144,6 +153,7 @@ public class MtImAutoReplyOrchestrationService {
             stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.DEAD, "REPLY_MESSAGE_NOT_FOUND");
             throw new MtAsyncTaskTerminalFailureException("REPLY_MESSAGE_NOT_FOUND");
         }
+        awaitSendDelay(autoReply);
         if (ImMessageDeliveryStatusEnum.SENT.name().equals(replyMessage.getDeliveryStatus())) {
             stateService.markSent(autoReplyId);
             return;
@@ -164,15 +174,17 @@ public class MtImAutoReplyOrchestrationService {
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
                 PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+        String modelContext = shopBasicInfoPromptService.merge(
+                shopBasicInfoPromptService.build(shop), ragContext.promptContext());
 
         ImAutoReplyChatResult result = chatService.generate(
-                prompt.getContent(), ragContext.promptContext(), context.messages());
+                prompt.getContent(), modelContext, context.messages());
         String content = result.content();
         int rewriteCount = 0;
         int maxRewriteAttempts = Math.max(mtProperties.getSensitiveWord().getMaxRewriteAttempts(), 0);
         while (isSensitive(content) && rewriteCount < maxRewriteAttempts) {
             ImAutoReplyChatResult rewritten = chatService.rewrite(
-                    prompt.getContent(), ragContext.promptContext(), context.messages(), content);
+                    prompt.getContent(), modelContext, context.messages(), content);
             result = result.plusUsage(rewritten);
             content = result.content();
             rewriteCount++;
@@ -184,6 +196,7 @@ public class MtImAutoReplyOrchestrationService {
                 throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
             }
         }
+        content = contactSuffixService.append(autoReply.getShopId(), content);
         stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
                 userMessageCategory);
     }
@@ -252,6 +265,65 @@ public class MtImAutoReplyOrchestrationService {
         return null;
     }
 
+    /**
+     * 商家静默窗口：商家人工发言后的一段时间内不抢答，把接待机会留给人工。
+     *
+     * <p>能走到这里说明商家最后一次发言早于本条触发消息（更晚的发言已被
+     * {@link #checkNewerMessages} 终结为 SKIPPED），因此窗口截止时刻是一个固定的历史时间点，
+     * 只会到期、不会被推迟，单次等待上限即为 merchantHoldSeconds，不存在无限等待。</p>
+     *
+     * <p>需求所说的「滚动重新计时」由每条新顾客消息各自计算窗口自然产生，无需额外状态。</p>
+     */
+    private void awaitMerchantHoldWindow(MtImMessage trigger) {
+        long holdSeconds = mtProperties.getImAutoReply().getMerchantHoldSeconds();
+        if (holdSeconds <= 0) {
+            return;
+        }
+        MtImMessage lastMerchant =
+                messageMapper.selectLatestMerchantMessageInConversation(trigger.getConversationId());
+        if (lastMerchant == null || lastMerchant.getEventTime() == null) {
+            return;
+        }
+        LocalDateTime releaseAt = lastMerchant.getEventTime().plusSeconds(holdSeconds);
+        long waitSeconds = secondsUntil(releaseAt);
+        if (waitSeconds > 0) {
+            throw new MtAsyncTaskDryRunException("MERCHANT_HOLD_WINDOW", waitSeconds);
+        }
+    }
+
+    /**
+     * 生成后的随机发送延迟，避免秒回显得机械。
+     *
+     * <p>延迟到期时刻必须落库：任务因等待被重排后会重新执行，若每次重新随机则永远到不了发送时刻。</p>
+     */
+    private void awaitSendDelay(MtImAutoReply autoReply) {
+        LocalDateTime sendNotBefore = autoReply.getSendNotBefore();
+        if (sendNotBefore == null) {
+            sendNotBefore = stateService.assignSendNotBefore(autoReply.getId(), randomSendDelaySeconds());
+        }
+        long waitSeconds = secondsUntil(sendNotBefore);
+        if (waitSeconds > 0) {
+            throw new MtAsyncTaskDryRunException("SEND_DELAY", waitSeconds);
+        }
+    }
+
+    private long randomSendDelaySeconds() {
+        long min = Math.max(mtProperties.getImAutoReply().getSendDelayMinSeconds(), 0L);
+        long max = Math.max(mtProperties.getImAutoReply().getSendDelayMaxSeconds(), min);
+        return min == max ? min : ThreadLocalRandom.current().nextLong(min, max + 1);
+    }
+
+    /**
+     * 向上取整的剩余秒数；worker 轮询精度约 1 秒，取整可避免因不足 1 秒被判为已到期而提前发送。
+     */
+    private long secondsUntil(LocalDateTime target) {
+        if (target == null) {
+            return 0L;
+        }
+        long millis = Duration.between(LocalDateTime.now(), target).toMillis();
+        return millis <= 0 ? 0L : (millis + 999L) / 1000L;
+    }
+
     private SkipDecision checkNewerMessages(MtImMessage trigger) {
         List<MtImMessage> newer = messageMapper.selectAfterMessageInConversation(
                 trigger.getConversationId(), trigger.getId());
@@ -259,10 +331,16 @@ public class MtImAutoReplyOrchestrationService {
             return null;
         }
         for (MtImMessage message : newer) {
-            if (ImMessageSenderRoleEnum.MERCHANT.name().equals(message.getSenderRole())) {
+            // 商家侧只排除卡片：卡片由平台推送，不是人工回复。图片等其它类型仍视为人工已介入，
+            // 判错的代价是顾客同时收到人工回复和自动回复，因此这里不收窄成 isConversational
+            if (ImMessageSenderRoleEnum.MERCHANT.name().equals(message.getSenderRole())
+                    && !ImMessageTypeEnum.isCard(message.getMsgType())) {
                 return SkipDecision.skipped("MANUAL_REPLY_AFTER_TRIGGER");
             }
-            if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())) {
+            // 只有能自己触发回复的用户消息才可以顶掉本次回复；否则 CARD 之类顶掉后无人接手，
+            // 用户的提问会静默地得不到任何答复
+            if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
+                    && ImMessageTypeEnum.isConversational(message.getMsgType())) {
                 return new SkipDecision(MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
             }
         }

@@ -32,6 +32,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * 数据库异步任务 worker。
@@ -360,7 +362,9 @@ public class MtAsyncTaskWorkerTask {
             String errorSummary;
             if (taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY) {
                 errorSummary = "IM_AUTO_REPLY_EXECUTION_FAILED:" + e.getClass().getSimpleName();
-                log.error("IM自动回复任务执行失败，taskId={}, errorType={}", taskId, e.getClass().getSimpleName());
+                log.error("IM自动回复任务执行失败，taskId={}, errorType={}, rootCause={}, at={}",
+                        taskId, e.getClass().getSimpleName(),
+                        rootCauseType(e), originFrames(e));
             } else {
                 errorSummary = e.getMessage();
                 log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
@@ -371,6 +375,28 @@ public class MtAsyncTaskWorkerTask {
                 markImAutoReplyDead(task);
             }
         }
+    }
+
+    /**
+     * IM 自动回复任务禁止输出异常 message 和完整堆栈：底层 SQL/HTTP 异常的 message 可能
+     * 回显消息正文或字段值。这里只输出根因类型和本项目包内的调用位置，足以定位代码行，
+     * 不含任何业务文本。
+     */
+    private String rootCauseType(Throwable e) {
+        Throwable cause = e;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getName();
+    }
+
+    private String originFrames(Throwable e) {
+        return Arrays.stream(e.getStackTrace())
+                .filter(frame -> frame.getClassName().startsWith("com.gogoga.backend"))
+                .limit(3)
+                .map(frame -> frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1)
+                        + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                .collect(Collectors.joining(" <- "));
     }
 
     private void markImAutoReplyDead(MtAsyncTask task) {

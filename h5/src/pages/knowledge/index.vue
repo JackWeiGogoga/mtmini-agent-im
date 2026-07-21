@@ -3,6 +3,31 @@
     <app-subpage-header title="导入文档" />
 
     <view class="content">
+      <!-- 整卡可点：输入框本身只占一行里很窄的一段，只让 ✎ 或输入框可点会很难触发 -->
+      <view class="contact-card" :class="{ editing: contactPhoneEditing }" @tap="startEditContactPhone">
+        <view class="contact-row">
+          <text class="contact-icon">☏</text>
+          <text class="contact-label">联系电话：</text>
+          <input
+            class="contact-input"
+            type="text"
+            :value="contactPhoneInput"
+            :focus="contactPhoneFocus"
+            :maxlength="32"
+            placeholder="请输入号码..."
+            placeholder-class="contact-placeholder"
+            confirm-type="done"
+            @input="onContactPhoneInput"
+            @focus="contactPhoneEditing = true"
+            @blur="saveContactPhone"
+            @confirm="saveContactPhone"
+          />
+          <text v-if="savingContactPhone" class="contact-saving">保存中</text>
+          <text v-else class="contact-edit">✎</text>
+        </view>
+        <text class="contact-hint">{{ contactHint }}</text>
+      </view>
+
       <view class="upload-card">
         <view class="upload-log-entry" @tap="openUploadLogs">
           上传记录
@@ -239,11 +264,13 @@ import {
   getKnowledgeDocumentChunks,
   getKnowledgeDocuments,
   getKnowledgeQaItems,
+  getMtH5ContactPhone,
   previewKnowledgeDocument,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
   updateKnowledgeChunkEnabled,
   updateKnowledgeQaItem,
+  updateMtH5ContactPhone,
   uploadKnowledgeDocument,
 } from '@/utils/mt-auth'
 
@@ -256,6 +283,13 @@ const categoryOptions = [
 
 const qaItems = ref([])
 const documents = ref([])
+// contactPhoneSaved 存已落库的自定义号码，用于判断失焦时是否真的改过，避免无谓请求
+const contactPhoneSaved = ref('')
+const contactPhoneInput = ref('')
+const contactPhoneFallback = ref('')
+const contactPhoneEditing = ref(false)
+const contactPhoneFocus = ref(false)
+const savingContactPhone = ref(false)
 const uploading = ref(false)
 const savingQa = ref(false)
 const qaFormVisible = ref(false)
@@ -296,6 +330,16 @@ const knowledgeRows = computed(() => {
   }))
 })
 
+const contactHint = computed(() => {
+  if (!contactPhoneFallback.value) {
+    return '填写后，自动回复结尾会附上「可以联系门店 电话」'
+  }
+  if (contactPhoneSaved.value) {
+    return `自动回复结尾会附上：可以联系门店 ${contactPhoneFallback.value}`
+  }
+  return `未填写时使用门店电话：${contactPhoneFallback.value}`
+})
+
 const failedDocumentCount = computed(() => {
   return documents.value.filter((doc) => doc.parseStatus === 'FAILED').length
 })
@@ -324,6 +368,64 @@ async function refresh() {
     documents.value = docs || []
   } catch (error) {
     uni.showToast({ title: error.message || '加载失败', icon: 'none' })
+  }
+  loadContactPhone()
+}
+
+async function loadContactPhone() {
+  try {
+    applyContactPhone(await getMtH5ContactPhone())
+  } catch (error) {
+    uni.showToast({ title: error.message || '联系电话加载失败', icon: 'none' })
+  }
+}
+
+function applyContactPhone(settings) {
+  contactPhoneSaved.value = settings?.customContactPhone || ''
+  contactPhoneInput.value = contactPhoneSaved.value
+  contactPhoneFallback.value = settings?.effectiveContactPhone || ''
+}
+
+function onContactPhoneInput(event) {
+  contactPhoneInput.value = event.detail.value
+}
+
+function startEditContactPhone() {
+  if (savingContactPhone.value) {
+    return
+  }
+  contactPhoneEditing.value = true
+  contactPhoneFocus.value = true
+}
+
+async function saveContactPhone() {
+  const next = (contactPhoneInput.value || '').trim()
+  contactPhoneEditing.value = false
+  // 必须复位：uni-app 的 focus 靠 false→true 的变化触发，不复位则下次点卡片不再拉起键盘
+  contactPhoneFocus.value = false
+  if (next === contactPhoneSaved.value) {
+    contactPhoneInput.value = contactPhoneSaved.value
+    return
+  }
+  savingContactPhone.value = true
+  try {
+    applyContactPhone(await updateMtH5ContactPhone(next))
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'CONTACT_PHONE_UPDATE',
+      result: 'SUCCESS',
+      cleared: next === '',
+    })
+    uni.showToast({ title: next ? '联系电话已保存' : '已清除联系电话', icon: 'none' })
+  } catch (error) {
+    // 校验失败时回滚到已落库的值，避免页面显示一个其实没生效的号码
+    contactPhoneInput.value = contactPhoneSaved.value
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'CONTACT_PHONE_UPDATE',
+      result: 'FAILED',
+    })
+    uni.showToast({ title: error.message || '联系电话保存失败', icon: 'none' })
+  } finally {
+    savingContactPhone.value = false
   }
 }
 
@@ -747,6 +849,7 @@ function formatFileSize(value) {
   padding: 12px 16px 28px;
 }
 
+.contact-card,
 .upload-card,
 .qa-card,
 .clear-card {
@@ -754,6 +857,72 @@ function formatFileSize(value) {
   border-radius: 16px;
   box-sizing: border-box;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+}
+
+.contact-card {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.contact-card.editing {
+  border-color: #ffc300;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contact-icon {
+  flex: none;
+  color: #111111;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.contact-label {
+  flex: none;
+  color: #111111;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.contact-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  color: #111111;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.contact-placeholder {
+  color: #b6b6b6;
+  font-size: 15px;
+}
+
+.contact-edit,
+.contact-saving {
+  flex: none;
+  color: #9a9a9a;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.contact-saving {
+  font-size: 12px;
+}
+
+.contact-hint {
+  display: block;
+  margin-top: 6px;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .upload-card {

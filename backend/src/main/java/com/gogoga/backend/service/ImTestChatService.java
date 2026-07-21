@@ -13,6 +13,7 @@ import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtImTestChatLogMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.param.ImTestChatParam;
+import com.gogoga.backend.util.CustomerPhoneExtractor;
 import com.gogoga.backend.util.UserContext;
 import com.gogoga.backend.vo.ImTestChatLogVO;
 import com.gogoga.backend.vo.ImTestChatReplyVO;
@@ -38,7 +39,9 @@ import java.util.Map;
 public class ImTestChatService {
 
     private static final String PROMPT_KEY = "IM_AUTO_REPLY_SYSTEM";
-    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史简洁、礼貌地回复；信息不足时建议联系人工客服，不得虚构。";
+    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史与门店知识片段简洁、礼貌地回复。"
+            + "联系方式、营业时间、门店地址、价格与订单进度等信息，只有知识片段中有明确内容时才可回复，"
+            + "否则说明没有确切信息并建议联系人工客服，严禁猜测或编造任何可能误导顾客的内容。";
 
     /** 每个门店每日测试消息上限。 */
     static final int DAILY_LIMIT_PER_SHOP = 100;
@@ -51,9 +54,11 @@ public class ImTestChatService {
     private final MtImTestChatLogMapper testChatLogMapper;
     private final ImMessageClassificationService messageClassificationService;
     private final ImAutoReplyRagService ragService;
+    private final ShopBasicInfoPromptService shopBasicInfoPromptService;
     private final ImAutoReplyChatService chatService;
     private final SystemPromptService systemPromptService;
     private final SensitiveWordService sensitiveWordService;
+    private final ImReplyContactSuffixService contactSuffixService;
     private final KnowledgeEmbeddingService knowledgeEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
 
@@ -80,9 +85,11 @@ public class ImTestChatService {
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
                 PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+        String modelContext = shopBasicInfoPromptService.merge(
+                shopBasicInfoPromptService.build(shop), ragContext.promptContext());
 
         ImAutoReplyChatResult result = chatService.generate(
-                prompt.getContent(), ragContext.promptContext(), history);
+                prompt.getContent(), modelContext, history);
         String content = result.content();
         SensitiveWordHitDTO triggerHit = sensitiveWordService.detect(content);
         SensitiveWordHitDTO currentHit = triggerHit;
@@ -90,7 +97,7 @@ public class ImTestChatService {
         int maxRewriteAttempts = Math.max(mtProperties.getSensitiveWord().getMaxRewriteAttempts(), 0);
         while (currentHit.isHit() && rewriteCount < maxRewriteAttempts) {
             ImAutoReplyChatResult rewritten = chatService.rewrite(
-                    prompt.getContent(), ragContext.promptContext(), history, content);
+                    prompt.getContent(), modelContext, history, content);
             result = result.plusUsage(rewritten);
             content = result.content();
             currentHit = sensitiveWordService.detect(content);
@@ -101,6 +108,8 @@ public class ImTestChatService {
             content = mtProperties.getImAutoReply().getSafeFallbackReply();
             blocked = true;
         }
+        // 与线上自动回复保持一致：测试对话也要能看到结尾拼接的联系方式。
+        content = contactSuffixService.append(shopId, content);
         if (triggerHit.isHit()) {
             log.warn("测试聊天回复命中敏感词，shopId={}, operator={}, categories={}, words={}, severity={}, rewriteCount={}, blocked={}",
                     shopId, UserContext.getUserId(), triggerHit.getCategories(), triggerHit.getHitWords(),
@@ -111,6 +120,7 @@ public class ImTestChatService {
         ImTestChatReplyVO full = buildReplyVo(content, category, ragContext, rewriteCount, blocked, result);
         full.setSensitiveHit(toSensitiveHit(triggerHit));
         full.setClassificationDebug(toClassificationDebug(classification));
+        full.setUserPhones(CustomerPhoneExtractor.extract(message));
         saveLog(shopId, StringUtils.trimToNull(param.getSessionId()), message, full);
 
         if (!isAdminView()) {

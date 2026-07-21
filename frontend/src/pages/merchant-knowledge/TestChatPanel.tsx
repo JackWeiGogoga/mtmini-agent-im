@@ -56,6 +56,21 @@ function DebugPanel({ debug }: { debug: TestChatReply }) {
         {(debug.rewriteCount ?? 0) > 0 && <Tag color="orange">敏感词改写 {debug.rewriteCount} 次</Tag>}
         {debug.blocked && <Tag color="red">已触发安全兜底</Tag>}
       </Space>
+      {/* 手机号识别结果：命中与否都要显示，否则分不清「没识别到」和「没跑识别」 */}
+      <div style={{ marginTop: 4 }}>
+        {(debug.userPhones?.length ?? 0) > 0 ? (
+          <Space size={[4, 4]} wrap>
+            <span>识别到手机号：</span>
+            {debug.userPhones?.map((phone) => (
+              <Tag key={phone} color="volcano" style={{ marginInlineEnd: 0 }}>
+                <Typography.Text copyable={{ text: phone }}>{phone}</Typography.Text>
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          <span style={{ color: "rgba(0,0,0,0.45)" }}>未在本轮输入中识别到手机号</span>
+        )}
+      </div>
       {debug.classificationDebug && (
         <div style={{ marginTop: 4, color: "rgba(0,0,0,0.45)" }}>
           分类模型原始输出：

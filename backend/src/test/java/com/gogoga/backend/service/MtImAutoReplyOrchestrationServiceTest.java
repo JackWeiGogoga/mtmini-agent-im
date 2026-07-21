@@ -12,6 +12,7 @@ import com.gogoga.backend.entity.mt.MtImAutoReply;
 import com.gogoga.backend.entity.mt.MtImMessage;
 import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
+import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.enums.MtImAutoReplyStatusEnum;
 import com.gogoga.backend.mapper.MtImAutoReplyMapper;
@@ -31,9 +32,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +60,7 @@ class MtImAutoReplyOrchestrationServiceTest {
     @Mock private ImAutoReplyChatService chatService;
     @Mock private SystemPromptService promptService;
     @Mock private SensitiveWordService sensitiveWordService;
+    @Mock private ImReplyContactSuffixService contactSuffixService;
     @Mock private MtImAutoReplyStateService stateService;
     @Mock private MtImMessageClient messageClient;
 
@@ -69,8 +74,11 @@ class MtImAutoReplyOrchestrationServiceTest {
         service = new MtImAutoReplyOrchestrationService(
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
                 tokenService, authFailureHandler, lockService, contextService, messageClassificationService,
-                ragService, chatService,
-                promptService, sensitiveWordService, stateService, messageClient);
+                ragService, new ShopBasicInfoPromptService(), chatService,
+                promptService, sensitiveWordService, contactSuffixService, stateService, messageClient);
+        // 默认无联系方式可拼：正文原样透传，个别用例再覆盖成有联系方式的门店。
+        lenient().when(contactSuffixService.append(anyLong(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @Test
@@ -79,6 +87,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         MtImMessage trigger = trigger();
         MtImMessage newer = new MtImMessage();
         newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
         when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
         when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
         when(messageMapper.selectById(31L)).thenReturn(trigger);
@@ -89,6 +98,196 @@ class MtImAutoReplyOrchestrationServiceTest {
 
         verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
         verify(chatService, never()).generate(anyString(), anyString(), any());
+    }
+
+    @Test
+    void doesNotSupersedeWhenNewerUserMessageIsOnlyACard() {
+        MtImAutoReply autoReply = autoReply();
+        autoReply.setReplyMessageId(32L);
+        autoReply.setBilledAt(LocalDateTime.now());
+        autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        MtImMessage card = new MtImMessage();
+        card.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        card.setMsgType(ImMessageTypeEnum.CARD.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(card));
+        mockReadyShop();
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        // CARD 自身不会触发回复，若允许它顶掉本次回复，用户提问将永远无人应答
+        verify(stateService, never())
+                .markStatus(9L, MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void doesNotTreatMerchantCardAsManualReply() {
+        MtImAutoReply autoReply = autoReply();
+        autoReply.setReplyMessageId(32L);
+        autoReply.setBilledAt(LocalDateTime.now());
+        autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        MtImMessage merchantCard = new MtImMessage();
+        merchantCard.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchantCard.setMsgType(ImMessageTypeEnum.CARD.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchantCard));
+        mockReadyShop();
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        verify(stateService, never())
+                .markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void stillTreatsMerchantImageAsManualReply() {
+        MtImAutoReply autoReply = autoReply();
+        MtImMessage merchantImage = new MtImMessage();
+        merchantImage.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchantImage.setMsgType(ImMessageTypeEnum.IMAGE.getCode());
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchantImage));
+
+        service.execute(payload());
+
+        // 商家发图片是真实的人工介入，放行会让顾客同时收到人工回复和自动回复
+        verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+    }
+
+    @Test
+    void holdsReplyWhileMerchantSilenceWindowIsOpen() {
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        merchant.setEventTime(LocalDateTime.now().minusSeconds(10));
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply());
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(messageMapper.selectLatestMerchantMessageInConversation(11L)).thenReturn(merchant);
+
+        // 商家 10 秒前说过话，40 秒窗口未到期，任务应无损重排而非放弃
+        MtAsyncTaskDryRunException reschedule =
+                assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        assertEquals("MERCHANT_HOLD_WINDOW", reschedule.getMessage());
+        assertEquals(30L, reschedule.getRescheduleSeconds());
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+        verify(stateService, never()).markStatus(eq(9L), any(), anyString());
+    }
+
+    @Test
+    void generatesOnceMerchantSilenceWindowHasExpired() {
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        merchant.setEventTime(LocalDateTime.now().minusSeconds(41));
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        generated.setSendNotBefore(LocalDateTime.now().minusSeconds(1));
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(messageMapper.selectLatestMerchantMessageInConversation(11L)).thenReturn(merchant);
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void holdsSendUntilRandomDelayElapsesAndDoesNotRerollAfterReschedule() {
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        generated.setSendNotBefore(LocalDateTime.now().plusSeconds(5));
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+
+        MtAsyncTaskDryRunException reschedule =
+                assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        assertEquals("SEND_DELAY", reschedule.getMessage());
+        verify(messageClient, never()).sendTwoPartyMessage(anyString(), any());
+        // sendNotBefore 已落库，重排后不得重新随机
+        verify(stateService, never()).assignSendNotBefore(anyLong(), anyLong());
+    }
+
+    @Test
+    void assignsSendDelayWithinConfiguredBoundsOnFirstAttempt() {
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(stateService.assignSendNotBefore(eq(9L), anyLong()))
+                .thenAnswer(call -> LocalDateTime.now().plusSeconds(call.getArgument(1, Long.class)));
+
+        assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        ArgumentCaptor<Long> delay = ArgumentCaptor.forClass(Long.class);
+        verify(stateService).assignSendNotBefore(eq(9L), delay.capture());
+        assertTrue(delay.getValue() >= 3L && delay.getValue() <= 10L,
+                "随机延迟应落在配置的 3-10 秒区间，实际=" + delay.getValue());
     }
 
     @Test
@@ -115,6 +314,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         when(messageMapper.selectById(31L)).thenReturn(trigger);
         MtImMessage newer = new MtImMessage();
         newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
         when(messageMapper.selectAfterMessageInConversation(11L, 31L))
                 .thenReturn(List.of())
                 .thenReturn(List.of(newer));
@@ -145,6 +345,47 @@ class MtImAutoReplyOrchestrationServiceTest {
         verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("安全答复"), usage.capture(), any(), eq(1), eq("GENERAL"));
         assertEquals(15, usage.getValue().promptTokens());
         assertEquals(3, usage.getValue().completionTokens());
+    }
+
+    @Test
+    void persistsReplyWithShopContactSuffix() {
+        MtImAutoReply pending = autoReply();
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending, pending, generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        MtImMessage trigger = trigger();
+        trigger.setMsgContentPlaintext("问题");
+        when(messageMapper.selectById(31L)).thenReturn(trigger);
+        MtImMessage newer = new MtImMessage();
+        newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L))
+                .thenReturn(List.of())
+                .thenReturn(List.of(newer));
+        mockReadyShop();
+        when(contextService.build(21L)).thenReturn(new ImAutoReplyContextService.Context(
+                List.of(new ImAutoReplyChatMessage("user", "问题")), List.of("问题")));
+        when(messageClassificationService.classify(List.of("问题")))
+                .thenReturn(com.gogoga.backend.enums.KnowledgeCategoryEnum.GENERAL);
+        when(ragService.retrieve(1L, List.of("问题"), "GENERAL"))
+                .thenReturn(ImAutoReplyRagService.RagContext.empty());
+        ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
+        prompt.setContent("系统");
+        when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
+        when(chatService.generate(eq("系统"), eq(""), any()))
+                .thenReturn(new ImAutoReplyChatResult("答复", 10, 2));
+        SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
+        safe.setHit(false);
+        when(sensitiveWordService.detect("答复")).thenReturn(safe);
+        when(contactSuffixService.append(1L, "答复")).thenReturn("答复\n可以联系门店 400-820-8820");
+
+        service.execute(payload());
+
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n可以联系门店 400-820-8820"),
+                any(), any(), eq(0), eq("GENERAL"));
     }
 
     @Test

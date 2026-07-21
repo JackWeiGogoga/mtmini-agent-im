@@ -8,6 +8,7 @@ import com.gogoga.backend.mapper.MtImConversationMapper;
 import com.gogoga.backend.mapper.MtImReplyQueryMapper;
 import com.gogoga.backend.param.ImAutoReplyLogQueryParam;
 import com.gogoga.backend.param.ImConversationQueryParam;
+import com.gogoga.backend.util.CustomerPhoneExtractor;
 import com.gogoga.backend.vo.ImAutoReplyLogVO;
 import com.gogoga.backend.vo.ImConversationHistoryPageVO;
 import com.gogoga.backend.vo.ImConversationListVO;
@@ -43,7 +44,12 @@ public class ImReplyLogQueryService {
         query.setShopKeyword(StringUtils.trimToNull(query.getShopKeyword()));
         query.setStatus(StringUtils.upperCase(StringUtils.trimToNull(query.getStatus())));
         PageHelper.startPage(normalizePageNum(query.getPageNum()), normalizePageSize(query.getPageSize()));
-        return new PageInfo<>(queryMapper.selectReplyLogs(query));
+        List<ImAutoReplyLogVO> rows = queryMapper.selectReplyLogs(query);
+        // 查询时实时识别，历史日志不用回刷；正则调整后旧数据也会跟着变。
+        for (ImAutoReplyLogVO row : rows) {
+            row.setUserPhones(CustomerPhoneExtractor.extract(row.getUserContent()));
+        }
+        return new PageInfo<>(rows);
     }
 
     public PageInfo<ImConversationListVO> listConversations(ImConversationQueryParam param, Long forcedShopId) {

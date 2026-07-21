@@ -63,6 +63,8 @@ public class MtImAutoReplyStateService {
         message.setReplyToMessageId(autoReply.getTriggerMessageId());
         message.setAutoReplyId(autoReply.getId());
         message.setDeliveryStatus(ImMessageDeliveryStatusEnum.GENERATED.name());
+        // AI 生成的消息不来自美团回调，没有签名可验；sign_verified 为 NOT NULL，不能留空
+        message.setSignVerified(false);
         message.setEventTime(now);
         message.setBizType(1);
         message.setPlatformMsgId(autoReply.getOutboundMessageId());
@@ -146,6 +148,23 @@ public class MtImAutoReplyStateService {
                     autoReply.getReplyMessageId(), ImMessageDeliveryStatusEnum.FAILED.name(),
                     reason, reason, now);
         }
+    }
+
+    /**
+     * 固化随机发送延迟的到期时刻。已有值时直接返回，保证任务重排后不会重新随机。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public LocalDateTime assignSendNotBefore(Long autoReplyId, long delaySeconds) {
+        MtImAutoReply autoReply = requireAutoReply(autoReplyId);
+        if (autoReply.getSendNotBefore() != null) {
+            return autoReply.getSendNotBefore();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sendNotBefore = now.plusSeconds(Math.max(delaySeconds, 0L));
+        autoReply.setSendNotBefore(sendNotBefore);
+        autoReply.setUpdateTime(now);
+        autoReplyMapper.update(autoReply);
+        return sendNotBefore;
     }
 
     @Transactional(rollbackFor = Exception.class)

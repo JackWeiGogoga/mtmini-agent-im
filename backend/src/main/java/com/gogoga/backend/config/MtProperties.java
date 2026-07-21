@@ -91,7 +91,13 @@ public class MtProperties {
         /**
          * 是否阻断全部美团 SDK 出站调用。安全起见默认开启。
          */
-        private boolean dryRun = true;
+        private boolean dryRun = false;
+
+        /**
+         * 是否单独阻断 IM 消息发送调用。在总开关之上额外收紧，默认关闭；
+         * 总开关开启时 IM 发送同样被阻断，与此开关取值无关。
+         */
+        private boolean imSendDryRun = true;
 
         /**
          * 数据库异步任务因 dry run 跳过后的无损重排秒数。
@@ -105,6 +111,23 @@ public class MtProperties {
          * 美团 IM 消息 AES 密钥，UTF-8 编码必须恰好 16 字节。
          */
         private String secret;
+
+        /**
+         * IM 回调携带的 businessId。
+         *
+         * <p>与 OAuth / token 刷新 / H5 鉴权使用的 {@code mt.business-id} 不是同一个值：
+         * 后者是外卖业务线（16），而 IM 回调走独立业务线（2）。两者必须分开配置，
+         * 否则改动一侧会连带破坏另一侧。</p>
+         */
+        private Integer callbackBusinessId = 2;
+
+        /**
+         * 验签失败时是否输出完整原始回调参数。默认关闭。
+         *
+         * <p>开启后日志会包含消息密文和完整 sign，只应在测试门店联调期间短暂启用，
+         * 排查结束必须关回 false。</p>
+         */
+        private boolean callbackDebugLog = false;
     }
 
     @Data
@@ -129,6 +152,22 @@ public class MtProperties {
          * 连续用户消息防抖时间。
          */
         private long debounceMillis = 2000L;
+
+        /**
+         * 商家人工发言后的静默等待秒数。该窗口内不抢答，把接待机会留给人工；
+         * 窗口到期且商家未继续跟进时，AI 接管回复。
+         */
+        private long merchantHoldSeconds = 40L;
+
+        /**
+         * 回复生成后的随机发送延迟下限秒数，避免秒回显得机械。
+         */
+        private long sendDelayMinSeconds = 3L;
+
+        /**
+         * 回复生成后的随机发送延迟上限秒数。
+         */
+        private long sendDelayMaxSeconds = 10L;
 
         /**
          * 模型上下文中消息正文的最大字符预算。

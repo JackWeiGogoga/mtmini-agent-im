@@ -12,11 +12,26 @@
         <view v-if="!messageRows.length && !loading" class="empty-card">暂无自动回复记录</view>
         <view v-for="row in messageRows" :key="row.autoReplyId" class="reply-card" @tap="openConversation(row)">
           <view class="card-head">
-            <view>
-              <text class="customer">顾客 {{ row.openUserId || '-' }}</text>
-              <text class="order">订单 {{ row.orderId || 0 }}</text>
-            </view>
+            <text class="customer">顾客 {{ row.openUserId || '-' }}</text>
             <text class="status" :class="statusClass(row.status)">{{ statusText(row.status) }}</text>
+          </view>
+          <!-- 订单号与手机号是商家最常要抄走的信息，单独成行并支持点按复制；卡片本身是打开对话的，这里要 stop 掉冒泡 -->
+          <view v-if="row.orderId || row.userPhones?.length" class="contact-row" @tap.stop>
+            <view v-if="row.orderId" class="chip order-chip" @tap.stop="copyValue(row.orderId, '订单号')">
+              <text class="chip-label">订单</text>
+              <text class="chip-value">{{ row.orderId }}</text>
+              <text class="chip-copy">复制</text>
+            </view>
+            <view
+              v-for="phone in row.userPhones || []"
+              :key="phone"
+              class="chip phone-chip"
+              @tap.stop="copyValue(phone, '手机号')"
+            >
+              <text class="chip-label">手机</text>
+              <text class="chip-value">{{ phone }}</text>
+              <text class="chip-copy">复制</text>
+            </view>
           </view>
           <view class="message-block user-block">
             <text class="role">顾客消息</text>
@@ -58,7 +73,8 @@
       <view v-else-if="!hasMore && currentRows.length" class="loading-text">已加载全部</view>
     </view>
 
-    <view v-if="detailVisible" class="detail-mask" @tap="closeDetail">
+    <!-- 弹窗打开时锁住底层页面滚动；对话区域自己 stop 掉 touchmove，不会被这里的 prevent 拦住 -->
+    <view v-if="detailVisible" class="detail-mask" @tap="closeDetail" @touchmove.stop.prevent="noop">
       <view class="detail-panel" @tap.stop>
         <view class="detail-head">
           <view>
@@ -73,6 +89,7 @@
           :scroll-into-view="scrollIntoView"
           :upper-threshold="80"
           @scrolltoupper="loadOlderHistory"
+          @touchmove.stop
         >
           <view v-if="historyHasMore" class="history-tip">{{ historyLoading ? '正在加载...' : '向上滑动加载更早消息' }}</view>
           <view v-for="(item, index) in historyRows" :id="`msg-${item.id}`" :key="item.id">
@@ -99,7 +116,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import AppSubpageHeader from '@/components/app-subpage-header.vue'
 import AppTabbar from '@/components/app-tabbar.vue'
@@ -125,6 +142,8 @@ const historyHasMore = ref(false)
 const historyLoading = ref(false)
 const historyCursor = ref({})
 const scrollIntoView = ref('')
+// null 表示未锁；锁定时存下被冻结前的滚动位置，用于关闭时还原
+let lockedScrollTop = null
 
 const currentRows = computed(() => activeView.value === 'messages' ? messageRows.value : conversationRows.value)
 
@@ -133,13 +152,17 @@ onMounted(() => {
   refresh()
 })
 
+// 弹窗开着时被返回/切页销毁，body 的 fixed 会留在文档上，必须兜底解锁
+onUnmounted(unlockPageScroll)
+
+// 弹窗打开时底层列表不应再翻页/刷新：遮罩已拦住 touchmove，这里兜住各端页面事件的差异
 onPullDownRefresh(async () => {
-  await refresh()
+  if (!detailVisible.value) await refresh()
   uni.stopPullDownRefresh()
 })
 
 onReachBottom(() => {
-  if (hasMore.value && !loading.value) loadMore()
+  if (!detailVisible.value && hasMore.value && !loading.value) loadMore()
 })
 
 async function switchView(value) {
@@ -178,6 +201,7 @@ async function loadMore() {
 async function openConversation(row) {
   selectedConversation.value = row
   detailVisible.value = true
+  lockPageScroll()
   historyRows.value = []
   historyCursor.value = {}
   historyHasMore.value = false
@@ -222,6 +246,44 @@ function closeDetail() {
   selectedConversation.value = null
   historyRows.value = []
   scrollIntoView.value = ''
+  unlockPageScroll()
+}
+
+// 挂在遮罩 touchmove 上，只为拿到 .prevent 修饰符去挡住落在遮罩/标题栏上的拖动
+function noop() {}
+
+/**
+ * 弹窗期间冻结底层页面滚动。
+ *
+ * 只靠遮罩上的 touchmove.prevent 不够：对话区是 scroll-view，它必须放行 touchmove，
+ * 而浏览器在内层滚动到边界后会把手势「链」给外层文档继续滚，表现就是底下的日志列表跟着动。
+ * 这里把文档滚动整体停掉，位置用 top 负偏移保住，关闭时再还原，滚动链就没有外层可去了。
+ */
+function lockPageScroll() {
+  if (typeof document === 'undefined' || lockedScrollTop !== null) {
+    return
+  }
+  const scroller = document.scrollingElement || document.documentElement
+  lockedScrollTop = scroller.scrollTop
+  document.body.style.position = 'fixed'
+  document.body.style.top = `-${lockedScrollTop}px`
+  document.body.style.left = '0'
+  document.body.style.right = '0'
+  document.body.style.overflow = 'hidden'
+}
+
+function unlockPageScroll() {
+  if (typeof document === 'undefined' || lockedScrollTop === null) {
+    return
+  }
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.overflow = ''
+  const scroller = document.scrollingElement || document.documentElement
+  scroller.scrollTop = lockedScrollTop
+  lockedScrollTop = null
 }
 
 function isNewSession(item, index) {
@@ -250,6 +312,18 @@ function statusClass(status) {
 function formatTime(value) {
   return value ? String(value).replace('T', ' ').slice(0, 19) : '-'
 }
+
+function copyValue(value, label) {
+  const text = String(value ?? '').trim()
+  if (!text) return
+  uni.setClipboardData({
+    data: text,
+    // 关掉 uni 自带的「内容已复制」，换成带字段名的提示，避免两个 toast 互相顶掉
+    showToast: false,
+    success: () => uni.showToast({ title: `${label}已复制`, icon: 'none' }),
+    fail: () => uni.showToast({ title: '复制失败，请长按手动选择', icon: 'none' }),
+  })
+}
 </script>
 
 <style scoped>
@@ -262,9 +336,16 @@ function formatTime(value) {
 .reply-card, .conversation-card { margin-bottom: 22rpx; padding: 24rpx; border-radius: 22rpx; background: #fff; box-shadow: 0 8rpx 28rpx rgba(0,0,0,.04); }
 .card-head, .conversation-head, .card-foot, .role-line, .conversation-meta { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
 .customer { display: block; color: #242424; font-size: 28rpx; font-weight: 700; }
-.order, .time { display: block; margin-top: 4rpx; color: #9a9a9a; font-size: 21rpx; }
+.time { display: block; margin-top: 4rpx; color: #9a9a9a; font-size: 21rpx; }
 .status { padding: 7rpx 14rpx; border-radius: 999rpx; font-size: 21rpx; }
 .status.success { color: #198754; background: #eaf8f0; }.status.failed { color: #d9363e; background: #fff0f0; }.status.pending { color: #9a6b00; background: #fff7dc; }.status.muted { color: #777; background: #f0f0f0; }
+.contact-row { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.chip { display: flex; align-items: center; gap: 8rpx; padding: 8rpx 14rpx; border-radius: 999rpx; font-size: 22rpx; }
+.order-chip { color: #2f5fbf; background: #eaf1ff; }
+.phone-chip { color: #b34a1a; background: #fdeee4; }
+.chip-label { opacity: .7; }
+.chip-value { font-weight: 700; font-family: monospace; letter-spacing: .5rpx; }
+.chip-copy { padding-left: 8rpx; border-left: 2rpx solid currentColor; opacity: .6; }
 .message-block { margin-top: 18rpx; padding: 20rpx; border-radius: 16rpx; }.user-block { background: #f3f7ff; }.ai-block { background: #faf7ff; }
 .role { color: #356ac3; font-size: 22rpx; font-weight: 700; }.ai-role { color: #7651b5; }.rag-tag { padding: 4rpx 10rpx; border-radius: 999rpx; color: #356ac3; background: #eaf2ff; font-size: 19rpx; }
 .message-text { display: block; margin-top: 10rpx; color: #333; font-size: 27rpx; line-height: 1.55; white-space: pre-wrap; }
@@ -276,6 +357,9 @@ function formatTime(value) {
 .detail-head { display: flex; align-items: center; justify-content: space-between; padding: 28rpx; border-bottom: 2rpx solid #f0f0f0; }
 .detail-title { display: block; color: #222; font-size: 30rpx; font-weight: 700; }.detail-subtitle { display: block; margin-top: 6rpx; color: #999; font-size: 21rpx; }.detail-close { padding: 10rpx; color: #777; font-size: 44rpx; }
 .history-scroll { height: calc(88vh - 110rpx); padding: 0 24rpx 40rpx; box-sizing: border-box; }
+/* 真正带 overflow 的是 scroll-view 内层的 .uni-scroll-view，类名挂在外层宿主上，所以要 deep 进去。
+   contain：滚到顶/底后不把手势链给外层文档，避免橡皮筋回弹时带动底层日志列表 */
+.history-scroll :deep(.uni-scroll-view) { overscroll-behavior: contain; }
 .history-tip { padding: 20rpx; text-align: center; color: #999; font-size: 21rpx; }
 .session-divider { display: flex; align-items: center; gap: 12rpx; padding: 22rpx 0; color: #aaa; font-size: 19rpx; }.session-line { flex: 1; height: 2rpx; background: #eee; }
 .bubble-row { display: flex; justify-content: flex-start; margin-bottom: 18rpx; }.bubble-row.mine { justify-content: flex-end; }

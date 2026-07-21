@@ -165,7 +165,8 @@ mt:
   business-id: ${MT_BUSINESS_ID:16}
   callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aic.waimaidashi.com/#/}
   api:
-    dry-run: ${MT_API_DRY_RUN:true}
+    dry-run: ${MT_API_DRY_RUN:false}
+    im-send-dry-run: ${MT_API_IM_SEND_DRY_RUN:false}
     dry-run-reschedule-seconds: ${MT_API_DRY_RUN_RESCHEDULE_SECONDS:3600}
   h5:
     app-key: ${MT_H5_APP_KEY:}
@@ -228,11 +229,16 @@ mt:
       max-backoff-seconds: ${MT_ASYNC_TASK_IM_AUTO_REPLY_MAX_BACKOFF_SECONDS:300}
   im:
     secret: ${MT_IM_SECRET:}
+    callback-business-id: ${MT_IM_CALLBACK_BUSINESS_ID:2}
+    callback-debug-log: ${MT_IM_CALLBACK_DEBUG_LOG:false}
   im-auto-reply:
     enabled: ${MT_IM_AUTO_REPLY_ENABLED:false}
     session-idle-minutes: ${MT_IM_AUTO_REPLY_SESSION_IDLE_MINUTES:30}
     history-max-rounds: ${MT_IM_AUTO_REPLY_HISTORY_MAX_ROUNDS:100}
     debounce-millis: ${MT_IM_AUTO_REPLY_DEBOUNCE_MILLIS:2000}
+    merchant-hold-seconds: ${MT_IM_AUTO_REPLY_MERCHANT_HOLD_SECONDS:40}
+    send-delay-min-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MIN_SECONDS:3}
+    send-delay-max-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MAX_SECONDS:10}
     max-context-chars: ${MT_IM_AUTO_REPLY_MAX_CONTEXT_CHARS:24000}
     max-completion-tokens: ${MT_IM_AUTO_REPLY_MAX_COMPLETION_TOKENS:512}
     temperature: ${MT_IM_AUTO_REPLY_TEMPERATURE:0.3}
