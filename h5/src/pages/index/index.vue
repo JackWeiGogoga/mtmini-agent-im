@@ -108,7 +108,11 @@
             >
           </view>
 
-          <view class="broadcast-entry" @tap="openBroadcastDialog">
+          <view
+            class="broadcast-entry"
+            :class="{ 'broadcast-entry-disabled': !broadcastRightGranted }"
+            @tap="openBroadcastDialog"
+          >
             <view class="broadcast-entry-copy">
               <text class="broadcast-entry-title">消息群发</text>
               <text class="broadcast-entry-count"
@@ -581,6 +585,8 @@ export default {
       broadcastSubmitting: false,
       broadcastConfigured: false,
       broadcastTotalSentCount: 0,
+      // 默认放行：接口数据回来前不置灰，避免首屏闪一下灰态。
+      broadcastRightGranted: true,
       weekDayPanelVisible: false,
       repeatModePanelVisible: false,
       timePanelVisible: false,
@@ -921,6 +927,8 @@ export default {
       this.broadcastTotalSentCount = Number(
         broadcastSetting.totalSentCount || 0,
       );
+      // 只有后端明确回 false 才置灰，字段缺失时按放行处理。
+      this.broadcastRightGranted = broadcastSetting.rightGranted !== false;
       this.form = {
         weekDays: Array.isArray(broadcastSetting.weekDays)
           ? [...broadcastSetting.weekDays]
@@ -931,6 +939,13 @@ export default {
       };
     },
     openBroadcastDialog() {
+      if (!this.broadcastRightGranted) {
+        uni.showToast({
+          title: "当前版本不支持消息群发，请升级后使用",
+          icon: "none",
+        });
+        return;
+      }
       this.closeBroadcastPanels();
       this.broadcastDialogVisible = true;
     },
@@ -1792,6 +1807,11 @@ export default {
   margin: 24rpx -28rpx -28rpx;
   padding: 24rpx 28rpx;
   overflow: hidden;
+}
+
+/* 置灰但不隐藏：入口仍可点，点击后提示升级，让商家知道有这个能力。 */
+.broadcast-entry-disabled {
+  opacity: 0.6;
 }
 
 .broadcast-entry-copy {

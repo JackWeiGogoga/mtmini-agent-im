@@ -53,4 +53,11 @@ public class ImBroadcastSettingVO {
      * 累计成功群发条数，首页「已群发N条」取此值。
      */
     private Long totalSentCount;
+
+    /**
+     * 当前门店权益是否包含群发能力。
+     *
+     * <p>为 false 时 H5 把群发入口置灰并提示升级；后端保存接口同样会拒绝，前端置灰只是体验层。</p>
+     */
+    private Boolean rightGranted;
 }

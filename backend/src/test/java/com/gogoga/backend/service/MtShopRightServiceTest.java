@@ -303,6 +303,66 @@ class MtShopRightServiceTest {
         assertNull(result);
     }
 
+    @Test
+    void shouldGrantAutoReplyButNotBroadcastForAutoReplyOnlyRight() {
+        when(mtShopRightMapper.selectByShopId(41L))
+                .thenReturn(List.of(activeRight(41L, MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY)));
+
+        assertTrue(mtShopRightService.hasAutoReplyRight(41L));
+        assertFalse(mtShopRightService.hasBroadcastRight(41L));
+    }
+
+    @Test
+    void shouldGrantBothCapabilitiesForPromotionRight() {
+        when(mtShopRightMapper.selectByShopId(42L))
+                .thenReturn(List.of(activeRight(42L, MtShopRightCodeConstant.H5_PROMOTION)));
+
+        assertTrue(mtShopRightService.hasAutoReplyRight(42L));
+        assertTrue(mtShopRightService.hasBroadcastRight(42L));
+    }
+
+    @Test
+    void shouldDenyBothCapabilitiesOnceAutoReplyOnlyRightExpired() {
+        MtShopRight expired = activeRight(43L, MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY);
+        expired.setExpireAt(LocalDateTime.now().minusMinutes(1));
+        when(mtShopRightMapper.selectByShopId(43L)).thenReturn(List.of(expired));
+
+        assertFalse(mtShopRightService.hasAutoReplyRight(43L));
+        assertFalse(mtShopRightService.hasBroadcastRight(43L));
+    }
+
+    @Test
+    void shouldKeepBroadcastUntilPromotionRightExpiresEvenWhenAutoReplyOnlyIsHeld() {
+        // 版本切换后两条权益并存：群发能力跟着 H5_PROMOTION 自己的到期时间走。
+        MtShopRight expiredPromotion = activeRight(44L, MtShopRightCodeConstant.H5_PROMOTION);
+        expiredPromotion.setExpireAt(LocalDateTime.now().minusMinutes(1));
+        when(mtShopRightMapper.selectByShopId(44L)).thenReturn(List.of(
+                expiredPromotion, activeRight(44L, MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY)));
+
+        assertTrue(mtShopRightService.hasAutoReplyRight(44L));
+        assertFalse(mtShopRightService.hasBroadcastRight(44L));
+    }
+
+    @Test
+    void shouldShowAutoReplyOnlyRightOnHomepageMembership() {
+        when(mtShopRightMapper.selectByShopId(45L))
+                .thenReturn(List.of(activeRight(45L, MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY)));
+
+        MtShopRight result = mtShopRightService.findHomepageActiveRight(45L);
+
+        // 不纳入会员卡的话，只持有该权益的门店首页会拿不到有效期。
+        assertEquals(MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY, result.getServiceCode());
+    }
+
+    private MtShopRight activeRight(Long shopId, String serviceCode) {
+        MtShopRight right = new MtShopRight();
+        right.setShopId(shopId);
+        right.setServiceCode(serviceCode);
+        right.setType(2);
+        right.setExpireAt(LocalDateTime.now().plusDays(30));
+        return right;
+    }
+
     private MtAppOrder buildOrder(Long shopId, String orderId, String version, Integer days, LocalDateTime expireAt) {
         MtAppOrder order = new MtAppOrder();
         order.setShopId(shopId);

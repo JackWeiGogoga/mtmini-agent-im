@@ -1,9 +1,7 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
 import com.gogoga.backend.dto.ImAutoReplyChatResult;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.dto.SensitiveWordHitDTO;
@@ -311,8 +309,7 @@ public class MtImAutoReplyOrchestrationService {
         if (!settingsService.isAutoReplyEnabled(shopId)) {
             return SkipDecision.skipped("SHOP_SWITCH_DISABLED");
         }
-        if (!shopRightService.hasShopRight(shopId, RequiresShopRight.Logical.OR,
-                MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION)) {
+        if (!shopRightService.hasAutoReplyRight(shopId)) {
             return SkipDecision.skipped("SHOP_RIGHT_MISSING");
         }
         MtAccessToken token = accessTokenService.findByShopId(shopId);

@@ -52,9 +52,12 @@ public class MtImBroadcastSettingService {
     private final MtImBroadcastSettingHistoryMapper historyMapper;
     private final SensitiveWordService sensitiveWordService;
     private final MtProperties mtProperties;
+    private final MtShopRightService shopRightService;
 
     public ImBroadcastSettingVO getSettings(Long shopId) {
-        return toVO(shopId, settingMapper.selectByShopId(shopId));
+        ImBroadcastSettingVO vo = toVO(shopId, settingMapper.selectByShopId(shopId));
+        vo.setRightGranted(shopRightService.hasBroadcastRight(shopId));
+        return vo;
     }
 
     /**
@@ -64,6 +67,10 @@ public class MtImBroadcastSettingService {
     public ImBroadcastSettingVO saveSettings(Long shopId, ImBroadcastSettingUpdateParam param, String changeSource) {
         if (shopId == null) {
             throw new BusinessException("门店ID不能为空");
+        }
+        // 前端置灰只是体验层，接口仍可被直接调用，权益必须在这里兜住。
+        if (!shopRightService.hasBroadcastRight(shopId)) {
+            throw new BusinessException("当前版本不支持消息群发，请升级后使用");
         }
         String weekDays = normalizeWeekDays(param.getWeekDays());
         ImBroadcastRepeatModeEnum repeatMode = ImBroadcastRepeatModeEnum.fromName(param.getRepeatMode())
@@ -97,6 +104,8 @@ public class MtImBroadcastSettingService {
             throw new BusinessException("保存群发配置失败");
         }
         ImBroadcastSettingVO after = toVO(shopId, setting);
+        // H5 直接用保存响应刷新入口状态，这里不回填的话保存成功后入口会瞬间变灰。
+        after.setRightGranted(true);
         appendHistory(setting, CHANGE_TYPE_SAVE, changeSource, before, after, now);
         log.info("门店群发配置已保存，shopId={}, weekDays={}, repeatMode={}, sendTime={}",
                 shopId, weekDays, repeatMode.name(), sendTime);

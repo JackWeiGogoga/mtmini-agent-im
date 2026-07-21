@@ -3,6 +3,7 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtImBroadcastSetting;
 import com.gogoga.backend.entity.mt.MtImBroadcastSettingHistory;
+import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtImBroadcastSettingHistoryMapper;
 import com.gogoga.backend.mapper.MtImBroadcastSettingMapper;
 import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
@@ -24,6 +25,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,12 +40,15 @@ class MtImBroadcastSettingServiceTest {
     @Mock private MtImBroadcastSettingMapper settingMapper;
     @Mock private MtImBroadcastSettingHistoryMapper historyMapper;
     @Mock private SensitiveWordService sensitiveWordService;
+    @Mock private MtShopRightService shopRightService;
 
     private MtImBroadcastSettingService service;
 
     @BeforeEach
     void setUp() {
-        service = new MtImBroadcastSettingService(settingMapper, historyMapper, sensitiveWordService, new MtProperties());
+        service = new MtImBroadcastSettingService(settingMapper, historyMapper, sensitiveWordService,
+                new MtProperties(), shopRightService);
+        when(shopRightService.hasBroadcastRight(anyLong())).thenReturn(true);
     }
 
     private ImBroadcastSettingUpdateParam param(LocalTime sendTime) {
@@ -217,5 +222,31 @@ class MtImBroadcastSettingServiceTest {
         service.deleteSettings(100L, MtImBroadcastSettingService.CHANGE_SOURCE_ADMIN);
 
         verify(historyMapper, never()).insert(any());
+    }
+
+    @Test
+    void rejectsSaveWhenShopHasNoBroadcastRight() {
+        when(shopRightService.hasBroadcastRight(100L)).thenReturn(false);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.saveSettings(100L, param(LocalTime.of(10, 0)),
+                        MtImBroadcastSettingService.CHANGE_SOURCE_H5));
+
+        assertEquals("当前版本不支持消息群发，请升级后使用", error.getMessage());
+        // 只含自动回复权益的门店，配置必须一行都写不进去。
+        verify(settingMapper, never()).insert(any());
+        verify(settingMapper, never()).update(any());
+        verify(historyMapper, never()).insert(any());
+    }
+
+    @Test
+    void exposesRightGrantedFlagForH5() {
+        when(settingMapper.selectByShopId(100L)).thenReturn(stored(true));
+        when(shopRightService.hasBroadcastRight(100L)).thenReturn(false);
+
+        assertFalse(service.getSettings(100L).getRightGranted());
+
+        when(shopRightService.hasBroadcastRight(100L)).thenReturn(true);
+        assertTrue(service.getSettings(100L).getRightGranted());
     }
 }

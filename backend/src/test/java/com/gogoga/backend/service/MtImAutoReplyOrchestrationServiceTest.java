@@ -1,6 +1,5 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.dto.ImAutoReplyChatMessage;
@@ -505,7 +504,7 @@ class MtImAutoReplyOrchestrationServiceTest {
 
     private void mockReadyShop() {
         when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
-        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR), any(), any())).thenReturn(true);
+        when(rightService.hasAutoReplyRight(1L)).thenReturn(true);
         MtAccessToken token = new MtAccessToken();
         token.setAccessToken("token");
         token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());

@@ -1,8 +1,6 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtImAutoReply;
 import com.gogoga.backend.entity.mt.MtImMessage;
@@ -21,6 +19,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+
 /**
  * 在 IM 入库事务内创建自动回复事实和数据库异步任务。
  */
@@ -103,11 +102,7 @@ public class MtImAutoReplyEnqueueService {
         if (!shopOperationSettingsService.isAutoReplyEnabled(message.getShopId())) {
             return false;
         }
-        if (!mtShopRightService.hasShopRight(
-                message.getShopId(),
-                RequiresShopRight.Logical.OR,
-                MtShopRightCodeConstant.VIP_CODE,
-                MtShopRightCodeConstant.H5_PROMOTION)) {
+        if (!mtShopRightService.hasAutoReplyRight(message.getShopId())) {
             return false;
         }
         MtAccessToken token = mtAccessTokenService.findByShopId(message.getShopId());

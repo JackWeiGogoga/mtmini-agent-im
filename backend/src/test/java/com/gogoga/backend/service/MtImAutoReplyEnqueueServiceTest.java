@@ -1,8 +1,6 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtImAutoReply;
 import com.gogoga.backend.entity.mt.MtImMessage;
@@ -56,8 +54,7 @@ class MtImAutoReplyEnqueueServiceTest {
     void createsPendingReplyAndIdempotentTaskForEligibleUserText() {
         MtImMessage message = eligibleMessage();
         when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
-        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR),
-                eq(MtShopRightCodeConstant.VIP_CODE), eq(MtShopRightCodeConstant.H5_PROMOTION))).thenReturn(true);
+        when(rightService.hasAutoReplyRight(1L)).thenReturn(true);
         MtAccessToken token = new MtAccessToken();
         token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());
         token.setAccessToken("token");
@@ -89,8 +86,7 @@ class MtImAutoReplyEnqueueServiceTest {
     void queuesWhenAuthorizationIsValidButTokenNeedsRefresh() {
         MtImMessage message = eligibleMessage();
         when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
-        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR),
-                eq(MtShopRightCodeConstant.VIP_CODE), eq(MtShopRightCodeConstant.H5_PROMOTION))).thenReturn(true);
+        when(rightService.hasAutoReplyRight(1L)).thenReturn(true);
         MtAccessToken token = new MtAccessToken();
         token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());
         token.setAccessToken("expired-token");
@@ -114,8 +110,7 @@ class MtImAutoReplyEnqueueServiceTest {
         message.setDecryptStatus(ImMessageDecryptStatusEnum.NOT_APPLICABLE.name());
         message.setMsgContentPlaintext(null);
         when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
-        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR),
-                eq(MtShopRightCodeConstant.VIP_CODE), eq(MtShopRightCodeConstant.H5_PROMOTION))).thenReturn(true);
+        when(rightService.hasAutoReplyRight(1L)).thenReturn(true);
         MtAccessToken token = new MtAccessToken();
         token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());
         token.setAccessToken("token");

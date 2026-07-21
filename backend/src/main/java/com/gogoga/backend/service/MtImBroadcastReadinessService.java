@@ -1,8 +1,6 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +10,9 @@ import org.springframework.stereotype.Service;
  * 群发的门店就绪校验。
  *
  * <p>群发与「一键开启AI回复」总开关相互独立，因此这里只校验群发总开关、门店权益与授权态。</p>
+ *
+ * <p>权益一律走 {@code hasBroadcastRight}：群发的权益范围比自动回复窄，
+ * 只含自动回复的权益（如 IM_AUTO_REPLY_ONLY）会在这里被拒。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -32,8 +33,7 @@ public class MtImBroadcastReadinessService {
         if (!mtProperties.getImBroadcast().isEnabled()) {
             return REASON_GLOBAL_SWITCH_DISABLED;
         }
-        if (!shopRightService.hasShopRight(shopId, RequiresShopRight.Logical.OR,
-                MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION)) {
+        if (!shopRightService.hasBroadcastRight(shopId)) {
             return REASON_SHOP_RIGHT_MISSING;
         }
         MtAccessToken token = accessTokenService.findByShopId(shopId);
