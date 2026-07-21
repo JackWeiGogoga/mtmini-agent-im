@@ -52,7 +52,6 @@ class MtImAutoReplyOrchestrationServiceTest {
     @Mock private ShopOperationSettingsService settingsService;
     @Mock private MtShopRightService rightService;
     @Mock private MtAccessTokenService tokenService;
-    @Mock private MtMeituanAuthorizationFailureHandler authFailureHandler;
     @Mock private ImConversationLockService lockService;
     @Mock private ImConversationLockService.LockHandle lockHandle;
     @Mock private ImAutoReplyContextService contextService;
@@ -72,6 +71,9 @@ class MtImAutoReplyOrchestrationServiceTest {
     void setUp() {
         properties = new MtProperties();
         properties.getImAutoReply().setEnabled(true);
+        // 用真实的鉴权失败封装，让刷新重试与标记重新授权的行为真正被覆盖，而不是被 mock 掉。
+        MtMeituanAuthorizationFailureHandler authFailureHandler =
+                new MtMeituanAuthorizationFailureHandler(tokenService);
         service = new MtImAutoReplyOrchestrationService(
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
                 tokenService, authFailureHandler, lockService, contextService, messageClassificationService,

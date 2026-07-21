@@ -39,7 +39,6 @@ class MtImBroadcastSendServiceTest {
     @Mock private MtImBroadcastRecordMapper recordMapper;
     @Mock private MtImBroadcastSettingMapper settingMapper;
     @Mock private MtAccessTokenService accessTokenService;
-    @Mock private MtMeituanAuthorizationFailureHandler authorizationFailureHandler;
     @Mock private MtImMessageClient messageClient;
     @Mock private ImBroadcastRateLimiter rateLimiter;
     @Mock private MtImBroadcastTimelineService timelineService;
@@ -51,6 +50,9 @@ class MtImBroadcastSendServiceTest {
     @BeforeEach
     void setUp() {
         mtProperties = new MtProperties();
+        // 用真实的鉴权失败封装，让刷新重试与标记重新授权的行为真正被覆盖，而不是被 mock 掉。
+        MtMeituanAuthorizationFailureHandler authorizationFailureHandler =
+                new MtMeituanAuthorizationFailureHandler(accessTokenService);
         service = new MtImBroadcastSendService(mtProperties, taskMapper, recordMapper, settingMapper,
                 accessTokenService, authorizationFailureHandler, messageClient, rateLimiter, timelineService);
 
@@ -166,6 +168,26 @@ class MtImBroadcastSendServiceTest {
 
         verify(settingMapper, never()).increaseTotalSentCount(anyLong(), anyInt());
         verify(timelineService, never()).persistSentMessage(any(), any());
+    }
+
+    @Test
+    void abandonsShardImmediatelyOnceAuthFailureIsConfirmed() {
+        when(recordMapper.selectPendingByShard(eq(9L), eq(0), anyInt()))
+                .thenReturn(List.of(record(1L, 8001L), record(2L, 8002L)));
+        when(messageClient.sendTwoPartyMessage(anyString(), any())).thenReturn(failure("OP_UNIAUTH_FAILED"));
+        when(recordMapper.countByTask(9L, "SENT")).thenReturn(0L);
+        when(recordMapper.countByTask(9L, "FAILED")).thenReturn(2L);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException.class,
+                () -> service.execute(new MtImBroadcastSendTaskPayload(9L, 100L, 0)));
+
+        // 首条确认鉴权失败后，第二条不再拿已失效的 token 空转。
+        verify(messageClient, org.mockito.Mockito.times(1)).sendTwoPartyMessage(anyString(), any());
+        verify(accessTokenService).markReauthRequired(100L);
+        // 剩余明细整体置失败，批次仍能收敛为终态而不是卡在 SENDING。
+        verify(recordMapper).markShardPendingFailed(9L, 0, "AUTH_REQUIRED", "AUTH_REQUIRED");
+        verify(taskMapper).updateProgress(eq(9L), eq(0L), eq(2L), eq("FAILED"), any());
     }
 
     @Test

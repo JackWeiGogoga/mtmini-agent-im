@@ -59,6 +59,16 @@
         WHERE id = #{id} AND status &lt;&gt; 'SENT'
     </update>
 
+    <!-- 只覆盖从未尝试过的 PENDING 明细：已失败的保留它自己的原始错误码，不被鉴权原因冲掉。 -->
+    <update id="markShardPendingFailed">
+        UPDATE mt_im_broadcast_record
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            error_summary = #{errorSummary},
+            update_time = NOW()
+        WHERE task_id = #{taskId} AND shard_no = #{shardNo} AND status = 'PENDING'
+    </update>
+
     <select id="countByTask" resultType="long">
         SELECT COUNT(*) FROM mt_im_broadcast_record
         WHERE task_id = #{taskId}

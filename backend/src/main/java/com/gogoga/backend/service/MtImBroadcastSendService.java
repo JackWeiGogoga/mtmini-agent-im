@@ -14,7 +14,7 @@ import com.gogoga.backend.mapper.MtImBroadcastTaskMapper;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtImBroadcastSendTaskPayload;
-import com.gogoga.backend.util.MeituanAuthFailureUtil;
+import com.meituan.sdk.internal.exceptions.MtSdkException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -94,34 +94,42 @@ public class MtImBroadcastSendService {
                 break;
             }
             SendOutcome outcome = sendOne(accessToken, task, record);
-            if (outcome.refreshedToken() != null) {
-                accessToken = outcome.refreshedToken();
-            }
+            accessToken = outcome.accessToken();
             newlySent += outcome.newlySent();
+            if (outcome.confirmedAuthFailure()) {
+                // 门店已被标记重新授权，再拿失效 token 发剩余明细必然条条失败，
+                // 直接整片置失败让批次照常收敛，省掉一整片的无效调用。
+                int abandoned = recordMapper.markShardPendingFailed(
+                        task.getId(), shardNo, "AUTH_REQUIRED", "AUTH_REQUIRED");
+                log.warn("群发确认鉴权失败，提前终止分片，broadcastTaskId={}, shopId={}, shardNo={}, abandoned={}",
+                        task.getId(), task.getShopId(), shardNo, abandoned);
+                settleBatch(task, newlySent);
+                throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
+            }
         }
         settleBatch(task, newlySent);
     }
 
     private SendOutcome sendOne(String accessToken, MtImBroadcastTask task, MtImBroadcastRecord record) {
-        MtImMessageClient.SendResult result = sendOnce(accessToken, task, record);
-        String refreshedToken = null;
-
-        if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-            MtAccessTokenService.TokenRefreshResult refresh =
-                    accessTokenService.refreshTokenForShopWithResult(task.getShopId());
-            MtAccessToken refreshed = refresh == null ? null : refresh.token();
-            if (isUsableToken(refreshed)) {
-                refreshedToken = refreshed.getAccessToken();
-                result = sendOnce(refreshedToken, task, record);
-            }
-            if (!result.success()
-                    && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-                authorizationFailureHandler.handleConfirmedAuthFailure(
-                        task.getShopId(), "IM_BROADCAST_SEND", result.errorCode(), result.responseSummary());
-            }
+        MtMeituanAuthorizationFailureHandler.AuthorizedCallResult<MtImMessageClient.SendResult> authorizedCallResult;
+        try {
+            // 鉴权失败的刷新重试与「仍失败则标记重新授权」统一由封装完成。
+            authorizedCallResult = authorizationFailureHandler.invokeWithRefreshRetry(
+                    task.getShopId(),
+                    accessToken,
+                    "IM_BROADCAST_SEND",
+                    token -> sendOnce(token, task, record),
+                    MtImBroadcastSendService::inspectAuthFailure
+            );
+        } catch (MtSdkException e) {
+            // 发送实现自身不抛 MtSdkException，这里只为满足封装的受检签名兜底。
+            throw new IllegalStateException("IM_SEND_FAILED", e);
         }
+        // 封装回传本次实际使用的 token：未刷新时即入参，刷新过则是新 token，供分片内后续消息复用。
+        String usableToken = StringUtils.defaultIfBlank(authorizedCallResult.accessToken(), accessToken);
+        MtImMessageClient.SendResult result = authorizedCallResult.response();
 
-        if (result.success()) {
+        if (result != null && result.success()) {
             // markSent 带 status <> 'SENT' 条件，返回 0 说明已被并发置为已发送，不能重复计入累计条数。
             int updated = recordMapper.markSent(record.getId(), LocalDateTime.now());
             if (updated > 0) {
@@ -133,12 +141,24 @@ public class MtImBroadcastSendService {
                             task.getId(), record.getOpenUserId(), e);
                 }
             }
-            return new SendOutcome(updated, refreshedToken);
+            return new SendOutcome(updated, usableToken, false);
         }
         recordMapper.markFailed(record.getId(),
-                StringUtils.abbreviate(StringUtils.defaultIfBlank(result.errorCode(), "IM_SEND_FAILED"), 64),
-                StringUtils.abbreviate(result.responseSummary(), ERROR_SUMMARY_MAX_LENGTH));
-        return new SendOutcome(0, refreshedToken);
+                StringUtils.abbreviate(
+                        StringUtils.defaultIfBlank(result == null ? null : result.errorCode(), "IM_SEND_FAILED"), 64),
+                StringUtils.abbreviate(result == null ? null : result.responseSummary(), ERROR_SUMMARY_MAX_LENGTH));
+        return new SendOutcome(0, usableToken, authorizedCallResult.confirmedAuthFailure());
+    }
+
+    /**
+     * 只有业务失败且命中鉴权错误码时才需要刷新 token 重试，成功响应一律不触发。
+     */
+    private static MtMeituanAuthorizationFailureHandler.AuthFailureInfo inspectAuthFailure(
+            MtImMessageClient.SendResult result) {
+        if (result == null || result.success()) {
+            return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.notAuthFailure();
+        }
+        return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.of(result.errorCode(), result.responseSummary());
     }
 
     /**
@@ -211,9 +231,10 @@ public class MtImBroadcastSendService {
     }
 
     /**
-     * @param newlySent      本次真正新置为 SENT 的条数（0 或 1），用于安全递增门店累计条数
-     * @param refreshedToken 本次发送中刷新出的新 token，供分片内后续消息复用；未刷新时为 null
+     * @param newlySent            本次真正新置为 SENT 的条数（0 或 1），用于安全递增门店累计条数
+     * @param accessToken          本次发送实际使用的 token，供分片内后续消息复用；未发生刷新时与入参相同
+     * @param confirmedAuthFailure 刷新重试后仍是鉴权失败，门店已被标记重新授权，分片应立即终止
      */
-    private record SendOutcome(int newlySent, String refreshedToken) {
+    private record SendOutcome(int newlySent, String accessToken, boolean confirmedAuthFailure) {
     }
 }

@@ -30,6 +30,14 @@ public interface MtImBroadcastRecordMapper {
                    @Param("errorSummary") String errorSummary);
 
     /**
+     * 把分片内仍待发送的明细整体置为失败，用于门店已确认失去授权、继续发送必然失败的场景。
+     */
+    int markShardPendingFailed(@Param("taskId") Long taskId,
+                               @Param("shardNo") Integer shardNo,
+                               @Param("errorCode") String errorCode,
+                               @Param("errorSummary") String errorSummary);
+
+    /**
      * 统计批次明细条数；status 为空表示统计全部。
      */
     long countByTask(@Param("taskId") Long taskId, @Param("status") String status);

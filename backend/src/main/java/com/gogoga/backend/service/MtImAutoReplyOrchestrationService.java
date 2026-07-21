@@ -24,7 +24,7 @@ import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
-import com.gogoga.backend.util.MeituanAuthFailureUtil;
+import com.meituan.sdk.internal.exceptions.MtSdkException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -255,25 +255,42 @@ public class MtImAutoReplyOrchestrationService {
         }
 
         stateService.markSending(autoReply.getId());
-        MtImMessageClient.SendResult result = sendOnce(token.getAccessToken(), autoReply, trigger, replyMessage);
-        if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-            MtAccessTokenService.TokenRefreshResult refresh = accessTokenService.refreshTokenForShopWithResult(autoReply.getShopId());
-            MtAccessToken refreshed = refresh == null ? null : refresh.token();
-            if (isUsableToken(refreshed)) {
-                result = sendOnce(refreshed.getAccessToken(), autoReply, trigger, replyMessage);
-            }
-            if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-                authorizationFailureHandler.handleConfirmedAuthFailure(
-                        autoReply.getShopId(), "IM_AUTO_REPLY_SEND", result.errorCode(), result.responseSummary());
-                stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
-                throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
-            }
+        MtMeituanAuthorizationFailureHandler.AuthorizedCallResult<MtImMessageClient.SendResult> authorizedCallResult;
+        try {
+            authorizedCallResult = authorizationFailureHandler.invokeWithRefreshRetry(
+                    autoReply.getShopId(),
+                    token.getAccessToken(),
+                    "IM_AUTO_REPLY_SEND",
+                    accessToken -> sendOnce(accessToken, autoReply, trigger, replyMessage),
+                    MtImAutoReplyOrchestrationService::inspectAuthFailure
+            );
+        } catch (MtSdkException e) {
+            // 发送实现自身不抛 MtSdkException，这里只为满足封装的受检签名兜底。
+            throw new IllegalStateException("IM_SEND_FAILED", e);
         }
-        if (!result.success()) {
-            stateService.markSendFailure(autoReply.getId(), result.errorCode(), result.responseSummary());
-            throw new IllegalStateException(StringUtils.defaultIfBlank(result.errorCode(), "IM_SEND_FAILED"));
+        // 鉴权失败的刷新重试与「仍失败则标记重新授权」已由封装完成，此处只收敛本地状态。
+        if (authorizedCallResult.confirmedAuthFailure()) {
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
+            throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
+        }
+        MtImMessageClient.SendResult result = authorizedCallResult.response();
+        if (result == null || !result.success()) {
+            String errorCode = result == null ? null : result.errorCode();
+            stateService.markSendFailure(autoReply.getId(), errorCode, result == null ? null : result.responseSummary());
+            throw new IllegalStateException(StringUtils.defaultIfBlank(errorCode, "IM_SEND_FAILED"));
         }
         stateService.markSent(autoReply.getId());
+    }
+
+    /**
+     * 只有业务失败且命中鉴权错误码时才需要刷新 token 重试，成功响应一律不触发。
+     */
+    private static MtMeituanAuthorizationFailureHandler.AuthFailureInfo inspectAuthFailure(
+            MtImMessageClient.SendResult result) {
+        if (result == null || result.success()) {
+            return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.notAuthFailure();
+        }
+        return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.of(result.errorCode(), result.responseSummary());
     }
 
     private MtImMessageClient.SendResult sendOnce(String accessToken,
