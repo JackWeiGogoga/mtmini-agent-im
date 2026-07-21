@@ -22,6 +22,28 @@ const STATUS_COLORS: Record<string, string> = {
   SKIPPED: "default", SUPERSEDED: "orange", DEAD: "red", PENDING: "gold", GENERATING: "purple",
 };
 
+/** 订单号与识别出的手机号：看日志时最常要复制的两项，单独成行并挂上复制按钮。 */
+function ContactTags({ orderId, phones }: { orderId?: number; phones?: string[] }) {
+  // 无订单的消息在库里存的是 0，这里按「缺失」处理，不能展示成「订单 0」
+  const hasOrder = Boolean(orderId);
+  const list = phones ?? [];
+  if (!hasOrder && list.length === 0) return null;
+  return (
+    <Space size={[4, 4]} wrap>
+      {hasOrder ? (
+        <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
+          订单 <Text copyable={{ text: String(orderId) }}>{orderId}</Text>
+        </Tag>
+      ) : null}
+      {list.map((phone) => (
+        <Tag key={phone} color="volcano" style={{ marginInlineEnd: 0 }}>
+          手机 <Text copyable={{ text: phone }}>{phone}</Text>
+        </Tag>
+      ))}
+    </Space>
+  );
+}
+
 interface Props {
   loadPage: (query: ImAutoReplyLogQuery) => Promise<PageInfo<ImAutoReplyLog>>;
   loadHistory: (
@@ -69,7 +91,8 @@ export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter 
       {
         title: "顾客消息", key: "user", width: 300,
         render: (_, row) => <Space direction="vertical" size={4} style={{ width: "100%" }}>
-          <Text type="secondary">顾客 {row.openUserId || "-"} · 订单 {row.orderId || 0}</Text>
+          <Text type="secondary">顾客 {row.openUserId || "-"}</Text>
+          <ContactTags orderId={row.orderId} phones={row.userPhones} />
           <Paragraph ellipsis={{ rows: 3, expandable: true, symbol: "展开" }} style={{ margin: 0, whiteSpace: "pre-wrap" }}>{row.userContent || "-"}</Paragraph>
           <Text type="secondary">{row.userMessageTime ? dayjs(row.userMessageTime).format("YYYY-MM-DD HH:mm:ss") : "-"}</Text>
         </Space>,

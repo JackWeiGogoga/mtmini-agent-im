@@ -13,6 +13,7 @@ import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtImTestChatLogMapper;
 import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.param.ImTestChatParam;
+import com.gogoga.backend.util.CustomerPhoneExtractor;
 import com.gogoga.backend.util.UserContext;
 import com.gogoga.backend.vo.ImTestChatLogVO;
 import com.gogoga.backend.vo.ImTestChatReplyVO;
@@ -119,6 +120,7 @@ public class ImTestChatService {
         ImTestChatReplyVO full = buildReplyVo(content, category, ragContext, rewriteCount, blocked, result);
         full.setSensitiveHit(toSensitiveHit(triggerHit));
         full.setClassificationDebug(toClassificationDebug(classification));
+        full.setUserPhones(CustomerPhoneExtractor.extract(message));
         saveLog(shopId, StringUtils.trimToNull(param.getSessionId()), message, full);
 
         if (!isAdminView()) {

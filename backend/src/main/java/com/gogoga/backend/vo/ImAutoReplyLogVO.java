@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ImAutoReplyLogVO {
@@ -18,6 +19,8 @@ public class ImAutoReplyLogVO {
     private Long orderId;
     private Long userMessageId;
     private String userContent;
+    /** 从顾客消息正文里识别出的手机号，查询时实时计算，不落库。 */
+    private List<String> userPhones;
     private LocalDateTime userMessageTime;
     private Long aiMessageId;
     private String aiContent;

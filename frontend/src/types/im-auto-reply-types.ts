@@ -27,6 +27,8 @@ export interface ImAutoReplyLog {
   orderId?: number;
   userMessageId: number;
   userContent?: string;
+  /** 后端从顾客消息里识别出的手机号（已去分隔符） */
+  userPhones?: string[];
   userMessageTime?: string;
   aiMessageId?: number;
   aiContent?: string;

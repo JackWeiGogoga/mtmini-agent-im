@@ -12,11 +12,26 @@
         <view v-if="!messageRows.length && !loading" class="empty-card">暂无自动回复记录</view>
         <view v-for="row in messageRows" :key="row.autoReplyId" class="reply-card" @tap="openConversation(row)">
           <view class="card-head">
-            <view>
-              <text class="customer">顾客 {{ row.openUserId || '-' }}</text>
-              <text class="order">订单 {{ row.orderId || 0 }}</text>
-            </view>
+            <text class="customer">顾客 {{ row.openUserId || '-' }}</text>
             <text class="status" :class="statusClass(row.status)">{{ statusText(row.status) }}</text>
+          </view>
+          <!-- 订单号与手机号是商家最常要抄走的信息，单独成行并支持点按复制；卡片本身是打开对话的，这里要 stop 掉冒泡 -->
+          <view v-if="row.orderId || row.userPhones?.length" class="contact-row" @tap.stop>
+            <view v-if="row.orderId" class="chip order-chip" @tap.stop="copyValue(row.orderId, '订单号')">
+              <text class="chip-label">订单</text>
+              <text class="chip-value">{{ row.orderId }}</text>
+              <text class="chip-copy">复制</text>
+            </view>
+            <view
+              v-for="phone in row.userPhones || []"
+              :key="phone"
+              class="chip phone-chip"
+              @tap.stop="copyValue(phone, '手机号')"
+            >
+              <text class="chip-label">手机</text>
+              <text class="chip-value">{{ phone }}</text>
+              <text class="chip-copy">复制</text>
+            </view>
           </view>
           <view class="message-block user-block">
             <text class="role">顾客消息</text>
@@ -297,6 +312,18 @@ function statusClass(status) {
 function formatTime(value) {
   return value ? String(value).replace('T', ' ').slice(0, 19) : '-'
 }
+
+function copyValue(value, label) {
+  const text = String(value ?? '').trim()
+  if (!text) return
+  uni.setClipboardData({
+    data: text,
+    // 关掉 uni 自带的「内容已复制」，换成带字段名的提示，避免两个 toast 互相顶掉
+    showToast: false,
+    success: () => uni.showToast({ title: `${label}已复制`, icon: 'none' }),
+    fail: () => uni.showToast({ title: '复制失败，请长按手动选择', icon: 'none' }),
+  })
+}
 </script>
 
 <style scoped>
@@ -309,9 +336,16 @@ function formatTime(value) {
 .reply-card, .conversation-card { margin-bottom: 22rpx; padding: 24rpx; border-radius: 22rpx; background: #fff; box-shadow: 0 8rpx 28rpx rgba(0,0,0,.04); }
 .card-head, .conversation-head, .card-foot, .role-line, .conversation-meta { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
 .customer { display: block; color: #242424; font-size: 28rpx; font-weight: 700; }
-.order, .time { display: block; margin-top: 4rpx; color: #9a9a9a; font-size: 21rpx; }
+.time { display: block; margin-top: 4rpx; color: #9a9a9a; font-size: 21rpx; }
 .status { padding: 7rpx 14rpx; border-radius: 999rpx; font-size: 21rpx; }
 .status.success { color: #198754; background: #eaf8f0; }.status.failed { color: #d9363e; background: #fff0f0; }.status.pending { color: #9a6b00; background: #fff7dc; }.status.muted { color: #777; background: #f0f0f0; }
+.contact-row { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.chip { display: flex; align-items: center; gap: 8rpx; padding: 8rpx 14rpx; border-radius: 999rpx; font-size: 22rpx; }
+.order-chip { color: #2f5fbf; background: #eaf1ff; }
+.phone-chip { color: #b34a1a; background: #fdeee4; }
+.chip-label { opacity: .7; }
+.chip-value { font-weight: 700; font-family: monospace; letter-spacing: .5rpx; }
+.chip-copy { padding-left: 8rpx; border-left: 2rpx solid currentColor; opacity: .6; }
 .message-block { margin-top: 18rpx; padding: 20rpx; border-radius: 16rpx; }.user-block { background: #f3f7ff; }.ai-block { background: #faf7ff; }
 .role { color: #356ac3; font-size: 22rpx; font-weight: 700; }.ai-role { color: #7651b5; }.rag-tag { padding: 4rpx 10rpx; border-radius: 999rpx; color: #356ac3; background: #eaf2ff; font-size: 19rpx; }
 .message-text { display: block; margin-top: 10rpx; color: #333; font-size: 27rpx; line-height: 1.55; white-space: pre-wrap; }
