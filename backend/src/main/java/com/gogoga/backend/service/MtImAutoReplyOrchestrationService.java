@@ -59,6 +59,7 @@ public class MtImAutoReplyOrchestrationService {
     private final ImAutoReplyChatService chatService;
     private final SystemPromptService systemPromptService;
     private final SensitiveWordService sensitiveWordService;
+    private final ImReplyContactSuffixService contactSuffixService;
     private final MtImAutoReplyStateService stateService;
     private final MtImMessageClient messageClient;
 
@@ -190,6 +191,7 @@ public class MtImAutoReplyOrchestrationService {
                 throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
             }
         }
+        content = contactSuffixService.append(autoReply.getShopId(), content);
         stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
                 userMessageCategory);
     }

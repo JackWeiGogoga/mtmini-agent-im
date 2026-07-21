@@ -58,7 +58,8 @@
       <view v-else-if="!hasMore && currentRows.length" class="loading-text">已加载全部</view>
     </view>
 
-    <view v-if="detailVisible" class="detail-mask" @tap="closeDetail">
+    <!-- 弹窗打开时锁住底层页面滚动；对话区域自己 stop 掉 touchmove，不会被这里的 prevent 拦住 -->
+    <view v-if="detailVisible" class="detail-mask" @tap="closeDetail" @touchmove.stop.prevent="noop">
       <view class="detail-panel" @tap.stop>
         <view class="detail-head">
           <view>
@@ -73,6 +74,7 @@
           :scroll-into-view="scrollIntoView"
           :upper-threshold="80"
           @scrolltoupper="loadOlderHistory"
+          @touchmove.stop
         >
           <view v-if="historyHasMore" class="history-tip">{{ historyLoading ? '正在加载...' : '向上滑动加载更早消息' }}</view>
           <view v-for="(item, index) in historyRows" :id="`msg-${item.id}`" :key="item.id">
@@ -133,13 +135,14 @@ onMounted(() => {
   refresh()
 })
 
+// 弹窗打开时底层列表不应再翻页/刷新：遮罩已拦住 touchmove，这里兜住各端页面事件的差异
 onPullDownRefresh(async () => {
-  await refresh()
+  if (!detailVisible.value) await refresh()
   uni.stopPullDownRefresh()
 })
 
 onReachBottom(() => {
-  if (hasMore.value && !loading.value) loadMore()
+  if (!detailVisible.value && hasMore.value && !loading.value) loadMore()
 })
 
 async function switchView(value) {
@@ -223,6 +226,9 @@ function closeDetail() {
   historyRows.value = []
   scrollIntoView.value = ''
 }
+
+// 挂在遮罩 touchmove 上，只为拿到 .prevent 修饰符去锁底层页面滚动
+function noop() {}
 
 function isNewSession(item, index) {
   return index === 0 || historyRows.value[index - 1]?.sessionId !== item.sessionId

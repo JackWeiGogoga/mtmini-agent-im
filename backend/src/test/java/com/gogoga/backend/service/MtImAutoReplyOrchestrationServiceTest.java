@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +60,7 @@ class MtImAutoReplyOrchestrationServiceTest {
     @Mock private ImAutoReplyChatService chatService;
     @Mock private SystemPromptService promptService;
     @Mock private SensitiveWordService sensitiveWordService;
+    @Mock private ImReplyContactSuffixService contactSuffixService;
     @Mock private MtImAutoReplyStateService stateService;
     @Mock private MtImMessageClient messageClient;
 
@@ -73,7 +75,10 @@ class MtImAutoReplyOrchestrationServiceTest {
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
                 tokenService, authFailureHandler, lockService, contextService, messageClassificationService,
                 ragService, chatService,
-                promptService, sensitiveWordService, stateService, messageClient);
+                promptService, sensitiveWordService, contactSuffixService, stateService, messageClient);
+        // 默认无联系方式可拼：正文原样透传，个别用例再覆盖成有联系方式的门店。
+        lenient().when(contactSuffixService.append(anyLong(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @Test
@@ -340,6 +345,47 @@ class MtImAutoReplyOrchestrationServiceTest {
         verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("安全答复"), usage.capture(), any(), eq(1), eq("GENERAL"));
         assertEquals(15, usage.getValue().promptTokens());
         assertEquals(3, usage.getValue().completionTokens());
+    }
+
+    @Test
+    void persistsReplyWithShopContactSuffix() {
+        MtImAutoReply pending = autoReply();
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending, pending, generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        MtImMessage trigger = trigger();
+        trigger.setMsgContentPlaintext("问题");
+        when(messageMapper.selectById(31L)).thenReturn(trigger);
+        MtImMessage newer = new MtImMessage();
+        newer.setSenderRole(ImMessageSenderRoleEnum.USER.name());
+        newer.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L))
+                .thenReturn(List.of())
+                .thenReturn(List.of(newer));
+        mockReadyShop();
+        when(contextService.build(21L)).thenReturn(new ImAutoReplyContextService.Context(
+                List.of(new ImAutoReplyChatMessage("user", "问题")), List.of("问题")));
+        when(messageClassificationService.classify(List.of("问题")))
+                .thenReturn(com.gogoga.backend.enums.KnowledgeCategoryEnum.GENERAL);
+        when(ragService.retrieve(1L, List.of("问题"), "GENERAL"))
+                .thenReturn(ImAutoReplyRagService.RagContext.empty());
+        ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
+        prompt.setContent("系统");
+        when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
+        when(chatService.generate(eq("系统"), eq(""), any()))
+                .thenReturn(new ImAutoReplyChatResult("答复", 10, 2));
+        SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
+        safe.setHit(false);
+        when(sensitiveWordService.detect("答复")).thenReturn(safe);
+        when(contactSuffixService.append(1L, "答复")).thenReturn("答复\n可以联系门店 400-820-8820");
+
+        service.execute(payload());
+
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n可以联系门店 400-820-8820"),
+                any(), any(), eq(0), eq("GENERAL"));
     }
 
     @Test

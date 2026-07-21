@@ -54,6 +54,7 @@ public class ImTestChatService {
     private final ImAutoReplyChatService chatService;
     private final SystemPromptService systemPromptService;
     private final SensitiveWordService sensitiveWordService;
+    private final ImReplyContactSuffixService contactSuffixService;
     private final KnowledgeEmbeddingService knowledgeEmbeddingService;
     private final KnowledgeVectorStore knowledgeVectorStore;
 
@@ -101,6 +102,8 @@ public class ImTestChatService {
             content = mtProperties.getImAutoReply().getSafeFallbackReply();
             blocked = true;
         }
+        // 与线上自动回复保持一致：测试对话也要能看到结尾拼接的联系方式。
+        content = contactSuffixService.append(shopId, content);
         if (triggerHit.isHit()) {
             log.warn("测试聊天回复命中敏感词，shopId={}, operator={}, categories={}, words={}, severity={}, rewriteCount={}, blocked={}",
                     shopId, UserContext.getUserId(), triggerHit.getCategories(), triggerHit.getHitWords(),

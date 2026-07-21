@@ -474,6 +474,7 @@ CREATE TABLE `mt_im_auto_reply_setting` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `shop_id` bigint NOT NULL COMMENT '门店ID',
   `auto_reply_enabled` tinyint(1) NOT NULL DEFAULT '0' COMMENT '本地IM自动回复总开关',
+  `custom_contact_phone` varchar(64) DEFAULT NULL COMMENT '商家自定义联系方式，优先于门店电话拼接在自动回复结尾',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),

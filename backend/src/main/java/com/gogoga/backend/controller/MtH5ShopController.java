@@ -2,6 +2,7 @@ package com.gogoga.backend.controller;
 
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.param.ShopContactPhoneUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.service.MtH5GuideStateService;
 import com.gogoga.backend.service.MtH5HomeDashboardService;
@@ -84,6 +85,33 @@ public class MtH5ShopController {
         return ResultVO.success(shopOperationSettingsService.updateSettings(
                 mtH5ShopService.getCurrentShop().getId(),
                 param,
+                ShopOperationSettingsService.CHANGE_SOURCE_H5
+        ));
+    }
+
+    /**
+     * 获取当前门店联系方式配置。
+     *
+     * @return 含自定义与实际生效联系方式的开关视图
+     */
+    @GetMapping("/contact-phone")
+    public ResultVO<ShopOperationSettingsVO> getContactPhone() {
+        return ResultVO.success(shopOperationSettingsService.buildSettings(
+                mtH5ShopService.getCurrentShop().getId()));
+    }
+
+    /**
+     * 更新当前门店自定义联系方式，留空表示清除并回退到门店电话。
+     *
+     * @param param 联系方式参数
+     * @return 更新后的配置
+     */
+    @PutMapping("/contact-phone")
+    public ResultVO<ShopOperationSettingsVO> updateContactPhone(
+            @Valid @RequestBody ShopContactPhoneUpdateParam param) {
+        return ResultVO.success(shopOperationSettingsService.updateCustomContactPhone(
+                mtH5ShopService.getCurrentShop().getId(),
+                param.getCustomContactPhone(),
                 ShopOperationSettingsService.CHANGE_SOURCE_H5
         ));
     }

@@ -78,6 +78,14 @@ export function updateMtH5OperationSettings(settings) {
   return request('/api/h5/shop/operation-settings', 'PUT', settings)
 }
 
+export function getMtH5ContactPhone() {
+  return request('/api/h5/shop/contact-phone', 'GET')
+}
+
+export function updateMtH5ContactPhone(customContactPhone) {
+  return request('/api/h5/shop/contact-phone', 'PUT', { customContactPhone })
+}
+
 export function getKnowledgeQaItems() {
   return request('/api/h5/knowledge/items', 'GET')
 }
