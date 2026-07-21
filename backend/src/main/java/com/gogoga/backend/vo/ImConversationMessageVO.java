@@ -14,6 +14,8 @@ public class ImConversationMessageVO {
     private LocalDateTime sessionStartedAt;
     private String senderRole;
     private String recordSource;
+    /** 消息类型，见 ImMessageTypeEnum。图片消息的正文是图片 URL，前端据此渲染成图片而不是链接文本。 */
+    private Integer msgType;
     private String content;
     private String deliveryStatus;
     private String autoReplyStatus;

@@ -106,6 +106,49 @@ class MtImAutoReplyEnqueueServiceTest {
                 eq(MtAsyncTaskTypeEnum.IM_AUTO_REPLY), eq("100"), eq("11"), any(), any(), anyInt());
     }
 
+    @Test
+    void queuesUserImageWithoutReadableContent() {
+        MtImMessage message = eligibleMessage();
+        // 图片消息不做解析，正文与密文都可能缺失，这不能成为漏回的理由
+        message.setMsgType(ImMessageTypeEnum.IMAGE.getCode());
+        message.setDecryptStatus(ImMessageDecryptStatusEnum.NOT_APPLICABLE.name());
+        message.setMsgContentPlaintext(null);
+        when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
+        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR),
+                eq(MtShopRightCodeConstant.VIP_CODE), eq(MtShopRightCodeConstant.H5_PROMOTION))).thenReturn(true);
+        MtAccessToken token = new MtAccessToken();
+        token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());
+        token.setAccessToken("token");
+        token.setExpiresAt(LocalDateTime.now().plusHours(1));
+        when(tokenService.findByShopId(1L)).thenReturn(token);
+        when(autoReplyMapper.insert(any())).thenAnswer(invocation -> {
+            ((MtImAutoReply) invocation.getArgument(0)).setId(101L);
+            return 1;
+        });
+
+        assertNotNull(service.enqueueIfEligible(message));
+        verify(asyncTaskService).enqueueTask(
+                eq(MtAsyncTaskTypeEnum.IM_AUTO_REPLY), eq("101"), eq("11"), any(), any(), anyInt());
+    }
+
+    @Test
+    void ignoresPlatformCardMessage() {
+        MtImMessage message = eligibleMessage();
+        message.setMsgType(ImMessageTypeEnum.CARD.getCode());
+
+        assertNull(service.enqueueIfEligible(message));
+        verify(autoReplyMapper, never()).insert(any());
+    }
+
+    @Test
+    void ignoresUserTextWithoutDecryptedContent() {
+        MtImMessage message = eligibleMessage();
+        message.setMsgContentPlaintext(null);
+
+        assertNull(service.enqueueIfEligible(message));
+        verify(autoReplyMapper, never()).insert(any());
+    }
+
     private MtImMessage eligibleMessage() {
         MtImMessage message = new MtImMessage();
         message.setId(31L);

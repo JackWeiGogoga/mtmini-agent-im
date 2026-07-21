@@ -223,6 +223,12 @@ public class MtProperties {
          * 敏感词改写仍失败时使用的固定安全回复。
          */
         private String safeFallbackReply = "抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。";
+
+        /**
+         * 顾客发来图片等非文本消息时的固定兜底回复。这类消息不做多模态解析、不调用大模型，
+         * 直接用本话术占位，再按常规逻辑拼接门店联系方式。
+         */
+        private String nonTextFallbackReply = "商家正在忙";
     }
 
     @Data

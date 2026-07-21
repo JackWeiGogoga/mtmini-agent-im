@@ -85,14 +85,19 @@ public class MtImAutoReplyEnqueueService {
             return false;
         }
         if (!ImMessageParseStatusEnum.SUCCESS.name().equals(message.getParseStatus())
-                || !ImMessageDecryptStatusEnum.SUCCESS.name().equals(message.getDecryptStatus())
                 || !ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
                 || !Integer.valueOf(1).equals(message.getBizType())
-                || !ImMessageTypeEnum.isConversational(message.getMsgType())
+                || !ImMessageTypeEnum.isReplyTriggerable(message.getMsgType())
                 || Integer.valueOf(2).equals(message.getHasReply())
-                || StringUtils.isBlank(message.getMsgContentPlaintext())
                 || message.getShopId() == null || message.getConversationId() == null
                 || message.getSessionId() == null || message.getOpenUserId() == null) {
+            return false;
+        }
+        // 正文只对文本消息是必需的：图片等非文本消息一律回固定兜底话术，正文既不喂模型也不做解析，
+        // 此时密文缺失（解密态 NOT_APPLICABLE）或解密失败都不影响回复，不能因此漏回。
+        if (ImMessageTypeEnum.isConversational(message.getMsgType())
+                && (!ImMessageDecryptStatusEnum.SUCCESS.name().equals(message.getDecryptStatus())
+                || StringUtils.isBlank(message.getMsgContentPlaintext()))) {
             return false;
         }
         if (!shopOperationSettingsService.isAutoReplyEnabled(message.getShopId())) {

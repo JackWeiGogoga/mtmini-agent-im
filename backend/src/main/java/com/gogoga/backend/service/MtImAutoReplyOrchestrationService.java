@@ -15,6 +15,7 @@ import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
 import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
+import com.gogoga.backend.enums.KnowledgeCategoryEnum;
 import com.gogoga.backend.enums.MtImAutoReplyStatusEnum;
 import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtImAutoReplyMapper;
@@ -127,12 +128,18 @@ public class MtImAutoReplyOrchestrationService {
             autoReply = autoReplyMapper.selectById(autoReplyId);
         }
         if (autoReply.getBilledAt() == null) {
-            try {
-                autoReply = stateService.bill(autoReplyId);
-            } catch (PowerInsufficientException insufficient) {
-                stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.SKIPPED,
-                        PowerInsufficientException.REASON_CODE);
-                throw new MtAsyncTaskTerminalFailureException(PowerInsufficientException.REASON_CODE);
+            if (usesModel(trigger)) {
+                try {
+                    autoReply = stateService.bill(autoReplyId);
+                } catch (PowerInsufficientException insufficient) {
+                    stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.SKIPPED,
+                            PowerInsufficientException.REASON_CODE);
+                    throw new MtAsyncTaskTerminalFailureException(PowerInsufficientException.REASON_CODE);
+                }
+            } else {
+                // 非文本兜底话术没有 token 用量，算力按实际 token 计费，因此这里零消耗直接过账，
+                // 只推进状态机，避免按 token 计费的公式拿到 0 用量后抛异常把任务卡死。
+                autoReply = stateService.markBilledFree(autoReplyId);
             }
         }
         if (!lock.isValid()) {
@@ -163,6 +170,10 @@ public class MtImAutoReplyOrchestrationService {
 
     private void generateAndPersist(MtImAutoReply autoReply, MtImMessage trigger) {
         stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.GENERATING, null);
+        if (!usesModel(trigger)) {
+            generateNonTextFallback(autoReply, trigger);
+            return;
+        }
         ImAutoReplyContextService.Context context = contextService.build(autoReply.getSessionId());
         List<String> recentUserMessages = context.latestUserMessages(
                 mtProperties.getImAutoReply().getRagRecentUserMessages());
@@ -201,6 +212,33 @@ public class MtImAutoReplyOrchestrationService {
         content = contactSuffixService.appendPhone(content, contactPhone);
         stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
                 userMessageCategory);
+    }
+
+    /**
+     * 图片等非文本消息的固定兜底回复。
+     *
+     * <p>不做多模态解析、不召回知识、不调用大模型：这类消息没有可用文本，模型只能凭空猜测，
+     * 代价与出错风险都不划算。回复内容是固定话术加常规联系方式后缀，其余环节（商家静默窗口、
+     * 更新消息顶替、发送延迟、幂等发送）与文本回复完全一致。</p>
+     */
+    private void generateNonTextFallback(MtImAutoReply autoReply, MtImMessage trigger) {
+        String content = mtProperties.getImAutoReply().getNonTextFallbackReply();
+        if (isSensitive(content)) {
+            // 兜底话术是配置项，可能被改成命中敏感词的内容；此时没有改写余地，只能不发。
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.DEAD, "NON_TEXT_FALLBACK_REJECTED");
+            throw new MtAsyncTaskTerminalFailureException("NON_TEXT_FALLBACK_REJECTED");
+        }
+        content = contactSuffixService.append(autoReply.getShopId(), content);
+        stateService.saveGenerated(autoReply.getId(), trigger, content,
+                new ImAutoReplyChatResult(content, 0, 0), null, 0,
+                KnowledgeCategoryEnum.GENERAL.name());
+    }
+
+    /**
+     * 本条触发消息是否走大模型生成。只有承载真实话语的文本消息才值得让模型作答。
+     */
+    private boolean usesModel(MtImMessage trigger) {
+        return ImMessageTypeEnum.isConversational(trigger.getMsgType());
     }
 
     private void send(MtImAutoReply autoReply, MtImMessage trigger, MtImMessage replyMessage) {
@@ -342,7 +380,7 @@ public class MtImAutoReplyOrchestrationService {
             // 只有能自己触发回复的用户消息才可以顶掉本次回复；否则 CARD 之类顶掉后无人接手，
             // 用户的提问会静默地得不到任何答复
             if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
-                    && ImMessageTypeEnum.isConversational(message.getMsgType())) {
+                    && ImMessageTypeEnum.isReplyTriggerable(message.getMsgType())) {
                 return new SkipDecision(MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
             }
         }

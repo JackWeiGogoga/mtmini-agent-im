@@ -95,8 +95,11 @@ public class MtImAutoReplyStateService {
         autoReply.setRagChunkCount(ragContext == null || ragContext.hits() == null ? 0 : ragContext.hits().size());
         autoReply.setRagMaxScore(ragContext == null || ragContext.maxCosineScore() == null
                 ? null : BigDecimal.valueOf(ragContext.maxCosineScore()));
-        autoReply.setModelProvider(mtProperties.getImAutoReply().getModelProvider());
-        autoReply.setModelName(mtProperties.getImAutoReply().getChatModel());
+        // 无 token 用量说明这条回复没走大模型（非文本消息的固定兜底话术），
+        // 记上模型名会让回复日志看起来像模型产出，排查时误导人。
+        boolean modelUsed = chatResult.promptTokens() > 0 || chatResult.completionTokens() > 0;
+        autoReply.setModelProvider(modelUsed ? mtProperties.getImAutoReply().getModelProvider() : null);
+        autoReply.setModelName(modelUsed ? mtProperties.getImAutoReply().getChatModel() : null);
         autoReply.setPromptTokens(chatResult.promptTokens());
         autoReply.setCompletionTokens(chatResult.completionTokens());
         autoReply.setRewriteCount(rewriteCount);
@@ -127,6 +130,25 @@ public class MtImAutoReplyStateService {
 
         LocalDateTime now = LocalDateTime.now();
         autoReply.setPowerAmount(powerAmount);
+        autoReply.setBilledAt(now);
+        autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
+        autoReply.setUpdateTime(now);
+        autoReplyMapper.update(autoReply);
+        return autoReply;
+    }
+
+    /**
+     * 零算力过账：非文本消息的固定兜底回复没有调用大模型，没有 token 用量可计费，
+     * 但仍要推进到 BILLED 才能进入发送阶段，因此只落状态、不扣算力。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public MtImAutoReply markBilledFree(Long autoReplyId) {
+        MtImAutoReply autoReply = requireAutoReply(autoReplyId);
+        if (autoReply.getBilledAt() != null) {
+            return autoReply;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        autoReply.setPowerAmount(0);
         autoReply.setBilledAt(now);
         autoReply.setStatus(MtImAutoReplyStatusEnum.BILLED.name());
         autoReply.setUpdateTime(now);

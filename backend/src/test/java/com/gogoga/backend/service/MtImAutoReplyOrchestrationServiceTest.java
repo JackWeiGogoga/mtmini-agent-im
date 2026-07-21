@@ -292,6 +292,68 @@ class MtImAutoReplyOrchestrationServiceTest {
     }
 
     @Test
+    void repliesFixedFallbackWithoutModelWhenTriggerIsNotText() {
+        MtImAutoReply pending = autoReply();
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        MtImAutoReply billed = autoReply();
+        billed.setReplyMessageId(32L);
+        billed.setBilledAt(LocalDateTime.now());
+        billed.setSendNotBefore(LocalDateTime.now().minusSeconds(1));
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending, pending, generated);
+        when(stateService.markBilledFree(9L)).thenReturn(billed);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        MtImMessage trigger = trigger(ImMessageTypeEnum.IMAGE);
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("商家正在忙\n可以联系门店 13800000000");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(messageMapper.selectById(31L)).thenReturn(trigger);
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
+        safe.setHit(false);
+        when(sensitiveWordService.detect("商家正在忙")).thenReturn(safe);
+        when(contactSuffixService.append(1L, "商家正在忙"))
+                .thenReturn("商家正在忙\n可以联系门店 13800000000");
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        // 不解析图片、不召回知识、不分类、不生成：整条链路都不碰大模型
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+        verify(ragService, never()).retrieve(anyLong(), any(), anyString());
+        verify(messageClassificationService, never()).classify(any());
+        // 兜底话术仍要拼联系方式，并按零 token 过账后正常发送
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("商家正在忙\n可以联系门店 13800000000"),
+                any(), eq(null), eq(0), eq("GENERAL"));
+        verify(stateService).markBilledFree(9L);
+        verify(stateService, never()).bill(anyLong());
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void skipsNonTextFallbackWhenMerchantAlreadyRepliedAfterTrigger() {
+        MtImAutoReply pending = autoReply();
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger(ImMessageTypeEnum.IMAGE));
+        mockReadyShop();
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchant));
+
+        service.execute(payload());
+
+        verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
+        verify(messageClient, never()).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
     void reschedulesWithoutRetryWhenConversationLockIsBusy() {
         when(autoReplyMapper.selectById(9L)).thenReturn(autoReply());
         when(lockService.tryAcquire(11L)).thenReturn(null);
@@ -462,11 +524,17 @@ class MtImAutoReplyOrchestrationServiceTest {
     }
 
     private MtImMessage trigger() {
+        return trigger(ImMessageTypeEnum.TEXT);
+    }
+
+    private MtImMessage trigger(ImMessageTypeEnum msgType) {
         MtImMessage message = new MtImMessage();
         message.setId(31L);
         message.setConversationId(11L);
         message.setOrderId(0L);
         message.setOpenUserId(41L);
+        // 触发消息类型决定是否走大模型，缺省会被当成非文本消息回兜底话术
+        message.setMsgType(msgType.getCode());
         return message;
     }
 

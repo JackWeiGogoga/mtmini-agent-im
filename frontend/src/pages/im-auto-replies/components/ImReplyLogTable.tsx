@@ -10,6 +10,7 @@ import type {
   PageInfo,
 } from "@/types";
 import ConversationHistoryDrawer from "./ConversationHistoryDrawer";
+import { MessageBody } from "./MessageBody";
 
 const { Text, Paragraph } = Typography;
 
@@ -93,7 +94,7 @@ export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter 
         render: (_, row) => <Space direction="vertical" size={4} style={{ width: "100%" }}>
           <Text type="secondary">顾客 {row.openUserId || "-"}</Text>
           <ContactTags orderId={row.orderId} phones={row.userPhones} />
-          <Paragraph ellipsis={{ rows: 3, expandable: true, symbol: "展开" }} style={{ margin: 0, whiteSpace: "pre-wrap" }}>{row.userContent || "-"}</Paragraph>
+          <MessageBody msgType={row.userMsgType} content={row.userContent} ellipsisRows={3} />
           <Text type="secondary">{row.userMessageTime ? dayjs(row.userMessageTime).format("YYYY-MM-DD HH:mm:ss") : "-"}</Text>
         </Space>,
       },

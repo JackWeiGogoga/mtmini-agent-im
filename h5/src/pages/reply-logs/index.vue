@@ -35,7 +35,14 @@
           </view>
           <view class="message-block user-block">
             <text class="role">顾客消息</text>
-            <text class="message-text">{{ row.userContent || '（无正文）' }}</text>
+            <image
+              v-if="isImageMessage(row.userMsgType, row.userContent)"
+              class="message-image"
+              :src="row.userContent.trim()"
+              mode="widthFix"
+              @tap.stop="previewImage(row.userContent)"
+            />
+            <text v-else class="message-text">{{ row.userContent || '（无正文）' }}</text>
             <text class="time">{{ formatTime(row.userMessageTime) }}</text>
           </view>
           <view class="message-block ai-block">
@@ -60,7 +67,8 @@
             <text class="customer">顾客 {{ row.openUserId }}</text>
             <text class="time">{{ formatTime(row.lastMessageAt) }}</text>
           </view>
-          <text class="last-message">{{ row.lastMessageContent || '暂无消息正文' }}</text>
+          <!-- 列表只做摘要，一行图床 URL 既占地方又没信息量，缩成图片标记 -->
+          <text class="last-message">{{ isImageMessage(row.lastMessageType, row.lastMessageContent) ? '[图片]' : (row.lastMessageContent || '暂无消息正文') }}</text>
           <view class="conversation-meta">
             <text>消息 {{ row.messageCount || 0 }}</text>
             <text>AI {{ row.aiMessageCount || 0 }}</text>
@@ -101,7 +109,14 @@
             <view class="bubble-row" :class="{ mine: item.senderRole !== 'USER' }">
               <view class="bubble" :class="bubbleClass(item.senderRole)">
                 <text class="bubble-role">{{ roleText(item.senderRole) }}</text>
-                <text class="bubble-content">{{ item.content || '（无正文）' }}</text>
+                <image
+                  v-if="isImageMessage(item.msgType, item.content)"
+                  class="bubble-image"
+                  :src="item.content.trim()"
+                  mode="widthFix"
+                  @tap.stop="previewImage(item.content)"
+                />
+                <text v-else class="bubble-content">{{ item.content || '（无正文）' }}</text>
                 <text class="bubble-time">{{ formatTime(item.eventTime) }}</text>
               </view>
             </view>
@@ -290,6 +305,23 @@ function isNewSession(item, index) {
   return index === 0 || historyRows.value[index - 1]?.sessionId !== item.sessionId
 }
 
+/** 与后端 ImMessageTypeEnum 对齐：图片消息的正文是美团图床 URL */
+const MSG_TYPE_IMAGE = 2
+
+/**
+ * 图片消息直接当文本渲染就是一长串链接，看不出顾客发了什么。
+ * 只认图片类型：OTHER 里可能是语音、视频等无法用 image 呈现的内容，仍按原文展示。
+ */
+function isImageMessage(msgType, content) {
+  return msgType === MSG_TYPE_IMAGE && /^https?:\/\//i.test(String(content || '').trim())
+}
+
+function previewImage(url) {
+  const current = String(url || '').trim()
+  if (!current) return
+  uni.previewImage({ urls: [current], current })
+}
+
 function roleText(role) {
   if (role === 'USER') return '顾客'
   if (role === 'AI') return 'AI 自动回复'
@@ -364,6 +396,8 @@ function copyValue(value, label) {
 .session-divider { display: flex; align-items: center; gap: 12rpx; padding: 22rpx 0; color: #aaa; font-size: 19rpx; }.session-line { flex: 1; height: 2rpx; background: #eee; }
 .bubble-row { display: flex; justify-content: flex-start; margin-bottom: 18rpx; }.bubble-row.mine { justify-content: flex-end; }
 .bubble { max-width: 78%; padding: 16rpx 20rpx; border-radius: 18rpx; }.user-bubble { background: #eef4ff; }.ai-bubble { background: #f4efff; }.merchant-bubble { background: #edf8ef; }
+.message-image { width: 240rpx; margin: 8rpx 0; border-radius: 12rpx; }
+.bubble-image { width: 260rpx; margin: 8rpx 0; border-radius: 12rpx; }
 .bubble-role, .bubble-time { display: block; color: #888; font-size: 19rpx; }.bubble-content { display: block; margin: 8rpx 0; color: #333; font-size: 26rpx; line-height: 1.5; white-space: pre-wrap; }.bubble-time { text-align: right; }
 .history-bottom { height: 24rpx; }
 </style>

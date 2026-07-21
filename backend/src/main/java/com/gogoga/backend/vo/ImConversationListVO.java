@@ -18,6 +18,8 @@ public class ImConversationListVO {
     private Integer merchantMessageCount;
     private Integer sessionCount;
     private String lastMessageRole;
+    /** 最后一条消息的类型，见 ImMessageTypeEnum；列表摘要据此把图片显示成「[图片]」而不是一串 URL。 */
+    private Integer lastMessageType;
     private String lastMessageContent;
     private LocalDateTime firstMessageAt;
     private LocalDateTime lastMessageAt;

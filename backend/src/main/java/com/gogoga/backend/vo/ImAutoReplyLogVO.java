@@ -18,6 +18,8 @@ public class ImAutoReplyLogVO {
     private Long openUserId;
     private Long orderId;
     private Long userMessageId;
+    /** 顾客消息类型，见 ImMessageTypeEnum。图片消息的正文是图片 URL，前端据此渲染成图片而不是链接文本。 */
+    private Integer userMsgType;
     private String userContent;
     /** 从顾客消息正文里识别出的手机号，查询时实时计算，不落库。 */
     private List<String> userPhones;
