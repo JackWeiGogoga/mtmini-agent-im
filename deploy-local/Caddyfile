@@ -19,9 +19,9 @@
 	respond @swagger 404
 }
 
-aib.waimaidashi.com {
+aic.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aib-access.log
+		output file /var/log/caddy/aic-access.log
 		format console
 	}
 
@@ -42,9 +42,9 @@ aib.waimaidashi.com {
 	}
 }
 
-aibadmin.waimaidashi.com {
+aicadmin.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aibadmin-access.log
+		output file /var/log/caddy/aicadmin-access.log
 		format console
 	}
 
@@ -65,9 +65,9 @@ aibadmin.waimaidashi.com {
 	}
 }
 
-aibapi.waimaidashi.com {
+aicapi.waimaidashi.com {
 	log {
-		output file /var/log/caddy/aibapi-access.log
+		output file /var/log/caddy/aicapi-access.log
 		format console
 	}
 

@@ -4,9 +4,3 @@ sms:
 power:
   wechat-pay:
     mock-enabled: ${POWER_WECHAT_PAY_MOCK_ENABLED:true}
-
-mt:
-  comment:
-    im-follow-up:
-      create-group-dry-run: ${MT_COMMENT_IM_CREATE_GROUP_DRY_RUN:true}
-      send-message-dry-run: ${MT_COMMENT_IM_SEND_MESSAGE_DRY_RUN:true}

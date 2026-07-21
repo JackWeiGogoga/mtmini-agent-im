@@ -16,7 +16,6 @@ export interface UserBehaviorAnalyticsRow {
   shopPhone?: string;
   h5AppOpenCount: number;
   h5HomePageViewCount: number;
-  h5LogPageViewCount: number;
   h5PowerPageViewCount: number;
   h5KnowledgePageViewCount: number;
   h5SupportPageViewCount: number;
@@ -24,14 +23,10 @@ export interface UserBehaviorAnalyticsRow {
   h5ExternalLinkClickCount: number;
   h5RechargeSubmitClickCount: number;
   h5RedemptionApplySuccessCount: number;
-  h5LogDetailExpandCount: number;
   h5KnowledgeActionCount: number;
-  pcCommentLogViewCount: number;
   pcKnowledgeViewCount: number;
   h5AutoReplyChangeCount: number;
-  h5NegativeAppealChangeCount: number;
   pcAutoReplyChangeCount: number;
-  pcNegativeAppealChangeCount: number;
   systemAutoDisableCount: number;
 }
 
@@ -43,6 +38,4 @@ export interface UserBehaviorAnalyticsPage {
   pages: number;
 }
 
-export type AdminBehaviorEventType =
-  | "PC_COMMENT_LOG_VIEW"
-  | "PC_KNOWLEDGE_VIEW";
+export type AdminBehaviorEventType = "PC_KNOWLEDGE_VIEW";

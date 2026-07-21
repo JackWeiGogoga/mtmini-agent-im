@@ -9,9 +9,6 @@ import lombok.Data;
 @Data
 public class ShopOperationSettingsUpdateParam {
 
-    @NotNull(message = "AI回复主开关不能为空")
+    @NotNull(message = "IM 自动回复主开关不能为空")
     private Boolean autoReplyEnabled;
-
-    @NotNull(message = "差评处理/申诉开关不能为空")
-    private Boolean negativeCommentAppealEnabled;
 }

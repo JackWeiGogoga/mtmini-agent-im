@@ -14,7 +14,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * 美团评价匿名群聊消息加密服务。
+ * 美团 IM 消息加密服务。
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +38,21 @@ public class MtImMessageCryptoService {
         }
     }
 
+    public String decrypt(String ciphertext) {
+        if (StringUtils.isBlank(ciphertext)) {
+            throw new IllegalArgumentException("IM_MESSAGE_CIPHERTEXT_EMPTY");
+        }
+        byte[] secret = resolveSecretBytes();
+        try {
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(secret, "AES"), new IvParameterSpec(secret));
+            byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(ciphertext));
+            return new String(decrypted, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new IllegalStateException("IM_MESSAGE_DECRYPT_FAILED", e);
+        }
+    }
+
     public String sha256(String content) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
@@ -48,7 +63,7 @@ public class MtImMessageCryptoService {
     }
 
     byte[] resolveSecretBytes() {
-        String secret = mtProperties.getComment().getImFollowUp().getImSecret();
+        String secret = mtProperties.getIm().getSecret();
         byte[] bytes = StringUtils.defaultString(secret).getBytes(StandardCharsets.UTF_8);
         if (bytes.length != 16) {
             throw new IllegalStateException("MT_IM_SECRET_MUST_BE_16_UTF8_BYTES");

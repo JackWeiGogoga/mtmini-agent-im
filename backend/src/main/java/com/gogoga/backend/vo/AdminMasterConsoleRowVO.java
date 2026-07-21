@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -38,14 +37,6 @@ public class AdminMasterConsoleRowVO implements Serializable {
     private String salesBoundUserPhone;
     private LocalDateTime salesBindTime;
 
-    private Integer goodCommentCount;
-    private Integer previousGoodCommentCount;
-    private Integer badCommentCount;
-    private Integer previousBadCommentCount;
-    private Integer repliedBadCommentCount;
-    private BigDecimal badCommentReplyRate;
-    private BigDecimal previousBadCommentReplyRate;
-
     private Integer powerBalance;
     private Integer totalRecharge;
     private Integer totalGrant;
@@ -63,7 +54,6 @@ public class AdminMasterConsoleRowVO implements Serializable {
     private LocalDateTime bindTime;
 
     private Boolean autoReplyEnabled;
-    private Boolean negativeCommentAppealEnabled;
 
     @JsonIgnore
     private Integer ordinaryBindingCount;

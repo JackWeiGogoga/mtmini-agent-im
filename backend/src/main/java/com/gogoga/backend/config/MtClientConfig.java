@@ -1,5 +1,6 @@
 package com.gogoga.backend.config;
 
+import com.gogoga.backend.client.MtDryRunMeituanClient;
 import com.meituan.sdk.DefaultMeituanClient;
 import com.meituan.sdk.MeituanClient;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +23,10 @@ public class MtClientConfig {
      */
     @Bean
     public MeituanClient meituanClient(MtProperties mtProperties) {
-        return DefaultMeituanClient.builder(mtProperties.getDeveloperId(), mtProperties.getSignKey()).build();
+        MeituanClient delegate = DefaultMeituanClient.builder(
+                mtProperties.getDeveloperId(),
+                mtProperties.getSignKey()
+        ).build();
+        return new MtDryRunMeituanClient(delegate, mtProperties);
     }
 }

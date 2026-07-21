@@ -1,6 +1,6 @@
 package com.gogoga.backend.dto;
 
-import com.gogoga.backend.entity.mt.MtReplyKnowledgeChunk;
+import com.gogoga.backend.entity.mt.MtKnowledgeChunk;
 import lombok.Data;
 
 /**
@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class KnowledgeSearchHitDTO {
 
-    private MtReplyKnowledgeChunk chunk;
+    private MtKnowledgeChunk chunk;
     private Double score;
     private Double cosineScore;
 }

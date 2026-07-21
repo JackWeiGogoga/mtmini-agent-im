@@ -59,14 +59,14 @@ class SystemPromptServiceImplTest {
     void renderReplacesVariablesAndMissingValues() {
         SystemPromptConfig config = new SystemPromptConfig();
         config.setPromptKey("TEST_PROMPT");
-        config.setContent("评价：{{comment}}，标签：{{label}}，未知：{{missing}}");
+        config.setContent("消息：{{message}}，标签：{{label}}，未知：{{missing}}");
         config.setEnabled(true);
         config.setVersion(1);
         when(mapper.selectByPromptKey("TEST_PROMPT")).thenReturn(config);
 
-        ResolvedSystemPromptDTO result = service.render("TEST_PROMPT", Map.of("comment", "很好", "label", ""), "兜底");
+        ResolvedSystemPromptDTO result = service.render("TEST_PROMPT", Map.of("message", "你好", "label", ""), "兜底");
 
-        assertThat(result.getContent()).isEqualTo("评价：很好，标签：无，未知：无");
+        assertThat(result.getContent()).isEqualTo("消息：你好，标签：无，未知：无");
     }
 
     @Test

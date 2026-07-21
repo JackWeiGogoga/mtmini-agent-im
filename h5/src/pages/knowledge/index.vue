@@ -3,6 +3,31 @@
     <app-subpage-header title="导入文档" />
 
     <view class="content">
+      <!-- 整卡可点：输入框本身只占一行里很窄的一段，只让 ✎ 或输入框可点会很难触发 -->
+      <view class="contact-card" :class="{ editing: contactPhoneEditing }" @tap="startEditContactPhone">
+        <view class="contact-row">
+          <text class="contact-icon">☏</text>
+          <text class="contact-label">联系电话：</text>
+          <input
+            class="contact-input"
+            type="text"
+            :value="contactPhoneInput"
+            :focus="contactPhoneFocus"
+            :maxlength="32"
+            placeholder="请输入号码..."
+            placeholder-class="contact-placeholder"
+            confirm-type="done"
+            @input="onContactPhoneInput"
+            @focus="contactPhoneEditing = true"
+            @blur="saveContactPhone"
+            @confirm="saveContactPhone"
+          />
+          <text v-if="savingContactPhone" class="contact-saving">保存中</text>
+          <text v-else class="contact-edit">✎</text>
+        </view>
+        <text class="contact-hint">{{ contactHint }}</text>
+      </view>
+
       <view class="upload-card">
         <view class="upload-log-entry" @tap="openUploadLogs">
           上传记录
@@ -23,13 +48,13 @@
       </view>
 
       <view class="qa-card">
-        <view class="card-action" @tap="openQaForm()">+添加回复内容</view>
+        <view class="card-action" @tap="openQaForm()">+添加知识问答</view>
         <text class="qa-tip">(输入文字内容)</text>
 
         <view v-if="knowledgeRows.length === 0" class="empty-state">
           <view class="empty-icon">?</view>
           <text class="empty-title">暂无知识内容</text>
-          <text class="empty-desc">可以上传文档，或手工添加顾客问题和回复内容。</text>
+          <text class="empty-desc">可以上传文档，或手工添加顾客问题和知识答案。</text>
         </view>
 
         <scroll-view v-else class="knowledge-list" scroll-y>
@@ -37,6 +62,7 @@
             <view class="question-icon">?</view>
             <view class="row-main">
               <view class="row-head">
+                <text class="category-badge" :class="categoryClass(row.category)">{{ categoryLabel(row.category) }}</text>
                 <text class="row-title">{{ row.title }}</text>
                 <view class="row-actions">
                   <text v-if="row.type === 'QA'" class="row-link" @tap="toggleAnswer(row.id)">查看回答</text>
@@ -46,7 +72,6 @@
               <text class="row-question">Q：{{ row.question }}</text>
               <text v-if="row.type === 'QA' && expandedQaId === row.id" class="row-answer">A：{{ row.answer }}</text>
               <view class="row-foot">
-                <text class="sentiment-badge" :class="sentimentClass(row.sentiment)">{{ sentimentLabel(row.sentiment) }}</text>
                 <text v-if="row.statusText" class="status-text">{{ row.statusText }}</text>
                 <text v-if="row.type === 'QA'" class="edit-link" @tap="openQaForm(row.raw)">编辑</text>
               </view>
@@ -69,10 +94,10 @@
           <input v-model="qaForm.title" class="form-input" maxlength="10" placeholder="请输入（10字内）" />
         </view>
         <view class="form-line">
-          <text class="form-label">评分：</text>
-          <picker class="form-picker" :range="sentimentOptions" range-key="label" :value="sentimentIndex" @change="changeSentiment">
+          <text class="form-label">类型：</text>
+          <picker class="form-picker" :range="categoryOptions" range-key="label" :value="categoryIndex" @change="changeCategory">
             <view class="picker-value">
-              <text>{{ sentimentOptions[sentimentIndex].label }}</text>
+              <text>{{ categoryOptions[categoryIndex].label }}</text>
               <text class="picker-arrow">▼</text>
             </view>
           </picker>
@@ -124,10 +149,7 @@
           </view>
           <scroll-view v-if="uploadPreviewChunks.length > 0" class="preview-chunk-list" scroll-y>
             <view v-for="chunk in uploadPreviewChunks" :key="chunk.index" class="preview-chunk-card">
-              <view class="chunk-head">
-                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
-                <text class="chunk-enabled">片段 {{ chunk.index }}</text>
-              </view>
+              <view class="chunk-head"><text class="chunk-enabled">片段 {{ chunk.index }}</text></view>
               <text class="chunk-text">{{ chunk.chunkText }}</text>
             </view>
           </scroll-view>
@@ -211,13 +233,9 @@
           <view v-else-if="documentChunks.length === 0" class="chunk-empty">暂无可用片段</view>
           <view v-else>
             <view v-for="chunk in documentChunks" :key="chunk.id" class="chunk-card" :class="{ 'chunk-disabled': !chunk.enabled }">
-              <view class="chunk-head">
-                <text class="sentiment-badge" :class="sentimentClass(chunk.sentiment)">{{ sentimentLabel(chunk.sentiment) }}</text>
-                <text class="chunk-enabled">{{ chunk.enabled ? '启用中' : '已停用' }}</text>
-              </view>
+              <view class="chunk-head"><text class="chunk-enabled">{{ chunk.enabled ? '启用中' : '已停用' }}</text></view>
               <text class="chunk-text">{{ chunk.chunkText }}</text>
               <view class="chunk-actions">
-                <text class="chunk-action" @tap="changeChunkSentiment(chunk)">改类型</text>
                 <text class="chunk-action" @tap="toggleChunkEnabled(chunk)">{{ chunk.enabled ? '停用' : '启用' }}</text>
                 <text class="chunk-action danger" @tap="removeChunk(chunk)">删除</text>
               </view>
@@ -238,31 +256,40 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import AppSubpageHeader from '@/components/app-subpage-header.vue'
 import {
-  clearCommentReplyKnowledge,
-  createCommentReplyQaItem,
-  deleteCommentReplyDocument,
-  deleteCommentReplyChunk,
-  deleteCommentReplyQaItem,
-  getCommentReplyDocumentChunks,
-  getCommentReplyDocuments,
-  getCommentReplyQaItems,
-  previewCommentReplyDocument,
+  clearKnowledge,
+  createKnowledgeQaItem,
+  deleteKnowledgeDocument,
+  deleteKnowledgeChunk,
+  deleteKnowledgeQaItem,
+  getKnowledgeDocumentChunks,
+  getKnowledgeDocuments,
+  getKnowledgeQaItems,
+  getMtH5ContactPhone,
+  previewKnowledgeDocument,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
-  updateCommentReplyChunkEnabled,
-  updateCommentReplyChunkSentiment,
-  updateCommentReplyQaItem,
-  uploadCommentReplyDocument,
+  updateKnowledgeChunkEnabled,
+  updateKnowledgeQaItem,
+  updateMtH5ContactPhone,
+  uploadKnowledgeDocument,
 } from '@/utils/mt-auth'
 
-const sentimentOptions = [
-  { label: '好评（4-5星）', value: 'GOOD' },
-  { label: '中评（3星）', value: 'NEUTRAL' },
-  { label: '差评（1-2星）', value: 'BAD' },
+const categoryOptions = [
+  { label: '普通类', value: 'GENERAL' },
+  { label: '配送类', value: 'DELIVERY' },
+  { label: '售后类', value: 'AFTER_SALE' },
+  { label: '其他', value: 'OTHER' },
 ]
 
 const qaItems = ref([])
 const documents = ref([])
+// contactPhoneSaved 存已落库的自定义号码，用于判断失焦时是否真的改过，避免无谓请求
+const contactPhoneSaved = ref('')
+const contactPhoneInput = ref('')
+const contactPhoneFallback = ref('')
+const contactPhoneEditing = ref(false)
+const contactPhoneFocus = ref(false)
+const savingContactPhone = ref(false)
 const uploading = ref(false)
 const savingQa = ref(false)
 const qaFormVisible = ref(false)
@@ -278,12 +305,16 @@ const uploadPreviewResult = ref(null)
 const pendingPreviewHint = ref('')
 const editingQaId = ref(null)
 const expandedQaId = ref(null)
-const sentimentIndex = ref(0)
 const qaForm = reactive({
   title: '',
-  sentiment: 'GOOD',
   question: '',
   answer: '',
+  category: 'GENERAL',
+})
+
+const categoryIndex = computed(() => {
+  const index = categoryOptions.findIndex((item) => item.value === qaForm.category)
+  return index === -1 ? 0 : index
 })
 
 const knowledgeRows = computed(() => {
@@ -291,12 +322,22 @@ const knowledgeRows = computed(() => {
     rowKey: `qa-${item.id}`,
     type: 'QA',
     id: item.id,
-    title: item.title || '回复内容',
+    title: item.title || '知识问答',
+    category: item.category || 'GENERAL',
     question: item.question || '',
     answer: item.answer || '',
-    sentiment: item.sentiment,
     raw: item,
   }))
+})
+
+const contactHint = computed(() => {
+  if (!contactPhoneFallback.value) {
+    return '填写后，自动回复结尾会附上「可以联系门店 电话」'
+  }
+  if (contactPhoneSaved.value) {
+    return `自动回复结尾会附上：可以联系门店 ${contactPhoneFallback.value}`
+  }
+  return `未填写时使用门店电话：${contactPhoneFallback.value}`
 })
 
 const failedDocumentCount = computed(() => {
@@ -320,13 +361,71 @@ onMounted(() => {
 async function refresh() {
   try {
     const [qa, docs] = await Promise.all([
-      getCommentReplyQaItems(),
-      getCommentReplyDocuments(),
+      getKnowledgeQaItems(),
+      getKnowledgeDocuments(),
     ])
     qaItems.value = qa || []
     documents.value = docs || []
   } catch (error) {
     uni.showToast({ title: error.message || '加载失败', icon: 'none' })
+  }
+  loadContactPhone()
+}
+
+async function loadContactPhone() {
+  try {
+    applyContactPhone(await getMtH5ContactPhone())
+  } catch (error) {
+    uni.showToast({ title: error.message || '联系电话加载失败', icon: 'none' })
+  }
+}
+
+function applyContactPhone(settings) {
+  contactPhoneSaved.value = settings?.customContactPhone || ''
+  contactPhoneInput.value = contactPhoneSaved.value
+  contactPhoneFallback.value = settings?.effectiveContactPhone || ''
+}
+
+function onContactPhoneInput(event) {
+  contactPhoneInput.value = event.detail.value
+}
+
+function startEditContactPhone() {
+  if (savingContactPhone.value) {
+    return
+  }
+  contactPhoneEditing.value = true
+  contactPhoneFocus.value = true
+}
+
+async function saveContactPhone() {
+  const next = (contactPhoneInput.value || '').trim()
+  contactPhoneEditing.value = false
+  // 必须复位：uni-app 的 focus 靠 false→true 的变化触发，不复位则下次点卡片不再拉起键盘
+  contactPhoneFocus.value = false
+  if (next === contactPhoneSaved.value) {
+    contactPhoneInput.value = contactPhoneSaved.value
+    return
+  }
+  savingContactPhone.value = true
+  try {
+    applyContactPhone(await updateMtH5ContactPhone(next))
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'CONTACT_PHONE_UPDATE',
+      result: 'SUCCESS',
+      cleared: next === '',
+    })
+    uni.showToast({ title: next ? '联系电话已保存' : '已清除联系电话', icon: 'none' })
+  } catch (error) {
+    // 校验失败时回滚到已落库的值，避免页面显示一个其实没生效的号码
+    contactPhoneInput.value = contactPhoneSaved.value
+    reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
+      actionCode: 'CONTACT_PHONE_UPDATE',
+      result: 'FAILED',
+    })
+    uni.showToast({ title: error.message || '联系电话保存失败', icon: 'none' })
+  } finally {
+    savingContactPhone.value = false
   }
 }
 
@@ -354,7 +453,7 @@ async function openUploadPreview(file) {
   uploadPreviewVisible.value = true
   previewingUpload.value = true
   try {
-    uploadPreviewResult.value = await previewCommentReplyDocument(file.path)
+    uploadPreviewResult.value = await previewKnowledgeDocument(file.path)
     reportMtH5BehaviorEvent('H5_KNOWLEDGE_ACTION', {
       actionCode: 'DOCUMENT_PREVIEW_RESULT',
       result: 'SUCCESS',
@@ -399,7 +498,7 @@ async function confirmUploadDocument() {
   })
   uploading.value = true
   try {
-    const uploaded = await uploadCommentReplyDocument(pendingUploadFile.value.path)
+    const uploaded = await uploadKnowledgeDocument(pendingUploadFile.value.path)
     resetUploadPreview()
     uni.showToast({ title: '上传成功，解析中', icon: 'none' })
     await refresh()
@@ -459,7 +558,7 @@ function confirmRemoveDocument(doc) {
         return
       }
       try {
-        await deleteCommentReplyDocument(doc.id)
+        await deleteKnowledgeDocument(doc.id)
         if (selectedDocument.value?.id === doc.id) {
           closeDocumentDetail()
         }
@@ -540,7 +639,7 @@ async function reloadDocumentDetail() {
 async function loadDocumentChunks(documentId) {
   loadingChunks.value = true
   try {
-    documentChunks.value = await getCommentReplyDocumentChunks(documentId) || []
+    documentChunks.value = await getKnowledgeDocumentChunks(documentId) || []
   } catch (error) {
     uni.showToast({ title: error.message || '加载片段失败', icon: 'none' })
   } finally {
@@ -548,33 +647,9 @@ async function loadDocumentChunks(documentId) {
   }
 }
 
-function changeChunkSentiment(chunk) {
-  const options = [
-    { label: '好评', value: 'GOOD' },
-    { label: '中评', value: 'NEUTRAL' },
-    { label: '差评', value: 'BAD' },
-    { label: '通用', value: 'UNKNOWN' },
-  ]
-  uni.showActionSheet({
-    itemList: options.map((item) => item.label),
-    success: async (res) => {
-      const sentiment = options[res.tapIndex]?.value
-      if (!sentiment || sentiment === chunk.sentiment) {
-        return
-      }
-      try {
-        await updateCommentReplyChunkSentiment(chunk.id, sentiment)
-        await reloadDocumentDetail()
-      } catch (error) {
-        uni.showToast({ title: error.message || '修改失败', icon: 'none' })
-      }
-    },
-  })
-}
-
 async function toggleChunkEnabled(chunk) {
   try {
-    await updateCommentReplyChunkEnabled(chunk.id, !chunk.enabled)
+    await updateKnowledgeChunkEnabled(chunk.id, !chunk.enabled)
     await reloadDocumentDetail()
   } catch (error) {
     uni.showToast({ title: error.message || '操作失败', icon: 'none' })
@@ -592,7 +667,7 @@ function removeChunk(chunk) {
         return
       }
       try {
-        await deleteCommentReplyChunk(chunk.id)
+        await deleteKnowledgeChunk(chunk.id)
         await reloadDocumentDetail()
       } catch (error) {
         uni.showToast({ title: error.message || '删除失败', icon: 'none' })
@@ -608,11 +683,15 @@ function openQaForm(item) {
   })
   editingQaId.value = item?.id || null
   qaForm.title = item?.title || ''
-  qaForm.sentiment = item?.sentiment || 'GOOD'
   qaForm.question = item?.question || ''
   qaForm.answer = item?.answer || ''
-  sentimentIndex.value = Math.max(0, sentimentOptions.findIndex((option) => option.value === qaForm.sentiment))
+  qaForm.category = item?.category || 'GENERAL'
   qaFormVisible.value = true
+}
+
+function changeCategory(event) {
+  const index = Number(event?.detail?.value || 0)
+  qaForm.category = categoryOptions[index]?.value || 'GENERAL'
 }
 
 function closeQaForm() {
@@ -620,12 +699,6 @@ function closeQaForm() {
     return
   }
   qaFormVisible.value = false
-}
-
-function changeSentiment(event) {
-  const index = Number(event.detail.value || 0)
-  sentimentIndex.value = index
-  qaForm.sentiment = sentimentOptions[index].value
 }
 
 async function submitQaForm() {
@@ -640,15 +713,15 @@ async function submitQaForm() {
   try {
     const payload = {
       title,
-      sentiment: qaForm.sentiment,
       question,
       answer,
+      category: qaForm.category || 'GENERAL',
       enabled: true,
     }
     if (editingQaId.value) {
-      await updateCommentReplyQaItem(editingQaId.value, payload)
+      await updateKnowledgeQaItem(editingQaId.value, payload)
     } else {
-      await createCommentReplyQaItem(payload)
+      await createKnowledgeQaItem(payload)
     }
     qaFormVisible.value = false
     await refresh()
@@ -662,7 +735,7 @@ async function submitQaForm() {
 function removeQa(id) {
   uni.showModal({
     title: '确认删除这条知识？',
-    content: '删除后 AI 将不再使用这条回复内容。',
+    content: '删除后 AI 将不再使用这条知识问答。',
     confirmText: '确认',
     cancelText: '取消',
     success: async (res) => {
@@ -670,7 +743,7 @@ function removeQa(id) {
         return
       }
       try {
-        await deleteCommentReplyQaItem(id)
+        await deleteKnowledgeQaItem(id)
         await refresh()
       } catch (error) {
         uni.showToast({ title: error.message || '删除失败', icon: 'none' })
@@ -682,7 +755,7 @@ function removeQa(id) {
 function confirmClearKnowledge() {
   uni.showModal({
     title: '确认要删除AI所有知识吗？',
-    content: '删除后已上传文档和回复内容都会清空。',
+    content: '删除后已上传文档和知识问答都会清空。',
     confirmText: '确认',
     cancelText: '取消',
     success: async (res) => {
@@ -690,7 +763,7 @@ function confirmClearKnowledge() {
         return
       }
       try {
-        await clearCommentReplyKnowledge()
+        await clearKnowledge()
         expandedQaId.value = null
         await refresh()
       } catch (error) {
@@ -704,21 +777,17 @@ function toggleAnswer(id) {
   expandedQaId.value = expandedQaId.value === id ? null : id
 }
 
-function sentimentLabel(value) {
-  return {
-    GOOD: '好评',
-    NEUTRAL: '中评',
-    BAD: '差评',
-    UNKNOWN: '文档',
-  }[value] || '文档'
+function categoryLabel(value) {
+  return categoryOptions.find((item) => item.value === value)?.label || '普通类'
 }
 
-function sentimentClass(value) {
+function categoryClass(value) {
   return {
-    GOOD: 'sentiment-good',
-    NEUTRAL: 'sentiment-neutral',
-    BAD: 'sentiment-bad',
-  }[value] || 'sentiment-doc'
+    GENERAL: 'category-general',
+    DELIVERY: 'category-delivery',
+    AFTER_SALE: 'category-after-sale',
+    OTHER: 'category-other',
+  }[value] || 'category-general'
 }
 
 function parseStatusText(value) {
@@ -780,6 +849,7 @@ function formatFileSize(value) {
   padding: 12px 16px 28px;
 }
 
+.contact-card,
 .upload-card,
 .qa-card,
 .clear-card {
@@ -787,6 +857,72 @@ function formatFileSize(value) {
   border-radius: 16px;
   box-sizing: border-box;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+}
+
+.contact-card {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.contact-card.editing {
+  border-color: #ffc300;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contact-icon {
+  flex: none;
+  color: #111111;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.contact-label {
+  flex: none;
+  color: #111111;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.contact-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  color: #111111;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.contact-placeholder {
+  color: #b6b6b6;
+  font-size: 15px;
+}
+
+.contact-edit,
+.contact-saving {
+  flex: none;
+  color: #9a9a9a;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.contact-saving {
+  font-size: 12px;
+}
+
+.contact-hint {
+  display: block;
+  margin-top: 6px;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .upload-card {
@@ -1018,6 +1154,35 @@ function formatFileSize(value) {
   text-overflow: ellipsis;
 }
 
+.category-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 700;
+}
+
+.category-general {
+  background: #eef1f6;
+  color: #55617a;
+}
+
+.category-delivery {
+  background: #e7f2ff;
+  color: #2b6cb0;
+}
+
+.category-after-sale {
+  background: #fdeeee;
+  color: #cf4b4b;
+}
+
+.category-other {
+  background: #f1f0ee;
+  color: #8a7d63;
+}
+
 .row-actions {
   flex-shrink: 0;
   gap: 9px;
@@ -1060,32 +1225,6 @@ function formatFileSize(value) {
   justify-content: flex-start;
   gap: 7px;
   margin-top: 8px;
-}
-
-.sentiment-badge {
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-}
-
-.sentiment-good {
-  color: #138a3d;
-  background: #eaf8ef;
-}
-
-.sentiment-neutral {
-  color: #9a6a00;
-  background: #fff4d8;
-}
-
-.sentiment-bad {
-  color: #cf2d23;
-  background: #ffecea;
-}
-
-.sentiment-doc {
-  color: #555555;
-  background: #f0f0f0;
 }
 
 .status-text {

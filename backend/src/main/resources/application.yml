@@ -28,7 +28,7 @@ server:
 
 spring:
   config:
-    import: classpath:comment-reply-sensitive-words.yml
+    import: classpath:sensitive-words.yml
   application:
     name: backend
   profiles:
@@ -163,7 +163,11 @@ mt:
   developer-id: ${MT_DEVELOPER_ID:}
   sign-key: ${MT_SIGN_KEY:}
   business-id: ${MT_BUSINESS_ID:16}
-  callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aib.waimaidashi.com/#/}
+  callback-success-url: ${MT_CALLBACK_SUCCESS_URL:https://aic.waimaidashi.com/#/}
+  api:
+    dry-run: ${MT_API_DRY_RUN:false}
+    im-send-dry-run: ${MT_API_IM_SEND_DRY_RUN:false}
+    dry-run-reschedule-seconds: ${MT_API_DRY_RUN_RESCHEDULE_SECONDS:3600}
   h5:
     app-key: ${MT_H5_APP_KEY:}
   token:
@@ -189,11 +193,8 @@ mt:
     executor-queue-capacity: ${MT_ASYNC_TASK_EXECUTOR_QUEUE_CAPACITY:200}
     llm-executor-concurrency: ${MT_ASYNC_TASK_LLM_EXECUTOR_CONCURRENCY:2}
     llm-task-weights:
-      comment-auto-reply: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_REPLY:5}
-      comment-auto-im-follow-up: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_IM_FOLLOW_UP:2}
-      comment-auto-complaint: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_AUTO_COMPLAINT:2}
-      comment-log-analysis: ${MT_ASYNC_TASK_LLM_WEIGHT_COMMENT_LOG_ANALYSIS:1}
       knowledge-document-parse: ${MT_ASYNC_TASK_LLM_WEIGHT_KNOWLEDGE_DOCUMENT_PARSE:1}
+      im-auto-reply: ${MT_ASYNC_TASK_LLM_WEIGHT_IM_AUTO_REPLY:5}
     cleanup:
       enabled: ${MT_ASYNC_TASK_CLEANUP_ENABLED:false}
       delay-ms: ${MT_ASYNC_TASK_CLEANUP_DELAY_MS:3600000}
@@ -211,88 +212,68 @@ mt:
       timeout-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_TIMEOUT_SECONDS:180}
       initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_BACKFILL_POI_ID_MAX_BACKOFF_SECONDS:900}
-    auth-comment-backfill:
-      max-retry-count: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_TIMEOUT_SECONDS:300}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_COMMENT_BACKFILL_MAX_BACKOFF_SECONDS:900}
-    comment-auto-reply:
-      max-retry-count: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_REPLY_MAX_BACKOFF_SECONDS:900}
-    comment-log-analysis:
-      max-retry-count: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_LOG_ANALYSIS_MAX_BACKOFF_SECONDS:900}
-    comment-auto-complaint:
-      max-retry-count: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_MAX_RETRY_COUNT:3}
-      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_COMPLAINT_MAX_BACKOFF_SECONDS:900}
-    comment-auto-im-follow-up:
-      max-retry-count: 0
-      timeout-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_IM_FOLLOW_UP_TIMEOUT_SECONDS:180}
-      initial-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_IM_FOLLOW_UP_INITIAL_BACKOFF_SECONDS:60}
-      max-backoff-seconds: ${MT_ASYNC_TASK_COMMENT_AUTO_IM_FOLLOW_UP_MAX_BACKOFF_SECONDS:60}
+    auth-configure-im:
+      max-retry-count: ${MT_ASYNC_TASK_AUTH_CONFIGURE_IM_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_ASYNC_TASK_AUTH_CONFIGURE_IM_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_AUTH_CONFIGURE_IM_INITIAL_BACKOFF_SECONDS:60}
+      max-backoff-seconds: ${MT_ASYNC_TASK_AUTH_CONFIGURE_IM_MAX_BACKOFF_SECONDS:900}
     knowledge-document-parse:
       max-retry-count: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_MAX_RETRY_COUNT:3}
       timeout-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_TIMEOUT_SECONDS:600}
       initial-backoff-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_INITIAL_BACKOFF_SECONDS:60}
       max-backoff-seconds: ${MT_ASYNC_TASK_KNOWLEDGE_DOCUMENT_PARSE_MAX_BACKOFF_SECONDS:900}
-  comment:
-    pull-cron: ${MT_COMMENT_PULL_CRON:0 0 8,13,19 * * ?}
-    lookback-days: ${MT_COMMENT_LOOKBACK_DAYS:7}
-    page-size: ${MT_COMMENT_PAGE_SIZE:20}
-    query-dry-run: ${MT_COMMENT_QUERY_DRY_RUN:false}
-    reply-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:false}
-    complaint-dry-run: ${MT_COMMENT_REPLY_DRY_RUN:false}
-    dry-run-reschedule-seconds: ${MT_COMMENT_DRY_RUN_RESCHEDULE_SECONDS:3600}
-    default-reply: ${MT_COMMENT_DEFAULT_REPLY:很好}
-    im-follow-up:
-      im-secret: ${MT_IM_SECRET:}
-      create-group-dry-run: ${MT_COMMENT_IM_CREATE_GROUP_DRY_RUN:false}
-      send-message-dry-run: ${MT_COMMENT_IM_SEND_MESSAGE_DRY_RUN:false}
-      dry-run-reschedule-seconds: ${MT_COMMENT_IM_DRY_RUN_RESCHEDULE_SECONDS:3600}
-      fallback-power-amount: ${MT_COMMENT_IM_FALLBACK_POWER_AMOUNT:1000}
-      fallback-message: ${MT_COMMENT_IM_FALLBACK_MESSAGE:我是售后处理专员：亲~收到了您的一条差评[{{commentContent}}]，抱歉给您带来不好的体验，能提供一下订单号和联系号码吗？方便我核实后给您补偿处理☺️}
-    sensitive-word:
-      enabled: ${MT_COMMENT_SENSITIVE_WORD_ENABLED:true}
-      max-rewrite-attempts: ${MT_COMMENT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}
-    knowledge:
-      enabled: ${MT_COMMENT_KNOWLEDGE_ENABLED:true}
-      max-qa-items-per-shop: ${MT_COMMENT_KNOWLEDGE_MAX_QA_ITEMS_PER_SHOP:500}
-      max-documents-per-shop: ${MT_COMMENT_KNOWLEDGE_MAX_DOCUMENTS_PER_SHOP:10}
-      max-document-bytes: ${MT_COMMENT_KNOWLEDGE_MAX_DOCUMENT_BYTES:20971520}
-      max-chunks-per-document: ${MT_COMMENT_KNOWLEDGE_MAX_CHUNKS_PER_DOCUMENT:500}
-      max-search-candidates: ${MT_COMMENT_KNOWLEDGE_MAX_SEARCH_CANDIDATES:1000}
-      top-k: ${MT_COMMENT_KNOWLEDGE_TOP_K:5}
-      min-context-cosine-score: ${MT_COMMENT_KNOWLEDGE_MIN_CONTEXT_COSINE_SCORE:0.75}
-      rag-balance-threshold: ${MT_COMMENT_KNOWLEDGE_RAG_BALANCE_THRESHOLD:10000}
-      auth-grant-power-amount: ${MT_COMMENT_KNOWLEDGE_AUTH_GRANT_POWER_AMOUNT:${POWER_NEW_AUTHORIZED_SHOP_GRANT_AMOUNT:800000}}
-      model-provider: ${MT_COMMENT_KNOWLEDGE_MODEL_PROVIDER:TOKENHUB}
-      model-base-url: ${MT_COMMENT_KNOWLEDGE_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
-      model-api-key: ${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}
-      chat-model: ${MT_COMMENT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}
-      embedding-provider: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_PROVIDER:DASHSCOPE}
-      embedding-base-url: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_BASE_URL:https://llm-kz8j7o34hwdm6nb4.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}
-      embedding-api-key: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
-      embedding-model: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_MODEL:text-embedding-v4}
-      embedding-dim: ${MT_COMMENT_KNOWLEDGE_EMBEDDING_DIM:1024}
-      document-key-prefix: ${MT_COMMENT_KNOWLEDGE_DOCUMENT_KEY_PREFIX:comment-knowledge/documents}
-      vision-enabled: ${MT_COMMENT_KNOWLEDGE_VISION_ENABLED:true}
-      vision-provider: ${MT_COMMENT_KNOWLEDGE_VISION_PROVIDER:TOKENHUB}
-      vision-model-base-url: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
-      vision-model-api-key: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL_API_KEY:${MT_COMMENT_KNOWLEDGE_MODEL_API_KEY:}}
-      vision-model: ${MT_COMMENT_KNOWLEDGE_VISION_MODEL:qwen3.5-flash}
-      vision-max-image-count: ${MT_COMMENT_KNOWLEDGE_VISION_MAX_IMAGE_COUNT:3}
-      vision-timeout-seconds: ${MT_COMMENT_KNOWLEDGE_VISION_TIMEOUT_SECONDS:30}
-      vision-fallback-power-amount: ${MT_COMMENT_KNOWLEDGE_VISION_FALLBACK_POWER_AMOUNT:1000}
-      vision-image-key-prefix: ${MT_COMMENT_KNOWLEDGE_VISION_IMAGE_KEY_PREFIX:comment-knowledge/vision-images}
-      vision-temp-image-key-prefix: ${MT_COMMENT_KNOWLEDGE_VISION_TEMP_IMAGE_KEY_PREFIX:comment-knowledge/vision-temp-images}
-      fallback-rag-power-amount: ${MT_COMMENT_KNOWLEDGE_FALLBACK_RAG_POWER_AMOUNT:1000}
-
+    im-auto-reply:
+      max-retry-count: ${MT_ASYNC_TASK_IM_AUTO_REPLY_MAX_RETRY_COUNT:5}
+      timeout-seconds: ${MT_ASYNC_TASK_IM_AUTO_REPLY_TIMEOUT_SECONDS:180}
+      initial-backoff-seconds: ${MT_ASYNC_TASK_IM_AUTO_REPLY_INITIAL_BACKOFF_SECONDS:5}
+      max-backoff-seconds: ${MT_ASYNC_TASK_IM_AUTO_REPLY_MAX_BACKOFF_SECONDS:300}
+  im:
+    secret: ${MT_IM_SECRET:}
+    callback-business-id: ${MT_IM_CALLBACK_BUSINESS_ID:2}
+    callback-debug-log: ${MT_IM_CALLBACK_DEBUG_LOG:false}
+  im-auto-reply:
+    enabled: ${MT_IM_AUTO_REPLY_ENABLED:false}
+    session-idle-minutes: ${MT_IM_AUTO_REPLY_SESSION_IDLE_MINUTES:30}
+    history-max-rounds: ${MT_IM_AUTO_REPLY_HISTORY_MAX_ROUNDS:100}
+    debounce-millis: ${MT_IM_AUTO_REPLY_DEBOUNCE_MILLIS:2000}
+    merchant-hold-seconds: ${MT_IM_AUTO_REPLY_MERCHANT_HOLD_SECONDS:40}
+    send-delay-min-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MIN_SECONDS:3}
+    send-delay-max-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MAX_SECONDS:10}
+    max-context-chars: ${MT_IM_AUTO_REPLY_MAX_CONTEXT_CHARS:24000}
+    max-completion-tokens: ${MT_IM_AUTO_REPLY_MAX_COMPLETION_TOKENS:512}
+    temperature: ${MT_IM_AUTO_REPLY_TEMPERATURE:0.3}
+    rag-recent-user-messages: ${MT_IM_AUTO_REPLY_RAG_RECENT_USER_MESSAGES:3}
+    lock-lease-seconds: ${MT_IM_AUTO_REPLY_LOCK_LEASE_SECONDS:60}
+    lock-renew-seconds: ${MT_IM_AUTO_REPLY_LOCK_RENEW_SECONDS:20}
+    model-provider: ${MT_IM_AUTO_REPLY_MODEL_PROVIDER:${MT_KNOWLEDGE_MODEL_PROVIDER:TOKENHUB}}
+    model-base-url: ${MT_IM_AUTO_REPLY_MODEL_BASE_URL:${MT_KNOWLEDGE_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}}
+    model-api-key: ${MT_IM_AUTO_REPLY_MODEL_API_KEY:${MT_KNOWLEDGE_MODEL_API_KEY:}}
+    chat-model: ${MT_IM_AUTO_REPLY_CHAT_MODEL:${MT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}}
+    safe-fallback-reply: ${MT_IM_AUTO_REPLY_SAFE_FALLBACK_REPLY:抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。}
+  sensitive-word:
+    enabled: ${MT_SENSITIVE_WORD_ENABLED:true}
+    max-rewrite-attempts: ${MT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}
+  knowledge:
+    enabled: ${MT_KNOWLEDGE_ENABLED:true}
+    max-qa-items-per-shop: ${MT_KNOWLEDGE_MAX_QA_ITEMS_PER_SHOP:500}
+    max-documents-per-shop: ${MT_KNOWLEDGE_MAX_DOCUMENTS_PER_SHOP:10}
+    max-document-bytes: ${MT_KNOWLEDGE_MAX_DOCUMENT_BYTES:20971520}
+    max-chunks-per-document: ${MT_KNOWLEDGE_MAX_CHUNKS_PER_DOCUMENT:500}
+    max-search-candidates: ${MT_KNOWLEDGE_MAX_SEARCH_CANDIDATES:1000}
+    top-k: ${MT_KNOWLEDGE_TOP_K:5}
+    min-context-cosine-score: ${MT_KNOWLEDGE_MIN_CONTEXT_COSINE_SCORE:0.5}
+    rag-balance-threshold: ${MT_KNOWLEDGE_RAG_BALANCE_THRESHOLD:10000}
+    auth-grant-power-amount: ${MT_KNOWLEDGE_AUTH_GRANT_POWER_AMOUNT:${POWER_NEW_AUTHORIZED_SHOP_GRANT_AMOUNT:800000}}
+    model-provider: ${MT_KNOWLEDGE_MODEL_PROVIDER:TOKENHUB}
+    model-base-url: ${MT_KNOWLEDGE_MODEL_BASE_URL:https://tokenhub.tencentmaas.com/v1}
+    model-api-key: ${MT_KNOWLEDGE_MODEL_API_KEY:}
+    chat-model: ${MT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}
+    embedding-provider: ${MT_KNOWLEDGE_EMBEDDING_PROVIDER:DASHSCOPE}
+    embedding-base-url: ${MT_KNOWLEDGE_EMBEDDING_BASE_URL:https://llm-kz8j7o34hwdm6nb4.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}
+    embedding-api-key: ${MT_KNOWLEDGE_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
+    embedding-model: ${MT_KNOWLEDGE_EMBEDDING_MODEL:text-embedding-v4}
+    embedding-dim: ${MT_KNOWLEDGE_EMBEDDING_DIM:1024}
+    document-key-prefix: ${MT_KNOWLEDGE_DOCUMENT_KEY_PREFIX:knowledge/documents}
 youzan:
   client-id: ${YOUZAN_CLIENT_ID:}
   client-secret: ${YOUZAN_CLIENT_SECRET:}

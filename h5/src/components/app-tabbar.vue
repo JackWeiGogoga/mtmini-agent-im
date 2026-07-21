@@ -36,7 +36,6 @@ export default {
   data() {
     return {
       tabStatus: {
-        logUnread: false,
         powerInsufficient: false,
         powerStatusText: "",
       },
@@ -67,7 +66,6 @@ export default {
       try {
         const status = await getMtH5TabStatus();
         this.tabStatus = {
-          logUnread: Boolean(status?.logUnread),
           powerInsufficient: Boolean(status?.powerInsufficient),
           powerStatusText: status?.powerStatusText || "",
         };

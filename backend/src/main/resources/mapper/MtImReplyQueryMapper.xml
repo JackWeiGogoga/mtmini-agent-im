@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImReplyQueryMapper">
+    <select id="selectReplyLogs" parameterType="com.gogoga.backend.param.ImAutoReplyLogQueryParam"
+            resultType="com.gogoga.backend.vo.ImAutoReplyLogVO">
+        SELECT a.id AS auto_reply_id,
+               a.shop_id,
+               COALESCE(NULLIF(s.poi_name, ''), s.name) AS shop_name,
+               s.poi_id,
+               s.epoi_id,
+               a.conversation_id,
+               a.session_id,
+               trigger_message.open_user_id,
+               trigger_message.order_id,
+               trigger_message.id AS user_message_id,
+               trigger_message.msg_content_plaintext AS user_content,
+               trigger_message.event_time AS user_message_time,
+               reply_message.id AS ai_message_id,
+               reply_message.msg_content_plaintext AS ai_content,
+               reply_message.event_time AS ai_message_time,
+               reply_message.delivery_status,
+               a.status,
+               a.skip_reason,
+               a.rag_used,
+               a.rag_chunk_count,
+               a.rag_max_score,
+               a.model_name,
+               a.prompt_tokens,
+               a.completion_tokens,
+               a.power_amount,
+               a.rewrite_count,
+               a.sent_at,
+               a.last_error_code,
+               a.create_time
+        FROM mt_im_auto_reply a
+        JOIN mt_im_message trigger_message ON trigger_message.id = a.trigger_message_id
+        LEFT JOIN mt_im_message reply_message ON reply_message.id = a.reply_message_id
+        JOIN mt_shop s ON s.id = a.shop_id
+        <where>
+            <if test="shopId != null">AND a.shop_id = #{shopId}</if>
+            <if test="shopKeyword != null and shopKeyword != ''">
+                AND (s.name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_id LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.epoi_id LIKE CONCAT('%', #{shopKeyword}, '%'))
+            </if>
+            <if test="openUserId != null">AND trigger_message.open_user_id = #{openUserId}</if>
+            <if test="orderId != null">AND trigger_message.order_id = #{orderId}</if>
+            <if test="status != null and status != ''">AND a.status = #{status}</if>
+            <if test="ragUsed != null">AND a.rag_used = #{ragUsed}</if>
+            <if test="startTime != null">AND a.create_time &gt;= #{startTime}</if>
+            <if test="endTime != null">AND a.create_time &lt;= #{endTime}</if>
+        </where>
+        ORDER BY a.create_time DESC, a.id DESC
+    </select>
+
+    <select id="selectConversations" parameterType="com.gogoga.backend.param.ImConversationQueryParam"
+            resultType="com.gogoga.backend.vo.ImConversationListVO">
+        SELECT c.id AS conversation_id,
+               c.shop_id,
+               COALESCE(NULLIF(s.poi_name, ''), s.name) AS shop_name,
+               s.poi_id,
+               s.epoi_id,
+               c.open_user_id,
+               c.message_count,
+               c.user_message_count,
+               c.ai_message_count,
+               c.merchant_message_count,
+               c.session_count,
+               latest.sender_role AS last_message_role,
+               latest.msg_content_plaintext AS last_message_content,
+               c.first_message_at,
+               c.last_message_at,
+               c.last_ai_reply_at
+        FROM mt_im_conversation c
+        JOIN mt_shop s ON s.id = c.shop_id
+        LEFT JOIN mt_im_message latest ON latest.id = c.last_message_id
+        <where>
+            <if test="shopId != null">AND c.shop_id = #{shopId}</if>
+            <if test="shopKeyword != null and shopKeyword != ''">
+                AND (s.name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_name LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.poi_id LIKE CONCAT('%', #{shopKeyword}, '%')
+                  OR s.epoi_id LIKE CONCAT('%', #{shopKeyword}, '%'))
+            </if>
+            <if test="openUserId != null">AND c.open_user_id = #{openUserId}</if>
+            <if test="orderId != null">
+                AND EXISTS (SELECT 1 FROM mt_im_message order_message
+                            WHERE order_message.conversation_id = c.id AND order_message.order_id = #{orderId})
+            </if>
+            <if test="startTime != null">AND c.last_message_at &gt;= #{startTime}</if>
+            <if test="endTime != null">AND c.last_message_at &lt;= #{endTime}</if>
+        </where>
+        ORDER BY c.last_message_at DESC, c.id DESC
+    </select>
+
+    <select id="selectHistoryBefore" resultType="com.gogoga.backend.vo.ImConversationMessageVO">
+        SELECT m.id,
+               m.conversation_id,
+               m.session_id,
+               cs.session_no,
+               cs.boundary_reason AS session_boundary_reason,
+               cs.started_at AS session_started_at,
+               m.sender_role,
+               m.record_source,
+               m.msg_content_plaintext AS content,
+               m.delivery_status,
+               reply.status AS auto_reply_status,
+               m.reply_to_message_id,
+               m.order_id,
+               m.event_time
+        FROM mt_im_message m
+        LEFT JOIN mt_im_conversation_session cs ON cs.id = m.session_id
+        LEFT JOIN mt_im_auto_reply reply ON reply.id = m.auto_reply_id
+        WHERE m.conversation_id = #{conversationId}
+          AND m.sender_role IN ('USER', 'MERCHANT', 'AI')
+        <if test="cursorTime != null and cursorId != null">
+            AND (m.event_time &lt; #{cursorTime}
+              OR (m.event_time = #{cursorTime} AND m.id &lt; #{cursorId}))
+        </if>
+        ORDER BY m.event_time DESC, m.id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImAutoReplySettingMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImAutoReplySetting">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="auto_reply_enabled" property="autoReplyEnabled"/>
+        <result column="custom_contact_phone" property="customContactPhone"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT id, shop_id, auto_reply_enabled, custom_contact_phone, create_time, update_time
+        FROM mt_im_auto_reply_setting
+        WHERE shop_id = #{shopId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImAutoReplySetting"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_auto_reply_setting (
+            shop_id, auto_reply_enabled, custom_contact_phone, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{autoReplyEnabled}, #{customContactPhone}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.gogoga.backend.entity.mt.MtImAutoReplySetting">
+        UPDATE mt_im_auto_reply_setting
+        SET auto_reply_enabled = #{autoReplyEnabled},
+            custom_contact_phone = #{customContactPhone},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+</mapper>

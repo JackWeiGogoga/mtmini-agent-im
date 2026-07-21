@@ -21,9 +21,9 @@ public class MtH5HomeDashboardVO implements Serializable {
 
     private MembershipSummary membership;
 
-    private CommentStatsSummary commentStats;
-
     private PowerStatsSummary powerStats;
+
+    private MessageStatsSummary messageStats;
 
     private MtH5TabStatusVO tabStatus;
 
@@ -56,28 +56,6 @@ public class MtH5HomeDashboardVO implements Serializable {
     }
 
     @Data
-    public static class CommentStatsSummary implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        private Integer goodCommentCount;
-
-        private Integer neutralCommentCount;
-
-        private Integer badCommentCount;
-
-        private Integer repliedBadCommentCount;
-
-        private BigDecimal badCommentReplyRate;
-
-        private Integer previousGoodCommentCount;
-
-        private Integer previousBadCommentCount;
-
-        private BigDecimal previousBadCommentReplyRate;
-    }
-
-    @Data
     public static class PowerStatsSummary implements Serializable {
 
         private static final long serialVersionUID = 1L;
@@ -99,6 +77,24 @@ public class MtH5HomeDashboardVO implements Serializable {
         private Boolean insufficient;
 
         private String statusText;
+    }
+
+    @Data
+    public static class MessageStatsSummary implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private Integer currentMessageReplyCount;
+
+        private Integer previousMessageReplyCount;
+
+        private Integer currentAfterSaleMessageCount;
+
+        private Integer previousAfterSaleMessageCount;
+
+        private BigDecimal messageReplyRate;
+
+        private BigDecimal previousMessageReplyRate;
     }
 
     @Data

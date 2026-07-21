@@ -1,0 +1,258 @@
+sensitive-words:
+  categories:
+    - code: OFF_PLATFORM
+      name: 站外导流违规词
+      severity: HIGH
+      words:
+        - { text: "微信" }
+        - { text: "wx" }
+        - { text: "vx" }
+        - { text: "加微" }
+        - { text: "私微" }
+        - { text: "微信号" }
+        - { text: "微信二维码" }
+        - { text: "微信收款" }
+        - { text: "微信转账" }
+        - { text: "QQ" }
+        - { text: "扣扣" }
+        - { text: "QQ群" }
+        - { text: "QQ号" }
+        - { text: "手机号" }
+        - { text: "电话" }
+        - { text: "号码" }
+        - { text: "私聊" }
+        - { text: "致电" }
+        - { text: "打给我" }
+        - { text: "支付宝" }
+        - { text: "zfb" }
+        - { text: "支付宝转账" }
+        - { text: "收款码" }
+        - { text: "现金转账" }
+        - { text: "抖音" }
+        - { text: "快手" }
+        - { text: "小红书" }
+        - { text: "淘宝" }
+        - { text: "拼多多" }
+        - { text: "京东" }
+        - { text: "闲鱼" }
+        - { text: "某宝" }
+        - { text: "淘店" }
+        - { text: "网址" }
+        - { text: "链接" }
+        - { text: "外链" }
+        - { text: "官网" }
+        - { text: "线下门店" }
+        - { text: "线下交易" }
+        - { text: "二维码" }
+        - { text: "扫码" }
+        - { text: "扫一扫" }
+        - { text: "加好友" }
+        - { text: "私下交易" }
+        - { text: "线下付" }
+        - { text: "线下下单" }
+        - { text: "不走美团" }
+        - { text: "平台外交易" }
+        - { text: "微信发券" }
+        - { text: "加我领优惠" }
+        - { text: "私聊给低价" }
+        - { text: "私下退款" }
+        - { text: "线下退款" }
+        - { text: "脱离平台" }
+    - code: ABUSE
+      name: 辱骂人身攻击
+      severity: HIGH
+      words:
+        - { text: "傻逼" }
+        - { text: "脑残" }
+        - { text: "废物" }
+        - { text: "垃圾" }
+        - { text: "去死" }
+        - { text: "杂种" }
+        - { text: "贱人" }
+        - { text: "婊" }
+        - { text: "畜牲" }
+        - { text: "神经病" }
+        - { text: "沙比" }
+        - { text: "脑蚕" }
+        - { text: "垃机" }
+        - { text: "牛马" }
+        - { text: "穷鬼" }
+        - { text: "找人收拾你" }
+        - { text: "告死你" }
+        - { text: "报复" }
+        - { text: "差评轰炸" }
+    - code: SEXUAL
+      name: 色情低俗淫秽词
+      severity: HIGH
+      words:
+        - { text: "嫖" }
+        - { text: "妓女" }
+        - { text: "小姐" }
+        - { text: "出台" }
+        - { text: "约炮" }
+        - { text: "裸" }
+        - { text: "性交" }
+        - { text: "下体" }
+        - { text: "私处" }
+        - { text: "特殊服务" }
+        - { text: "嫖娼" }
+    - code: ILLEGAL
+      name: 违法犯罪违禁词
+      severity: HIGH
+      words:
+        - { text: "赌博" }
+        - { text: "线上赌场" }
+        - { text: "彩票私售" }
+        - { text: "毒品" }
+        - { text: "冰毒" }
+        - { text: "大麻" }
+        - { text: "吸毒" }
+        - { text: "贩毒" }
+        - { text: "假证" }
+        - { text: "假发票" }
+        - { text: "代开发票" }
+        - { text: "刻假章" }
+        - { text: "外挂" }
+        - { text: "破解" }
+        - { text: "盗号" }
+        - { text: "偷拍" }
+        - { text: "窃听" }
+        - { text: "传销" }
+        - { text: "洗钱" }
+        - { text: "套现" }
+        - { text: "枪支" }
+        - { text: "弹药" }
+        - { text: "爆炸物" }
+        - { text: "麻醉药" }
+        - { text: "精神类管制药品" }
+    - code: POLITICAL_RELIGIOUS
+      name: 政治宗教英烈敏感词
+      severity: HIGH
+      words:
+        - { text: "危害国家" }
+        - { text: "颠覆" }
+        - { text: "分裂" }
+        - { text: "台独" }
+        - { text: "港独" }
+        - { text: "疆独" }
+        - { text: "藏独" }
+        - { text: "邪教" }
+        - { text: "法轮功" }
+        - { text: "极端主义" }
+    - code: AD_EXTREME
+      name: 虚假宣传极限广告词
+      severity: MEDIUM
+      words:
+        - { text: "全网第一" }
+        - { text: "全国第一" }
+        - { text: "顶级" }
+        - { text: "极致" }
+        - { text: "最佳" }
+        - { text: "最好" }
+        - { text: "最强" }
+        - { text: "顶尖" }
+        - { text: "天花板" }
+        - { text: "独一无二" }
+        - { text: "唯一" }
+        - { text: "独家" }
+        - { text: "永久" }
+        - { text: "万能" }
+        - { text: "百分百" }
+        - { text: "100%" }
+        - { text: "绝对" }
+        - { text: "零风险" }
+        - { text: "无副作用" }
+        - { text: "国家级" }
+        - { text: "世界级" }
+        - { text: "稳赚不赔" }
+        - { text: "必中" }
+        - { text: "保底" }
+    - code: MEDICAL
+      name: 医疗健康违禁词
+      severity: HIGH
+      words:
+        - { text: "根治" }
+        - { text: "特效" }
+        - { text: "包治" }
+        - { text: "治病" }
+        - { text: "防癌" }
+        - { text: "抗癌" }
+        - { text: "壮阳" }
+        - { text: "减肥特效药" }
+        - { text: "治疗" }
+        - { text: "治愈" }
+        - { text: "消炎" }
+        - { text: "降三高" }
+        - { text: "降糖" }
+        - { text: "丰胸" }
+        - { text: "祛斑根治" }
+        - { text: "永久脱毛" }
+        - { text: "安眠药" }
+        - { text: "麻醉剂" }
+        - { text: "堕胎药" }
+        - { text: "问诊" }
+        - { text: "看病" }
+        - { text: "诊断" }
+        - { text: "开药方" }
+    - code: FAKE_REVIEW
+      name: 虚假评价违规词
+      severity: HIGH
+      words:
+        - { text: "好评返现" }
+        - { text: "好评返红包" }
+        - { text: "五星返现" }
+        - { text: "好评补偿" }
+        - { text: "刷好评" }
+        - { text: "刷单" }
+        - { text: "代评" }
+        - { text: "收购评价" }
+        - { text: "控评" }
+        - { text: "删评价" }
+        - { text: "代删差评" }
+        - { text: "有偿评价" }
+        - { text: "水军" }
+        - { text: "刷分" }
+        - { text: "截图返钱" }
+        - { text: "删评退款" }
+        - { text: "花钱消差评" }
+    - code: PLATFORM_ATTACK
+      name: 平台诋毁攻击
+      severity: MEDIUM
+      words:
+        - { text: "美团垃圾" }
+        - { text: "平台坑商家" }
+        - { text: "美团乱扣钱" }
+        - { text: "平台黑" }
+        - { text: "客服不作为" }
+        - { text: "平台压榨" }
+        - { text: "放弃美团" }
+        - { text: "卸载美团" }
+        - { text: "平台偏袒顾客" }
+    - code: FOOD_SAFETY
+      name: 食品安全敏感词
+      severity: MEDIUM
+      words:
+        - { text: "地沟油" }
+        - { text: "过期" }
+        - { text: "变质" }
+        - { text: "致癌" }
+        - { text: "重金属超标" }
+        - { text: "农药超标" }
+        - { text: "瘦肉精" }
+        - { text: "僵尸肉" }
+        - { text: "激素肉" }
+        - { text: "三无食材" }
+        - { text: "黑心后厨" }
+    - code: SUPERSTITION
+      name: 封建迷信违规词
+      severity: MEDIUM
+      words:
+        - { text: "算命" }
+        - { text: "卜卦" }
+        - { text: "驱邪" }
+        - { text: "符咒" }
+        - { text: "改运" }
+        - { text: "风水化解" }
+        - { text: "辟邪治病" }
+        - { text: "占卜" }
+        - { text: "生辰八字治病" }

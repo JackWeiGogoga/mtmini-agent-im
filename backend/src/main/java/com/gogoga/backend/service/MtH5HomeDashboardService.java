@@ -44,11 +44,11 @@ public class MtH5HomeDashboardService {
         MtH5HomeDashboardVO dashboard = new MtH5HomeDashboardVO();
         dashboard.setShop(buildShopSummary(shop));
         dashboard.setMembership(buildMembershipSummary(shop.getId()));
-        dashboard.setCommentStats(buildCommentStats(shop.getId(), statsRange));
         dashboard.setTabStatus(buildTabStatus(powerAccount, hidePower));
         dashboard.setGuide(buildGuideSummary(shop.getId()));
         dashboard.setAuthorization(buildLocalAuthorizationStatus(shop.getId()));
         dashboard.setOperationSettings(shopOperationSettingsService.buildSettings(shop));
+        dashboard.setMessageStats(buildMessageStats(shop.getId(), statsRange));
         if (!hidePower) {
             dashboard.setPowerStats(buildPowerStats(shop.getId(), powerAccount, statsRange));
         }
@@ -96,22 +96,6 @@ public class MtH5HomeDashboardService {
         return summary;
     }
 
-    private MtH5HomeDashboardVO.CommentStatsSummary buildCommentStats(Long shopId,
-                                                                      DashboardStatsRangeTypeEnum statsRange) {
-        ShopDashboardMetricsService.CommentStatsSnapshot snapshot =
-                shopDashboardMetricsService.buildCommentStats(shopId, statsRange);
-        MtH5HomeDashboardVO.CommentStatsSummary summary = new MtH5HomeDashboardVO.CommentStatsSummary();
-        summary.setGoodCommentCount(snapshot.getGoodCommentCount());
-        summary.setNeutralCommentCount(snapshot.getNeutralCommentCount());
-        summary.setBadCommentCount(snapshot.getBadCommentCount());
-        summary.setRepliedBadCommentCount(snapshot.getRepliedBadCommentCount());
-        summary.setBadCommentReplyRate(snapshot.getBadCommentReplyRate());
-        summary.setPreviousGoodCommentCount(snapshot.getPreviousGoodCommentCount());
-        summary.setPreviousBadCommentCount(snapshot.getPreviousBadCommentCount());
-        summary.setPreviousBadCommentReplyRate(snapshot.getPreviousBadCommentReplyRate());
-        return summary;
-    }
-
     private MtH5HomeDashboardVO.PowerStatsSummary buildPowerStats(Long shopId,
                                                                   MtPowerAccount powerAccount,
                                                                   DashboardStatsRangeTypeEnum statsRange) {
@@ -130,9 +114,22 @@ public class MtH5HomeDashboardService {
         return summary;
     }
 
+    private MtH5HomeDashboardVO.MessageStatsSummary buildMessageStats(Long shopId,
+                                                                      DashboardStatsRangeTypeEnum statsRange) {
+        ShopDashboardMetricsService.MessageStatsSnapshot snapshot =
+                shopDashboardMetricsService.buildMessageStats(shopId, statsRange);
+        MtH5HomeDashboardVO.MessageStatsSummary summary = new MtH5HomeDashboardVO.MessageStatsSummary();
+        summary.setCurrentMessageReplyCount(snapshot.getCurrentMessageReplyCount());
+        summary.setPreviousMessageReplyCount(snapshot.getPreviousMessageReplyCount());
+        summary.setCurrentAfterSaleMessageCount(snapshot.getCurrentAfterSaleMessageCount());
+        summary.setPreviousAfterSaleMessageCount(snapshot.getPreviousAfterSaleMessageCount());
+        summary.setMessageReplyRate(snapshot.getMessageReplyRate());
+        summary.setPreviousMessageReplyRate(snapshot.getPreviousMessageReplyRate());
+        return summary;
+    }
+
     private MtH5TabStatusVO buildTabStatus(MtPowerAccount powerAccount, boolean hidePower) {
         MtH5TabStatusVO status = new MtH5TabStatusVO();
-        status.setLogUnread(false);
         boolean powerInsufficient = !hidePower && isPowerInsufficient(powerAccount == null ? null : powerAccount.getBalance());
         status.setPowerInsufficient(powerInsufficient);
         status.setPowerStatusText(powerInsufficient ? "不足" : null);

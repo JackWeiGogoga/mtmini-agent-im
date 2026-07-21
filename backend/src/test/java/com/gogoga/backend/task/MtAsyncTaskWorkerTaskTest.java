@@ -4,25 +4,21 @@ import com.gogoga.backend.config.LlmRateLimitProperties;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
-import com.gogoga.backend.service.CommentLogAnalysisService;
-import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
+import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
-import com.gogoga.backend.service.MtCommentAutoReplyService;
-import com.gogoga.backend.service.MtCommentComplaintService;
-import com.gogoga.backend.service.MtCommentImFollowUpService;
+import com.gogoga.backend.service.MtImAutoReplyOrchestrationService;
 import com.gogoga.backend.service.RedisDistributedLockService;
-import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
+import com.gogoga.backend.service.async.MtApiDryRunException;
+import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
+import com.gogoga.backend.util.JsonUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executor;
 
@@ -30,91 +26,83 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MtAsyncTaskWorkerTaskTest {
 
-    @Mock
-    private MtAsyncTaskService asyncTaskService;
-    @Mock
-    private MtAuthAsyncTaskService authAsyncTaskService;
-    @Mock
-    private MtCommentAutoReplyService autoReplyService;
-    @Mock
-    private MtCommentComplaintService complaintService;
-    @Mock
-    private MtCommentImFollowUpService imFollowUpService;
-    @Mock
-    private CommentLogAnalysisService logAnalysisService;
-    @Mock
-    private CommentReplyKnowledgeDocumentService knowledgeDocumentService;
-    @Mock
-    private RedisDistributedLockService lockService;
-    @Mock
-    private Executor ordinaryExecutor;
-    @Mock
-    private ThreadPoolTaskExecutor llmExecutor;
+    @Mock private MtAsyncTaskService asyncTaskService;
+    @Mock private MtAuthAsyncTaskService authAsyncTaskService;
+    @Mock private KnowledgeDocumentService knowledgeDocumentService;
+    @Mock private MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService;
+    @Mock private RedisDistributedLockService lockService;
+    @Mock private Executor ordinaryExecutor;
+    @Mock private ThreadPoolTaskExecutor llmExecutor;
 
     private MtAsyncTaskWorkerTask worker;
 
     @BeforeEach
     void setUp() {
-        MtProperties mtProperties = new MtProperties();
-        LlmRateLimitProperties rateLimitProperties = new LlmRateLimitProperties();
-        rateLimitProperties.setRescheduleJitterMillis(0L);
         worker = new MtAsyncTaskWorkerTask(
                 asyncTaskService,
                 authAsyncTaskService,
-                autoReplyService,
-                complaintService,
-                imFollowUpService,
-                logAnalysisService,
                 knowledgeDocumentService,
+                imAutoReplyOrchestrationService,
                 lockService,
-                mtProperties,
-                rateLimitProperties,
+                new MtProperties(),
+                new LlmRateLimitProperties(),
                 ordinaryExecutor,
                 llmExecutor
         );
     }
 
     @Test
-    void shouldBuildConfiguredDefaultWeightedSchedule() {
+    void weightedScheduleIncludesKnowledgeAndWeightedImAutoReply() {
         List<MtAsyncTaskTypeEnum> schedule = worker.weightedLlmSchedule();
 
-        assertEquals(5, count(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY));
-        assertEquals(2, count(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP));
-        assertEquals(2, count(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT));
-        assertEquals(1, count(schedule, MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS));
-        assertEquals(1, count(schedule, MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE));
+        assertEquals(6, schedule.size());
+        assertEquals(MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE, schedule.get(0));
+        assertEquals(5, schedule.stream().filter(type -> type == MtAsyncTaskTypeEnum.IM_AUTO_REPLY).count());
     }
 
     @Test
-    void shouldRescheduleCapacityWaitWithoutBusinessRetry() {
+    void marksAutoReplyDeadWhenTaskRetryBudgetIsExhausted() {
+        MtImAutoReplyTaskPayload payload = new MtImAutoReplyTaskPayload();
+        payload.setAutoReplyId(99L);
         MtAsyncTask task = new MtAsyncTask();
-        task.setId(9L);
-        task.setTaskType(MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS.name());
-        task.setRetryCount(2);
-        task.setPayloadJson("{\"shopId\":100,\"commentId\":542543250001}");
-        doThrow(new LlmCapacityDeferredException(1200L))
-                .when(logAnalysisService)
-                .executeCommentLogAnalysisTask(any());
+        task.setId(7L);
+        task.setTaskType(MtAsyncTaskTypeEnum.IM_AUTO_REPLY.name());
+        task.setPayloadJson(JsonUtil.toJson(payload));
+        doThrow(new IllegalStateException("send failed")).when(imAutoReplyOrchestrationService).execute(any());
+        when(asyncTaskService.handleFailure(
+                eq(task), any(), eq("IM_AUTO_REPLY_EXECUTION_FAILED:IllegalStateException"), any())).thenReturn(true);
 
-        worker.executeClaimedTask(MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS, task);
+        worker.executeClaimedTask(MtAsyncTaskTypeEnum.IM_AUTO_REPLY, task);
 
-        ArgumentCaptor<LocalDateTime> availableAt = ArgumentCaptor.forClass(LocalDateTime.class);
-        ArgumentCaptor<LocalDateTime> updatedAt = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(asyncTaskService).rescheduleWithoutRetry(
-                eq(task),
-                availableAt.capture(),
-                eq("LLM_CAPACITY_DEFERRED"),
-                updatedAt.capture()
-        );
-        assertEquals(1200L, Duration.between(updatedAt.getValue(), availableAt.getValue()).toMillis());
+        verify(imAutoReplyOrchestrationService).markDeadAfterRetryExhausted(any());
     }
 
-    private long count(List<MtAsyncTaskTypeEnum> schedule, MtAsyncTaskTypeEnum taskType) {
-        return schedule.stream().filter(taskType::equals).count();
+    @Test
+    void reschedulesMeituanApiDryRunWithoutConsumingRetry() {
+        MtAsyncTask task = new MtAsyncTask();
+        task.setId(8L);
+        task.setTaskType(MtAsyncTaskTypeEnum.IM_AUTO_REPLY.name());
+        task.setRetryCount(2);
+        task.setPayloadJson(JsonUtil.toJson(new MtImAutoReplyTaskPayload()));
+        doThrow(new MtApiDryRunException("invokeApiWithToken:SendImMsgWmoperRequest", 17L))
+                .when(imAutoReplyOrchestrationService).execute(any());
+
+        worker.executeClaimedTask(MtAsyncTaskTypeEnum.IM_AUTO_REPLY, task);
+
+        verify(asyncTaskService).rescheduleWithoutRetry(
+                eq(task),
+                any(),
+                eq("MT_API_DRY_RUN:invokeApiWithToken:SendImMsgWmoperRequest"),
+                any()
+        );
+        verify(asyncTaskService, never()).handleFailure(eq(task), any(), any(), any());
+        verify(imAutoReplyOrchestrationService, never()).markDeadAfterRetryExhausted(any());
     }
 }

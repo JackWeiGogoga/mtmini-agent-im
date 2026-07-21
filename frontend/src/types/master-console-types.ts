@@ -39,13 +39,6 @@ export interface MasterConsoleShopRow {
   salesBoundUserName?: string;
   salesBoundUserPhone?: string;
   salesBindTime?: string;
-  goodCommentCount?: number;
-  previousGoodCommentCount?: number;
-  badCommentCount?: number;
-  previousBadCommentCount?: number;
-  repliedBadCommentCount?: number;
-  badCommentReplyRate?: number | string;
-  previousBadCommentReplyRate?: number | string;
   powerBalance?: number;
   totalRecharge?: number;
   totalGrant?: number;
@@ -60,26 +53,8 @@ export interface MasterConsoleShopRow {
   rightExpireAt?: string;
   bindTime?: string;
   autoReplyEnabled?: boolean;
-  negativeCommentAppealEnabled?: boolean;
 }
 
 export interface ShopOperationSettingsUpdateParam {
   autoReplyEnabled: boolean;
-  negativeCommentAppealEnabled: boolean;
-}
-
-export interface CommentReplyLogRecord {
-  id: number;
-  commentId?: number;
-  commentTime?: string;
-  replyTime?: string;
-  sentiment?: "GOOD" | "NEUTRAL" | "BAD" | string;
-  score?: number;
-  customerMessage?: string;
-  addComment?: string;
-  addCommentTime?: string;
-  imageUrls?: string[];
-  aiReplyText?: string;
-  analysisText?: string;
-  autoReplyStatus?: string;
 }

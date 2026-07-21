@@ -88,6 +88,9 @@ deploy-local/*
 !deploy-local/bootstrap-server.sh
 !deploy-local/Caddyfile
 !deploy-local/waimaidashi-backend.service
+!deploy-local/README.md
+!deploy-local/本地测试数据.sql
+!deploy-local/本地测试清单.md
 
 # =========================
 # Ansible 离线包

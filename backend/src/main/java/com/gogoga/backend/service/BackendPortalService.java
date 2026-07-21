@@ -36,7 +36,7 @@ public class BackendPortalService {
     );
     private static final Set<String> ORDINARY_PORTAL_PERMISSION_PREFIXES = Set.of(
             "shop:",
-            "comment:merchant-knowledge:"
+            "knowledge:"
     );
     private static final Set<String> ORDINARY_PORTAL_HIDDEN_PERMISSION_PREFIXES = Set.of(
             "shop:power-management:",

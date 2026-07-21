@@ -9,7 +9,6 @@
         <result column="shop_phone" property="shopPhone"/>
         <result column="h5_app_open_count" property="h5AppOpenCount"/>
         <result column="h5_home_page_view_count" property="h5HomePageViewCount"/>
-        <result column="h5_log_page_view_count" property="h5LogPageViewCount"/>
         <result column="h5_power_page_view_count" property="h5PowerPageViewCount"/>
         <result column="h5_knowledge_page_view_count" property="h5KnowledgePageViewCount"/>
         <result column="h5_support_page_view_count" property="h5SupportPageViewCount"/>
@@ -17,14 +16,10 @@
         <result column="h5_external_link_click_count" property="h5ExternalLinkClickCount"/>
         <result column="h5_recharge_submit_click_count" property="h5RechargeSubmitClickCount"/>
         <result column="h5_redemption_apply_success_count" property="h5RedemptionApplySuccessCount"/>
-        <result column="h5_log_detail_expand_count" property="h5LogDetailExpandCount"/>
         <result column="h5_knowledge_action_count" property="h5KnowledgeActionCount"/>
-        <result column="pc_comment_log_view_count" property="pcCommentLogViewCount"/>
         <result column="pc_knowledge_view_count" property="pcKnowledgeViewCount"/>
         <result column="h5_auto_reply_change_count" property="h5AutoReplyChangeCount"/>
-        <result column="h5_negative_appeal_change_count" property="h5NegativeAppealChangeCount"/>
         <result column="pc_auto_reply_change_count" property="pcAutoReplyChangeCount"/>
-        <result column="pc_negative_appeal_change_count" property="pcNegativeAppealChangeCount"/>
         <result column="system_auto_disable_count" property="systemAutoDisableCount"/>
     </resultMap>
 
@@ -49,7 +44,6 @@
                 COALESCE(NULLIF(sh.contact_phone, ''), NULLIF(sh.phone, '')) AS shop_phone,
                 COALESCE(ev.h5_app_open_count, 0) AS h5_app_open_count,
                 COALESCE(ev.h5_home_page_view_count, 0) AS h5_home_page_view_count,
-                COALESCE(ev.h5_log_page_view_count, 0) AS h5_log_page_view_count,
                 COALESCE(ev.h5_power_page_view_count, 0) AS h5_power_page_view_count,
                 COALESCE(ev.h5_knowledge_page_view_count, 0) AS h5_knowledge_page_view_count,
                 COALESCE(ev.h5_support_page_view_count, 0) AS h5_support_page_view_count,
@@ -57,14 +51,10 @@
                 COALESCE(ev.h5_external_link_click_count, 0) AS h5_external_link_click_count,
                 COALESCE(ev.h5_recharge_submit_click_count, 0) AS h5_recharge_submit_click_count,
                 COALESCE(ev.h5_redemption_apply_success_count, 0) AS h5_redemption_apply_success_count,
-                COALESCE(ev.h5_log_detail_expand_count, 0) AS h5_log_detail_expand_count,
                 COALESCE(ev.h5_knowledge_action_count, 0) AS h5_knowledge_action_count,
-                COALESCE(ev.pc_comment_log_view_count, 0) AS pc_comment_log_view_count,
                 COALESCE(ev.pc_knowledge_view_count, 0) AS pc_knowledge_view_count,
                 COALESCE(st.h5_auto_reply_change_count, 0) AS h5_auto_reply_change_count,
-                COALESCE(st.h5_negative_appeal_change_count, 0) AS h5_negative_appeal_change_count,
                 COALESCE(st.pc_auto_reply_change_count, 0) AS pc_auto_reply_change_count,
-                COALESCE(st.pc_negative_appeal_change_count, 0) AS pc_negative_appeal_change_count,
                 COALESCE(st.system_auto_disable_count, 0) AS system_auto_disable_count
             FROM mt_shop sh
             LEFT JOIN (
@@ -72,7 +62,6 @@
                     e.shop_id,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_APP_OPEN' THEN 1 ELSE 0 END) AS h5_app_open_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PAGE_VIEW' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.pageCode')) = 'HOME' THEN 1 ELSE 0 END) AS h5_home_page_view_count,
-                    SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PAGE_VIEW' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.pageCode')) = 'LOG' THEN 1 ELSE 0 END) AS h5_log_page_view_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PAGE_VIEW' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.pageCode')) = 'POWER' THEN 1 ELSE 0 END) AS h5_power_page_view_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PAGE_VIEW' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.pageCode')) = 'KNOWLEDGE' THEN 1 ELSE 0 END) AS h5_knowledge_page_view_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_PAGE_VIEW' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.pageCode')) = 'SUPPORT' THEN 1 ELSE 0 END) AS h5_support_page_view_count,
@@ -80,9 +69,7 @@
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_EXTERNAL_LINK_CLICK' THEN 1 ELSE 0 END) AS h5_external_link_click_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_RECHARGE_SUBMIT_CLICK' THEN 1 ELSE 0 END) AS h5_recharge_submit_click_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_REDEMPTION_APPLY_RESULT' AND JSON_UNQUOTE(JSON_EXTRACT(e.context_json, '$.result')) = 'SUCCESS' THEN 1 ELSE 0 END) AS h5_redemption_apply_success_count,
-                    SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_LOG_DETAIL_EXPAND' THEN 1 ELSE 0 END) AS h5_log_detail_expand_count,
                     SUM(CASE WHEN e.event_source = 'H5' AND e.event_type = 'H5_KNOWLEDGE_ACTION' THEN 1 ELSE 0 END) AS h5_knowledge_action_count,
-                    SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'PC_COMMENT_LOG_VIEW' THEN 1 ELSE 0 END) AS pc_comment_log_view_count,
                     SUM(CASE WHEN e.event_source = 'ADMIN_BACKEND' AND e.event_type = 'PC_KNOWLEDGE_VIEW' THEN 1 ELSE 0 END) AS pc_knowledge_view_count
                 FROM user_behavior_event e
                 WHERE e.event_time &gt;= #{startAt}
@@ -92,12 +79,10 @@
             LEFT JOIN (
                 SELECT
                     h.shop_id,
-                    SUM(CASE WHEN h.change_source = 'H5' AND <include refid="AutoReplyChanged"/> THEN 1 ELSE 0 END) AS h5_auto_reply_change_count,
-                    SUM(CASE WHEN h.change_source = 'H5' AND <include refid="NegativeAppealChanged"/> THEN 1 ELSE 0 END) AS h5_negative_appeal_change_count,
-                    SUM(CASE WHEN h.change_source = 'ADMIN' AND <include refid="AutoReplyChanged"/> THEN 1 ELSE 0 END) AS pc_auto_reply_change_count,
-                    SUM(CASE WHEN h.change_source = 'ADMIN' AND <include refid="NegativeAppealChanged"/> THEN 1 ELSE 0 END) AS pc_negative_appeal_change_count,
+                    SUM(CASE WHEN h.change_source = 'H5' THEN 1 ELSE 0 END) AS h5_auto_reply_change_count,
+                    SUM(CASE WHEN h.change_source = 'ADMIN' THEN 1 ELSE 0 END) AS pc_auto_reply_change_count,
                     SUM(CASE WHEN h.change_source = 'SYSTEM' AND h.change_reason = 'POWER_BALANCE_NOT_ENOUGH' THEN 1 ELSE 0 END) AS system_auto_disable_count
-                FROM mt_comment_reply_setting_history h
+                FROM mt_im_auto_reply_setting_history h
                 WHERE h.create_time &gt;= #{startAt}
                   AND h.create_time &lt; #{endAt}
                 GROUP BY h.shop_id
@@ -108,20 +93,6 @@
         ) stats
         <include refid="OrderBy"/>
     </select>
-
-    <sql id="AutoReplyChanged">
-        JSON_VALID(h.before_snapshot_json)
-        AND JSON_UNQUOTE(JSON_EXTRACT(h.before_snapshot_json, '$.autoReplyEnabled')) IS NOT NULL
-        AND JSON_UNQUOTE(JSON_EXTRACT(h.before_snapshot_json, '$.autoReplyEnabled'))
-            != IF(h.auto_reply_enabled = 1, 'true', 'false')
-    </sql>
-
-    <sql id="NegativeAppealChanged">
-        JSON_VALID(h.before_snapshot_json)
-        AND JSON_UNQUOTE(JSON_EXTRACT(h.before_snapshot_json, '$.negativeCommentAppealEnabled')) IS NOT NULL
-        AND JSON_UNQUOTE(JSON_EXTRACT(h.before_snapshot_json, '$.negativeCommentAppealEnabled'))
-            != IF(h.negative_comment_appeal_enabled = 1, 'true', 'false')
-    </sql>
 
     <sql id="VisibilityWhere">
         <choose>

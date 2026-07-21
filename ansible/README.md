@@ -49,16 +49,21 @@ The current recommended role mapping is:
 
 ```ini
 [app]
-mt4
+mt6
 
 [data]
-mt3
+mt5
 ```
 
-Run a connectivity check:
+`mt5` 是 private 数据库/缓存节点，同时运行一个 backend；`mt6` 是公网
+Web 节点，运行 Caddy、静态站点和另一个 backend。SSH alias 使用本机
+`~/.ssh/config` 中已经配置的 `mt5`、`mt6`。
+
+Before initialization, use the `raw` module for the SSH connectivity check. It does not
+require Python on the remote host:
 
 ```bash
-ansible -i ansible/inventory.ini all -m ping
+ansible -i ansible/inventory.ini all -m raw -a 'printf "connected host=%s\n" "$(hostname)"'
 ```
 
 Run the initialization:
@@ -68,6 +73,15 @@ ansible-playbook -i ansible/inventory.ini ansible/site.yml
 ```
 
 `site.yml` bootstraps `python3.11` first because OpenCloudOS 8 ships with Python 3.6, while modern Ansible requires a newer remote interpreter.
+
+After initialization, verify normal Python-based Ansible modules:
+
+```bash
+ansible -i ansible/inventory.ini all -m ping
+```
+
+Running `ansible ... -m ping` before `site.yml` is expected to fail with
+`/usr/bin/python3.11: No such file or directory`.
 
 To temporarily use online GitHub/nvm installation instead of local offline packages:
 

@@ -33,6 +33,15 @@
 - 角色管理
 - 菜单管理
 
+### 💬 美团 IM 自动回复
+
+- `/imMsg` 回调可靠入库，并在同一事务创建异步回复任务
+- 门店顾客长期 Conversation + 30 分钟空闲切分 Session
+- 当前 Session 最近 100 轮短期记忆，不使用历史 Session 做长期记忆
+- 有门店知识时执行向量召回，作为简单 RAG 上下文
+- 实际模型 token 幂等扣减算力，敏感词改写后使用稳定消息 ID 发送
+- 总控台、管理员双 Tab 页面与 H5 日志均可查看顾客消息、AI 回复和跨 Session 完整历史
+
 ---
 
 ## 🛠 技术栈
@@ -98,9 +107,17 @@ git clone https://github.com/your-org/project-template.git
 cd project-template
 ```
 
-#### 2. 数据库配置
+#### 2. 数据库配置与本地 IM 测试数据
 
 创建 MySQL 数据库并执行初始化脚本（如有），配置数据库连接信息到 `backend/src/main/env/dev/application.yml`。
+
+需要联调 IM 自动回复、日志和跨 Session 历史时，可执行幂等测试夹具：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p mtmini_ai_agent_im < deploy-local/本地测试数据.sql
+```
+
+所有美团 SDK 出站调用默认启用 dry-run；只有真实联调时才设置 `MT_API_DRY_RUN=false`。
 
 #### 3. 启动后端服务
 
@@ -121,11 +138,23 @@ pnpm install
 pnpm run dev
 ```
 
-前端服务将在 `http://localhost:5173` 启动。
+管理后台将在 `http://localhost:5174` 启动。
 
-#### 5. 访问应用
+#### 5. 启动 H5
 
-打开浏览器访问：**http://localhost:5173/**
+```bash
+cd h5
+pnpm install
+pnpm run dev:h5
+```
+
+H5 将在 `http://localhost:5173` 启动。
+
+#### 6. 访问应用
+
+管理后台访问：**http://localhost:5174/**
+
+本地测试门店 H5 直登：**http://localhost:5173/?wmPoiId=TEST_EPOI_REPLY_001&platform=local-test**
 
 ---
 
@@ -203,6 +232,9 @@ project-template/
 | `spring.datasource.*` | 数据库连接配置       |
 | `spring.data.redis.*` | Redis 连接配置       |
 | `oauth.*`             | OAuth 第三方登录配置 |
+| `mt.im-auto-reply.*`  | IM 自动回复、Session、上下文、RAG、模型和重试配置 |
+
+自动回复全局开关 `mt.im-auto-reply.enabled` 默认关闭；完成数据库升级和灰度验证后再按环境显式开启。
 
 ### 前端配置
 

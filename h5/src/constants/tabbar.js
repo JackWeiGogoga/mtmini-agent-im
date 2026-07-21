@@ -7,9 +7,9 @@ const TABBAR_ITEMS = [
     activeIcon: "/static/tabbar/home-fill.png",
   },
   {
-    key: "log",
+    key: "logs",
     label: "日志",
-    path: "/pages/log/index",
+    path: "/pages/reply-logs/index",
     icon: "/static/tabbar/log.png",
     activeIcon: "/static/tabbar/log-fill.png",
   },

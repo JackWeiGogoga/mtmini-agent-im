@@ -6,21 +6,15 @@ import com.gogoga.backend.entity.mt.MtAsyncTask;
 import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
-import com.gogoga.backend.service.MtCommentAutoReplyService;
-import com.gogoga.backend.service.MtCommentComplaintService;
-import com.gogoga.backend.service.MtCommentImFollowUpService;
-import com.gogoga.backend.service.CommentReplyKnowledgeDocumentService;
-import com.gogoga.backend.service.CommentLogAnalysisService;
+import com.gogoga.backend.service.MtImAutoReplyOrchestrationService;
+import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskExecutionPolicy;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
-import com.gogoga.backend.service.async.MtCommentAutoComplaintTaskPayload;
-import com.gogoga.backend.service.async.MtCommentAutoImFollowUpTaskPayload;
-import com.gogoga.backend.service.async.MtCommentAutoReplyTaskPayload;
-import com.gogoga.backend.service.async.MtCommentLogAnalysisTaskPayload;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
+import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
 import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +28,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +36,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * 数据库异步任务 worker。
@@ -54,28 +50,22 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
             MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
-            MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL
+            MtAsyncTaskTypeEnum.AUTH_CONFIGURE_IM
     );
 
     private static final List<MtAsyncTaskTypeEnum> POLL_TASK_TYPES = List.of(
             MtAsyncTaskTypeEnum.AUTH_SYNC_RIGHTS,
             MtAsyncTaskTypeEnum.AUTH_BACKFILL_POI_ID,
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
-            MtAsyncTaskTypeEnum.AUTH_COMMENT_BACKFILL,
-            MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY,
-            MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS,
-            MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT,
-            MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP,
-            MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE
+            MtAsyncTaskTypeEnum.AUTH_CONFIGURE_IM,
+            MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
+            MtAsyncTaskTypeEnum.IM_AUTO_REPLY
     );
 
     private final MtAsyncTaskService mtAsyncTaskService;
     private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
-    private final MtCommentAutoReplyService mtCommentAutoReplyService;
-    private final MtCommentComplaintService mtCommentComplaintService;
-    private final MtCommentImFollowUpService mtCommentImFollowUpService;
-    private final CommentLogAnalysisService commentLogAnalysisService;
-    private final CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService;
+    private final KnowledgeDocumentService knowledgeDocumentService;
+    private final MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
     private final LlmRateLimitProperties llmRateLimitProperties;
@@ -92,11 +82,8 @@ public class MtAsyncTaskWorkerTask {
     public MtAsyncTaskWorkerTask(
             MtAsyncTaskService mtAsyncTaskService,
             MtAuthAsyncTaskService mtAuthAsyncTaskService,
-            MtCommentAutoReplyService mtCommentAutoReplyService,
-            MtCommentComplaintService mtCommentComplaintService,
-            MtCommentImFollowUpService mtCommentImFollowUpService,
-            CommentLogAnalysisService commentLogAnalysisService,
-            CommentReplyKnowledgeDocumentService commentReplyKnowledgeDocumentService,
+            KnowledgeDocumentService knowledgeDocumentService,
+            MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
             LlmRateLimitProperties llmRateLimitProperties,
@@ -105,11 +92,8 @@ public class MtAsyncTaskWorkerTask {
     ) {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
-        this.mtCommentAutoReplyService = mtCommentAutoReplyService;
-        this.mtCommentComplaintService = mtCommentComplaintService;
-        this.mtCommentImFollowUpService = mtCommentImFollowUpService;
-        this.commentLogAnalysisService = commentLogAnalysisService;
-        this.commentReplyKnowledgeDocumentService = commentReplyKnowledgeDocumentService;
+        this.knowledgeDocumentService = knowledgeDocumentService;
+        this.imAutoReplyOrchestrationService = imAutoReplyOrchestrationService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
         this.llmRateLimitProperties = llmRateLimitProperties;
@@ -132,7 +116,8 @@ public class MtAsyncTaskWorkerTask {
                     taskType,
                     resolvePolicy(taskType),
                     asyncTask.getRecoveryLimit(),
-                    LocalDateTime.now()
+                    LocalDateTime.now(),
+                    taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY ? this::markImAutoReplyDead : null
             );
         }
         if (recoveredCount > 0) {
@@ -231,11 +216,8 @@ public class MtAsyncTaskWorkerTask {
     List<MtAsyncTaskTypeEnum> weightedLlmSchedule() {
         MtProperties.LlmTaskWeights weights = mtProperties.getAsyncTask().getLlmTaskWeights();
         List<MtAsyncTaskTypeEnum> schedule = new ArrayList<>();
-        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_REPLY, weights.getCommentAutoReply());
-        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_IM_FOLLOW_UP, weights.getCommentAutoImFollowUp());
-        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_AUTO_COMPLAINT, weights.getCommentAutoComplaint());
-        addWeight(schedule, MtAsyncTaskTypeEnum.COMMENT_LOG_ANALYSIS, weights.getCommentLogAnalysis());
         addWeight(schedule, MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE, weights.getKnowledgeDocumentParse());
+        addWeight(schedule, MtAsyncTaskTypeEnum.IM_AUTO_REPLY, weights.getImAutoReply());
         return schedule;
     }
 
@@ -261,12 +243,9 @@ public class MtAsyncTaskWorkerTask {
                 case AUTH_SYNC_RIGHTS -> executeAuthSyncRightsTask(task);
                 case AUTH_BACKFILL_POI_ID -> executeAuthBackfillPoiIdTask(task);
                 case AUTH_BLOCK_ORDER_PUSH -> executeAuthBlockOrderPushTask(task);
-                case AUTH_COMMENT_BACKFILL -> executeAuthCommentBackfillTask(task);
-                case COMMENT_AUTO_REPLY -> executeCommentAutoReplyTask(task);
-                case COMMENT_LOG_ANALYSIS -> executeCommentLogAnalysisTask(task);
-                case COMMENT_AUTO_COMPLAINT -> executeCommentAutoComplaintTask(task);
-                case COMMENT_AUTO_IM_FOLLOW_UP -> executeCommentAutoImFollowUpTask(task);
+                case AUTH_CONFIGURE_IM -> executeAuthConfigureImTask(task);
                 case KNOWLEDGE_DOCUMENT_PARSE -> executeKnowledgeDocumentParseTask(task);
+                case IM_AUTO_REPLY -> executeImAutoReplyTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
@@ -294,9 +273,52 @@ public class MtAsyncTaskWorkerTask {
                     taskType.name(), taskId, e.getMessage());
             mtAsyncTaskService.markTerminalFailure(task, e.getMessage(), LocalDateTime.now());
         } catch (Exception e) {
-            log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
-            mtAsyncTaskService.handleFailure(task, resolvePolicy(taskType), e.getMessage(), LocalDateTime.now());
+            String errorSummary;
+            if (taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY) {
+                errorSummary = "IM_AUTO_REPLY_EXECUTION_FAILED:" + e.getClass().getSimpleName();
+                log.error("IM自动回复任务执行失败，taskId={}, errorType={}, rootCause={}, at={}",
+                        taskId, e.getClass().getSimpleName(),
+                        rootCauseType(e), originFrames(e));
+            } else {
+                errorSummary = e.getMessage();
+                log.error("数据库异步任务执行失败，taskType={}, taskId={}", taskType.name(), taskId, e);
+            }
+            boolean dead = mtAsyncTaskService.handleFailure(
+                    task, resolvePolicy(taskType), errorSummary, LocalDateTime.now());
+            if (dead && taskType == MtAsyncTaskTypeEnum.IM_AUTO_REPLY) {
+                markImAutoReplyDead(task);
+            }
         }
+    }
+
+    /**
+     * IM 自动回复任务禁止输出异常 message 和完整堆栈：底层 SQL/HTTP 异常的 message 可能
+     * 回显消息正文或字段值。这里只输出根因类型和本项目包内的调用位置，足以定位代码行，
+     * 不含任何业务文本。
+     */
+    private String rootCauseType(Throwable e) {
+        Throwable cause = e;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getName();
+    }
+
+    private String originFrames(Throwable e) {
+        return Arrays.stream(e.getStackTrace())
+                .filter(frame -> frame.getClassName().startsWith("com.gogoga.backend"))
+                .limit(3)
+                .map(frame -> frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1)
+                        + "." + frame.getMethodName() + ":" + frame.getLineNumber())
+                .collect(Collectors.joining(" <- "));
+    }
+
+    private void markImAutoReplyDead(MtAsyncTask task) {
+        if (task == null) {
+            return;
+        }
+        MtImAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImAutoReplyTaskPayload.class);
+        imAutoReplyOrchestrationService.markDeadAfterRetryExhausted(payload);
     }
 
     private void executeAuthSyncRightsTask(MtAsyncTask task) {
@@ -311,35 +333,18 @@ public class MtAsyncTaskWorkerTask {
         mtAuthAsyncTaskService.executeAuthBlockOrderPushTask(parseAuthPayload(task));
     }
 
-    private void executeAuthCommentBackfillTask(MtAsyncTask task) {
-        mtCommentAutoReplyService.executeAuthCommentBackfillTask(parseAuthPayload(task));
-    }
-
-    private void executeCommentAutoReplyTask(MtAsyncTask task) {
-        MtCommentAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtCommentAutoReplyTaskPayload.class);
-        mtCommentAutoReplyService.executeCommentAutoReplyTask(payload);
-    }
-
-    private void executeCommentLogAnalysisTask(MtAsyncTask task) {
-        MtCommentLogAnalysisTaskPayload payload = JsonUtil.toBean(
-                task.getPayloadJson(), MtCommentLogAnalysisTaskPayload.class);
-        commentLogAnalysisService.executeCommentLogAnalysisTask(payload);
-    }
-
-    private void executeCommentAutoComplaintTask(MtAsyncTask task) {
-        MtCommentAutoComplaintTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtCommentAutoComplaintTaskPayload.class);
-        mtCommentComplaintService.executeCommentAutoComplaintTask(payload);
-    }
-
-    private void executeCommentAutoImFollowUpTask(MtAsyncTask task) {
-        MtCommentAutoImFollowUpTaskPayload payload = JsonUtil.toBean(
-                task.getPayloadJson(), MtCommentAutoImFollowUpTaskPayload.class);
-        mtCommentImFollowUpService.executeCommentAutoImFollowUpTask(payload);
+    private void executeAuthConfigureImTask(MtAsyncTask task) {
+        mtAuthAsyncTaskService.executeAuthConfigureImTask(parseAuthPayload(task));
     }
 
     private void executeKnowledgeDocumentParseTask(MtAsyncTask task) {
         MtKnowledgeDocumentParseTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtKnowledgeDocumentParseTaskPayload.class);
-        commentReplyKnowledgeDocumentService.executeDocumentParseTask(payload);
+        knowledgeDocumentService.executeDocumentParseTask(payload);
+    }
+
+    private void executeImAutoReplyTask(MtAsyncTask task) {
+        MtImAutoReplyTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImAutoReplyTaskPayload.class);
+        imAutoReplyOrchestrationService.execute(payload);
     }
 
     private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
@@ -355,18 +360,15 @@ public class MtAsyncTaskWorkerTask {
         return switch (taskType) {
             case AUTH_SYNC_RIGHTS -> resolvePolicy(asyncTask.getAuthSyncRights());
             case AUTH_BACKFILL_POI_ID -> resolvePolicy(asyncTask.getAuthBackfillPoiId());
-            case AUTH_COMMENT_BACKFILL -> resolvePolicy(asyncTask.getAuthCommentBackfill());
+            case AUTH_CONFIGURE_IM -> resolvePolicy(asyncTask.getAuthConfigureIm());
             case AUTH_BLOCK_ORDER_PUSH -> MtAsyncTaskExecutionPolicy.builder()
                     .maxRetryCount(0)
                     .timeout(Duration.ofSeconds(180))
                     .initialBackoff(Duration.ofSeconds(60))
                     .maxBackoff(Duration.ofSeconds(60))
                     .build();
-            case COMMENT_AUTO_REPLY -> resolvePolicy(asyncTask.getCommentAutoReply());
-            case COMMENT_LOG_ANALYSIS -> resolvePolicy(asyncTask.getCommentLogAnalysis());
-            case COMMENT_AUTO_COMPLAINT -> resolvePolicy(asyncTask.getCommentAutoComplaint());
-            case COMMENT_AUTO_IM_FOLLOW_UP -> resolvePolicy(asyncTask.getCommentAutoImFollowUp());
             case KNOWLEDGE_DOCUMENT_PARSE -> resolvePolicy(asyncTask.getKnowledgeDocumentParse());
+            case IM_AUTO_REPLY -> resolvePolicy(asyncTask.getImAutoReply());
         };
     }
 

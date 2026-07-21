@@ -27,7 +27,6 @@ import {
   LogoutOutlined,
   MenuOutlined,
   RobotOutlined,
-  CommentOutlined,
   BulbOutlined,
   DatabaseOutlined,
   FileSearchOutlined,
@@ -63,7 +62,6 @@ const iconMap: Record<string, React.ReactNode> = {
   AppstoreOutlined: <AppstoreOutlined />,
   MenuOutlined: <MenuOutlined />,
   RobotOutlined: <RobotOutlined />,
-  CommentOutlined: <CommentOutlined />,
   BulbOutlined: <BulbOutlined />,
   DatabaseOutlined: <DatabaseOutlined />,
   FileSearchOutlined: <FileSearchOutlined />,
@@ -88,11 +86,6 @@ const getIcon = (iconName?: string): React.ReactNode => {
  * 默认菜单项（当后端未返回菜单时使用）
  */
 const defaultMenuItems: MenuItem[] = [
-  // {
-  //   key: "/avatar",
-  //   icon: <RobotOutlined />,
-  //   label: "虚拟人管理",
-  // },
 ];
 
 /**
@@ -171,8 +164,6 @@ const defaultRouteTitles: Record<string, string> = {
   "/power-recharge-orders": "充值订单",
   "/analytics/user-behavior": "行为统计",
   "/merchant-knowledge": "知识库管理",
-  "/comment-reply-knowledge": "回复文案",
-  "/comment-processing-logs": "评价处理日志",
   "/system": "系统管理",
   "/system/user": "用户管理",
   "/system/role": "角色管理",

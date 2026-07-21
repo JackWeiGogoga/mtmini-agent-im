@@ -5,14 +5,14 @@
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "评价自动回复"
+        "navigationBarTitleText": "IM 自动回复"
       }
     },
     {
-      "path": "pages/log/index",
+      "path": "pages/reply-logs/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "日志",
+        "navigationBarTitleText": "回复日志",
         "enablePullDownRefresh": true
       }
     },
@@ -47,7 +47,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "评价自动回复",
+    "navigationBarTitleText": "IM 自动回复",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
   }

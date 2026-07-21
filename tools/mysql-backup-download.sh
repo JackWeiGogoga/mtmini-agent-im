@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REMOTE_HOST="${WMD_MYSQL_BACKUP_HOST:-mt_ai_agent}"
+REMOTE_HOST="${WMD_MYSQL_BACKUP_HOST:-mt5}"
 DB_NAME="${WMD_MYSQL_BACKUP_DB:-mtmini_ai_agent}"
 REMOTE_DIR="${WMD_MYSQL_BACKUP_REMOTE_DIR:-/data/backup/mysql}"
 LOCAL_DIR="${WMD_MYSQL_BACKUP_LOCAL_DIR:-${HOME}/data/outsourcing/takeout-master-ai/db-backups}"
@@ -15,7 +15,7 @@ Usage:
   tools/mysql-backup-download.sh [options]
 
 Options:
-  --host HOST                 SSH host or alias. Default: mt_ai_agent
+  --host HOST                 SSH host or alias. Default: mt5
   --db DB                     MySQL database name. Default: mtmini_ai_agent
   --remote-dir DIR            Remote backup dir. Default: /data/backup/mysql
   --local-dir DIR             Local download dir. Default: ~/data/outsourcing/takeout-master-ai/db-backups

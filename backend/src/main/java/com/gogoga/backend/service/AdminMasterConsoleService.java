@@ -8,7 +8,6 @@ import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
-import com.gogoga.backend.vo.MtH5CommentReplyLogVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.UserShopBindingVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
@@ -16,13 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -37,7 +33,6 @@ public class AdminMasterConsoleService {
     private final MtPowerAccountService mtPowerAccountService;
     private final ShopDashboardMetricsService shopDashboardMetricsService;
     private final ShopOperationSettingsService shopOperationSettingsService;
-    private final MtH5CommentReplyLogService mtH5CommentReplyLogService;
 
     public PageInfo<AdminMasterConsoleRowVO> listRows(String keyword,
                                                       String targetUserId,
@@ -87,11 +82,7 @@ public class AdminMasterConsoleService {
                 ExcelExportUtil.column("所属网销", this::resolveExportSalesUserName),
                 ExcelExportUtil.column("网销手机号", AdminMasterConsoleRowVO::getSalesBoundUserPhone),
                 ExcelExportUtil.column("授权状态", AdminMasterConsoleRowVO::getAuthStatusText),
-                ExcelExportUtil.column("AI回复开关", row -> Boolean.FALSE.equals(row.getAutoReplyEnabled()) ? "关闭" : "开启"),
-                ExcelExportUtil.column("差评处理/申诉开关", row -> Boolean.TRUE.equals(row.getNegativeCommentAppealEnabled()) ? "开启" : "关闭"),
-                ExcelExportUtil.column("好评数", AdminMasterConsoleRowVO::getGoodCommentCount),
-                ExcelExportUtil.column("差评数", AdminMasterConsoleRowVO::getBadCommentCount),
-                ExcelExportUtil.column("差评回复率", row -> formatRate(row.getBadCommentReplyRate())),
+                ExcelExportUtil.column("IM自动回复开关", row -> Boolean.TRUE.equals(row.getAutoReplyEnabled()) ? "开启" : "关闭"),
                 ExcelExportUtil.column("本期消耗算力", AdminMasterConsoleRowVO::getCurrentConsumedPower),
                 ExcelExportUtil.column("剩余算力", AdminMasterConsoleRowVO::getPowerBalance),
                 ExcelExportUtil.column("功能剩余时间", row -> formatRemainingRightTime(row.getRightExpireAt()))
@@ -111,15 +102,8 @@ public class AdminMasterConsoleService {
         );
     }
 
-    public PageInfo<MtH5CommentReplyLogVO> listCommentReplyLogs(Long shopId,
-                                                                String bindingDomain,
-                                                                Integer pageNum,
-                                                                Integer pageSize) {
-        return mtH5CommentReplyLogService.listLogs(
-                userShopBindingService.requireCurrentUserVisibleShop(shopId, bindingDomain),
-                pageNum,
-                pageSize
-        );
+    public void requireVisibleShop(Long shopId) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
     }
 
     private PageInfo<AdminMasterConsoleRowVO> buildRows(PageInfo<UserShopBindingVO> bindingPage,
@@ -127,16 +111,8 @@ public class AdminMasterConsoleService {
         List<UserShopBindingVO> bindings = bindingPage.getList() == null
                 ? Collections.emptyList()
                 : bindingPage.getList();
-        List<Long> shopIds = bindings.stream()
-                .map(UserShopBindingVO::getShopId)
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-        Map<Long, ShopDashboardMetricsService.DashboardStatsSnapshot> dashboardStatsByShopId =
-                shopDashboardMetricsService.buildDashboardStatsBatch(shopIds, statsRange);
-
         List<AdminMasterConsoleRowVO> rows = bindings.stream()
-                .map(binding -> buildRow(binding, statsRange, dashboardStatsByShopId.get(binding.getShopId())))
+                .map(binding -> buildRow(binding, statsRange))
                 .collect(Collectors.toList());
 
         PageInfo<AdminMasterConsoleRowVO> result = new PageInfo<>();
@@ -153,15 +129,10 @@ public class AdminMasterConsoleService {
     }
 
     private AdminMasterConsoleRowVO buildRow(UserShopBindingVO binding,
-                                             DashboardStatsRangeTypeEnum statsRange,
-                                             ShopDashboardMetricsService.DashboardStatsSnapshot dashboardStats) {
+                                             DashboardStatsRangeTypeEnum statsRange) {
         MtPowerAccount powerAccount = mtPowerAccountService.getOrCreateAccount(binding.getShopId());
         MtAccessToken accessToken = mtAccessTokenService.findByShopId(binding.getShopId());
         ShopOperationSettingsVO operationSettings = shopOperationSettingsService.buildSettings(binding.getShopId());
-        ShopDashboardMetricsService.DashboardStatsSnapshot safeDashboardStats = dashboardStats == null
-                ? shopDashboardMetricsService.buildDashboardStats(binding.getShopId(), statsRange)
-                : dashboardStats;
-        ShopDashboardMetricsService.CommentStatsSnapshot commentStats = safeDashboardStats.getCommentStats();
         ShopDashboardMetricsService.PowerStatsSnapshot powerStats =
                 shopDashboardMetricsService.buildPowerStats(binding.getShopId(), powerAccount, statsRange);
 
@@ -191,14 +162,6 @@ public class AdminMasterConsoleService {
         row.setOrdinaryBindingCount(binding.getOrdinaryBindingCount());
         row.setSalesBindingCount(binding.getSalesBindingCount());
 
-        row.setGoodCommentCount(commentStats.getGoodCommentCount());
-        row.setPreviousGoodCommentCount(commentStats.getPreviousGoodCommentCount());
-        row.setBadCommentCount(commentStats.getBadCommentCount());
-        row.setPreviousBadCommentCount(commentStats.getPreviousBadCommentCount());
-        row.setRepliedBadCommentCount(commentStats.getRepliedBadCommentCount());
-        row.setBadCommentReplyRate(commentStats.getBadCommentReplyRate());
-        row.setPreviousBadCommentReplyRate(commentStats.getPreviousBadCommentReplyRate());
-
         row.setPowerBalance(powerStats.getBalance());
         row.setTotalRecharge(powerStats.getTotalRecharge());
         row.setTotalGrant(powerAccount.getTotalGrant());
@@ -209,9 +172,8 @@ public class AdminMasterConsoleService {
         applyAuthorizationStatus(row, accessToken);
         row.setRightExpireAt(binding.getRightExpireAt());
         row.setBindTime(binding.getBindTime());
-        row.setAutoReplyEnabled(operationSettings == null || operationSettings.getAutoReplyEnabled() != Boolean.FALSE);
-        row.setNegativeCommentAppealEnabled(operationSettings != null
-                && Boolean.TRUE.equals(operationSettings.getNegativeCommentAppealEnabled()));
+        row.setAutoReplyEnabled(operationSettings != null
+                && Boolean.TRUE.equals(operationSettings.getAutoReplyEnabled()));
         return row;
     }
 
@@ -246,16 +208,6 @@ public class AdminMasterConsoleService {
                 salesDomainRow ? binding.getBoundUserName() : null,
                 resolveSalesUserId(binding)
         );
-    }
-
-    private String formatRate(BigDecimal value) {
-        if (value == null) {
-            return "";
-        }
-        return value.multiply(BigDecimal.valueOf(100))
-                .setScale(2, RoundingMode.HALF_UP)
-                .stripTrailingZeros()
-                .toPlainString() + "%";
     }
 
     private String formatRemainingRightTime(LocalDateTime rightExpireAt) {

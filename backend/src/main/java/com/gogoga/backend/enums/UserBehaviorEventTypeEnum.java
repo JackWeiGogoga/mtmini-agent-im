@@ -13,10 +13,8 @@ public enum UserBehaviorEventTypeEnum {
     H5_EXTERNAL_LINK_CLICK("H5_EXTERNAL_LINK_CLICK", UserBehaviorEventSourceEnum.H5),
     H5_RECHARGE_SUBMIT_CLICK("H5_RECHARGE_SUBMIT_CLICK", UserBehaviorEventSourceEnum.H5),
     H5_REDEMPTION_APPLY_RESULT("H5_REDEMPTION_APPLY_RESULT", UserBehaviorEventSourceEnum.H5),
-    H5_LOG_DETAIL_EXPAND("H5_LOG_DETAIL_EXPAND", UserBehaviorEventSourceEnum.H5),
     H5_KNOWLEDGE_ACTION("H5_KNOWLEDGE_ACTION", UserBehaviorEventSourceEnum.H5),
 
-    PC_COMMENT_LOG_VIEW("PC_COMMENT_LOG_VIEW", UserBehaviorEventSourceEnum.ADMIN_BACKEND),
     PC_KNOWLEDGE_VIEW("PC_KNOWLEDGE_VIEW", UserBehaviorEventSourceEnum.ADMIN_BACKEND);
 
     private final String value;

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImConversationSessionMapper">
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImConversationSession">
+        <id column="id" property="id"/>
+        <result column="conversation_id" property="conversationId"/>
+        <result column="session_no" property="sessionNo"/>
+        <result column="status" property="status"/>
+        <result column="boundary_reason" property="boundaryReason"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="last_active_at" property="lastActiveAt"/>
+        <result column="closed_at" property="closedAt"/>
+        <result column="message_count" property="messageCount"/>
+        <result column="user_message_count" property="userMessageCount"/>
+        <result column="ai_message_count" property="aiMessageCount"/>
+        <result column="merchant_message_count" property="merchantMessageCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="BaseColumnList">
+        id, conversation_id, session_no, status, boundary_reason, started_at, last_active_at,
+        closed_at, message_count, user_message_count, ai_message_count, merchant_message_count,
+        create_time, update_time
+    </sql>
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImConversationSession"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_conversation_session (
+            conversation_id, session_no, status, boundary_reason, started_at, last_active_at,
+            closed_at, message_count, user_message_count, ai_message_count, merchant_message_count,
+            create_time, update_time
+        ) VALUES (
+            #{conversationId}, #{sessionNo}, #{status}, #{boundaryReason}, #{startedAt}, #{lastActiveAt},
+            #{closedAt}, #{messageCount}, #{userMessageCount}, #{aiMessageCount}, #{merchantMessageCount},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_conversation_session WHERE id = #{id} LIMIT 1
+    </select>
+    <select id="selectActiveForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_conversation_session
+        WHERE conversation_id = #{conversationId} AND status = 'ACTIVE'
+        ORDER BY session_no DESC LIMIT 1 FOR UPDATE
+    </select>
+    <update id="close">
+        UPDATE mt_im_conversation_session
+        SET status = 'CLOSED', closed_at = #{closedAt}, update_time = NOW()
+        WHERE id = #{id} AND status = 'ACTIVE'
+    </update>
+    <update id="incrementMessageAggregate">
+        UPDATE mt_im_conversation_session
+        SET message_count = message_count + 1,
+            user_message_count = user_message_count + IF(#{senderRole} = 'USER', 1, 0),
+            ai_message_count = ai_message_count + IF(#{senderRole} = 'AI', 1, 0),
+            merchant_message_count = merchant_message_count + IF(#{senderRole} = 'MERCHANT', 1, 0),
+            last_active_at = GREATEST(last_active_at, #{eventTime}),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

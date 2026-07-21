@@ -3,8 +3,8 @@
     <view class="page-shell">
       <view class="header">
         <app-top-notice
-          message="登录 PC 端: https://aibadmin.waimaidashi.com"
-          copy-text="https://aibadmin.waimaidashi.com"
+          message="登录 PC 端: https://aicadmin.waimaidashi.com"
+          copy-text="https://aicadmin.waimaidashi.com"
           :show-icon="false"
           safe-top
         />
@@ -70,7 +70,7 @@
               <view class="feature-row">
                 <view class="ai-main-copy">
                   <text class="feature-name">一键开启AI回复</text>
-                  <text class="feature-desc">AI自动回复顾客差评内容</text>
+                  <text class="feature-desc">AI自动回复顾客消息</text>
                 </view>
                 <view
                   class="toggle"
@@ -102,32 +102,6 @@
             </view>
           </view>
 
-          <view class="current-bid-main ai-current-bid-main">
-            <view class="current-bid-title-wrap">
-              <text class="current-bid-title">差评群聊+申诉</text>
-              <text class="current-bid-subtitle"
-                >（已申诉{{ repliedBadCommentCount }}条）</text
-              >
-            </view>
-            <view class="current-bid-value-wrap">
-              <view
-                class="appeal-toggle"
-                :class="{
-                  'appeal-toggle-on': negativeCommentAppealEnabled,
-                  'appeal-toggle-disabled':
-                    operationSettingsSubmitting || !autoReplyEnabled,
-                }"
-                @tap.stop="toggleNegativeCommentAppeal"
-              >
-                <view class="appeal-toggle-dot"></view>
-              </view>
-              <image
-                class="appeal-recommend-corner"
-                src="/static/icons/rec_corner.svg"
-                mode="aspectFit"
-              ></image>
-            </view>
-          </view>
           <view v-if="reauthRequired" class="promotion-warning">
             <text class="promotion-warning-text"
               >门店授权已失效，请重新授权后继续自动回复。</text
@@ -209,7 +183,7 @@
                 <text
                   class="stats-text-switch-item"
                   :class="{
-                    'stats-text-switch-active': statsMode === 'comments',
+                    'stats-text-switch-active': statsMode === 'messages',
                   }"
                   >效果统计</text
                 >
@@ -411,10 +385,9 @@ export default {
       },
       reauthRequired: false,
       autoReplyEnabled: true,
-      negativeCommentAppealEnabled: false,
       operationSettingsSubmitting: false,
       pageEntrySource: "APP",
-      statsMode: "comments",
+      statsMode: "messages",
       hasPowerStats: true,
       supportPromptVisible: false,
       activityPopupVisible: false,
@@ -424,14 +397,13 @@ export default {
         { label: "近7天", value: "LAST_7_DAYS", compareLabel: "较前7日" },
         { label: "近30天", value: "LAST_30_DAYS", compareLabel: "较前30日" },
       ],
-      commentStats: {
-        goodCommentCount: 0,
-        previousGoodCommentCount: 0,
-        badCommentCount: 0,
-        previousBadCommentCount: 0,
-        repliedBadCommentCount: 0,
-        badCommentReplyRate: 0,
-        previousBadCommentReplyRate: 0,
+      messageStats: {
+        currentMessageReplyCount: 0,
+        previousMessageReplyCount: 0,
+        currentAfterSaleMessageCount: 0,
+        previousAfterSaleMessageCount: 0,
+        messageReplyRate: 0,
+        previousMessageReplyRate: 0,
       },
       powerStats: {
         currentConsumedPower: 0,
@@ -503,38 +475,42 @@ export default {
         ];
       }
 
-      const goodTrend = buildTrend(
-        this.commentStats.goodCommentCount,
-        this.commentStats.previousGoodCommentCount,
+      const replyTrend = buildTrend(
+        this.messageStats.currentMessageReplyCount,
+        this.messageStats.previousMessageReplyCount,
       );
-      const badTrend = buildTrend(
-        this.commentStats.badCommentCount,
-        this.commentStats.previousBadCommentCount,
+      const afterSaleTrend = buildTrend(
+        this.messageStats.currentAfterSaleMessageCount,
+        this.messageStats.previousAfterSaleMessageCount,
       );
       const replyRateTrend = buildTrend(
-        this.commentStats.badCommentReplyRate,
-        this.commentStats.previousBadCommentReplyRate,
+        this.messageStats.messageReplyRate,
+        this.messageStats.previousMessageReplyRate,
       );
       return [
         {
-          label: "好评数/个",
-          value: formatDisplayNumber(this.commentStats.goodCommentCount),
-          trend: goodTrend.text,
+          label: "消息回复数",
+          value: formatDisplayNumber(
+            this.messageStats.currentMessageReplyCount,
+          ),
+          trend: replyTrend.text,
           cardClass: "stat-card-warm",
           valueClass: "stat-value-dark",
-          trendClass: goodTrend.trendClass,
+          trendClass: replyTrend.trendClass,
         },
         {
-          label: "差评数/个",
-          value: formatDisplayNumber(this.commentStats.badCommentCount),
-          trend: badTrend.text,
+          label: "售后消息数",
+          value: formatDisplayNumber(
+            this.messageStats.currentAfterSaleMessageCount,
+          ),
+          trend: afterSaleTrend.text,
           cardClass: "stat-card-cool",
           valueClass: "stat-value-dark",
-          trendClass: badTrend.trendClass,
+          trendClass: afterSaleTrend.trendClass,
         },
         {
-          label: "差评回复率",
-          value: formatPercentValue(this.commentStats.badCommentReplyRate),
+          label: "消息回复率",
+          value: formatPercentValue(this.messageStats.messageReplyRate),
           trend: replyRateTrend.text,
           cardClass: "stat-card-pink",
           valueClass: "stat-value-dark",
@@ -553,9 +529,6 @@ export default {
     },
     knowledgeStatusText() {
       return "已配置";
-    },
-    repliedBadCommentCount() {
-      return formatDisplayNumber(this.commentStats.repliedBadCommentCount);
     },
     powerBalanceAmount() {
       return Math.max(0, Number(this.powerStats.balance || 0));
@@ -648,12 +621,9 @@ export default {
       this.reauthRequired = Boolean(dashboard.authorization?.reauthRequired);
       const operationSettings = dashboard.operationSettings || {};
       this.autoReplyEnabled = operationSettings.autoReplyEnabled !== false;
-      this.negativeCommentAppealEnabled =
-        this.autoReplyEnabled &&
-        Boolean(operationSettings.negativeCommentAppealEnabled);
-      this.commentStats = {
-        ...this.commentStats,
-        ...(dashboard.commentStats || {}),
+      this.messageStats = {
+        ...this.messageStats,
+        ...(dashboard.messageStats || {}),
       };
       this.hasPowerStats = Boolean(dashboard.powerStats);
       if (this.hasPowerStats) {
@@ -662,7 +632,7 @@ export default {
           ...(dashboard.powerStats || {}),
         };
       } else {
-        this.statsMode = "comments";
+        this.statsMode = "messages";
       }
     },
     handleStatsRangeChange(event) {
@@ -678,53 +648,26 @@ export default {
       if (!this.hasPowerStats) {
         return;
       }
-      this.statsMode = this.statsMode === "comments" ? "power" : "comments";
+      this.statsMode = this.statsMode === "messages" ? "power" : "messages";
     },
     async toggleAutoReply() {
-      const nextAutoReplyEnabled = !this.autoReplyEnabled;
       await this.updateOperationSettings({
-        autoReplyEnabled: nextAutoReplyEnabled,
-        negativeCommentAppealEnabled: nextAutoReplyEnabled
-          ? this.negativeCommentAppealEnabled
-          : false,
-      });
-    },
-    async toggleNegativeCommentAppeal() {
-      if (!this.autoReplyEnabled) {
-        uni.showToast({
-          title: "请先开启AI回复",
-          icon: "none",
-        });
-        return;
-      }
-      await this.updateOperationSettings({
-        autoReplyEnabled: this.autoReplyEnabled,
-        negativeCommentAppealEnabled: !this.negativeCommentAppealEnabled,
+        autoReplyEnabled: !this.autoReplyEnabled,
       });
     },
     async updateOperationSettings(nextSettings) {
       if (this.operationSettingsSubmitting) {
         return;
       }
-      const previousSettings = {
-        autoReplyEnabled: this.autoReplyEnabled,
-        negativeCommentAppealEnabled: this.negativeCommentAppealEnabled,
-      };
+      const previousAutoReplyEnabled = this.autoReplyEnabled;
       this.autoReplyEnabled = nextSettings.autoReplyEnabled;
-      this.negativeCommentAppealEnabled =
-        nextSettings.negativeCommentAppealEnabled;
       this.operationSettingsSubmitting = true;
       try {
         const savedSettings = await updateMtH5OperationSettings(nextSettings);
         this.autoReplyEnabled = savedSettings.autoReplyEnabled !== false;
-        this.negativeCommentAppealEnabled =
-          this.autoReplyEnabled &&
-          Boolean(savedSettings.negativeCommentAppealEnabled);
         uni.showToast({ title: "已保存", icon: "none" });
       } catch (error) {
-        this.autoReplyEnabled = previousSettings.autoReplyEnabled;
-        this.negativeCommentAppealEnabled =
-          previousSettings.negativeCommentAppealEnabled;
+        this.autoReplyEnabled = previousAutoReplyEnabled;
         uni.showToast({
           title: error?.message || "保存失败",
           icon: "none",
@@ -735,7 +678,7 @@ export default {
     },
     goToLogPage() {
       uni.redirectTo({
-        url: "/pages/log/index?entrySource=HOME_CARD",
+        url: "/pages/reply-logs/index?entrySource=HOME_CARD",
       });
     },
     goToKnowledgePage() {
@@ -1019,92 +962,12 @@ export default {
   color: #8e8e8e;
 }
 
-.current-bid-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 64rpx;
-  gap: 20rpx;
-}
-
-.current-bid-title-wrap {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  flex: 1;
-}
-
-.current-bid-title {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #2b2b2f;
-  white-space: nowrap;
-}
-
-.current-bid-subtitle {
-  font-size: 22rpx;
-  color: #6e7078;
-  white-space: nowrap;
-}
-
-.current-bid-value-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.appeal-recommend-corner {
-  position: absolute;
-  top: -22rpx;
-  right: -28rpx;
-  z-index: 1;
-  width: 52rpx;
-  height: 52rpx;
-  pointer-events: none;
-}
-
-.appeal-toggle {
-  width: 92rpx;
-  height: 44rpx;
-  border-radius: 999rpx;
-  position: relative;
-  flex-shrink: 0;
-  background: #d9dbe2;
-  box-sizing: border-box;
-  transition: background-color 0.2s ease;
-}
-
-.appeal-toggle-on {
-  background: #efcb3f;
-}
-
-.appeal-toggle-disabled {
-  opacity: 0.6;
-}
-
-.appeal-toggle-dot {
-  position: absolute;
-  top: 4rpx;
-  left: 4rpx;
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.12);
-  transition: left 0.2s ease;
-}
-
-.appeal-toggle-on .appeal-toggle-dot {
-  left: calc(100% - 40rpx);
-}
-
 .feature-card {
   padding: 24rpx 26rpx;
 }
 
 .ai-card {
-  padding: 28rpx 28rpx 0;
+  padding: 28rpx 28rpx;
   overflow: hidden;
 }
 
@@ -1409,19 +1272,6 @@ export default {
 
 .power-balance-bar-insufficient .power-balance-fill {
   background: #ef2d2d;
-}
-
-.ai-current-bid-main {
-  margin: 18rpx -28rpx 0;
-  padding: 0 28rpx 28rpx;
-}
-
-.ai-current-bid-main .current-bid-title {
-  font-size: 32rpx;
-}
-
-.ai-current-bid-main .current-bid-subtitle {
-  font-size: 24rpx;
 }
 
 .promotion-warning {

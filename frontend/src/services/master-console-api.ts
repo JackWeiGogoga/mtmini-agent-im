@@ -1,12 +1,14 @@
 import request from "@/utils/request";
 import { downloadXlsx } from "@/utils/download";
 import type {
-  CommentReplyLogRecord,
   MasterConsoleQueryParam,
   MasterConsoleShopRow,
   PageInfo,
   ShopOperationSettingsUpdateParam,
   VisibleUserOption,
+  ImAutoReplyLog,
+  ImAutoReplyLogQuery,
+  ImConversationHistoryPage,
 } from "@/types";
 
 const MASTER_CONSOLE_BASE_URL = "/system/master-console";
@@ -57,17 +59,23 @@ export async function updateMasterConsoleShopOperationSettings(
   return response.data;
 }
 
-export async function getMasterConsoleCommentReplyLogs(
+export async function getMasterConsoleImAutoReplyLogs(
   shopId: number,
-  bindingDomain?: string,
-  pageNum = 1,
-  pageSize = 20,
-): Promise<PageInfo<CommentReplyLogRecord>> {
-  const response = await request.get<
-    unknown,
-    { data: PageInfo<CommentReplyLogRecord> }
-  >(`${MASTER_CONSOLE_BASE_URL}/comment-reply-logs`, {
-    params: { shopId, bindingDomain, pageNum, pageSize },
-  });
+  params: ImAutoReplyLogQuery,
+): Promise<PageInfo<ImAutoReplyLog>> {
+  const response = await request.get<unknown, { data: PageInfo<ImAutoReplyLog> }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/im-auto-replies`, { params },
+  );
+  return response.data;
+}
+
+export async function getMasterConsoleImConversationHistory(
+  shopId: number,
+  conversationId: number,
+  params?: { cursorTime?: string; cursorId?: number; pageSize?: number },
+): Promise<ImConversationHistoryPage> {
+  const response = await request.get<unknown, { data: ImConversationHistoryPage }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/im-conversations/${conversationId}/messages`, { params },
+  );
   return response.data;
 }

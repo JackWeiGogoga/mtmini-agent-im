@@ -45,12 +45,12 @@ class UserBehaviorEventMapperXmlTest {
 
         assertTrue(xml.contains("FROM mt_shop sh"));
         assertTrue(xml.contains("LEFT JOIN ("));
-        assertTrue(xml.contains("FROM mt_comment_reply_setting_history h"));
+        assertTrue(xml.contains("FROM mt_im_auto_reply_setting_history h"));
         assertTrue(xml.contains("h.change_source = 'H5'"));
         assertTrue(xml.contains("h.change_source = 'ADMIN'"));
         assertTrue(xml.contains("POWER_BALANCE_NOT_ENOUGH"));
-        assertTrue(xml.contains("$.autoReplyEnabled"));
-        assertTrue(xml.contains("$.negativeCommentAppealEnabled"));
+        assertFalse(xml.contains("negative"));
+        assertFalse(xml.contains("comment"));
     }
 
     @Test
