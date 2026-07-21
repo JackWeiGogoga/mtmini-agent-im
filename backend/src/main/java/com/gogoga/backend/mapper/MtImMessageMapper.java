@@ -33,6 +33,11 @@ public interface MtImMessageMapper {
     List<MtImMessage> selectAfterMessageInConversation(@Param("conversationId") Long conversationId,
                                                         @Param("messageId") Long messageId);
 
+    /**
+     * 会话内最近一条商家人工发言，用于商家静默窗口判定。卡片不计入。
+     */
+    MtImMessage selectLatestMerchantMessageInConversation(@Param("conversationId") Long conversationId);
+
     List<MtImMessage> selectConversationHistoryBefore(@Param("conversationId") Long conversationId,
                                                        @Param("cursorTime") LocalDateTime cursorTime,
                                                        @Param("cursorId") Long cursorId,

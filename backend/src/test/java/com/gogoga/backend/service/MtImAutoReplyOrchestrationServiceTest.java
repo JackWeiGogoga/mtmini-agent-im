@@ -32,7 +32,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -173,6 +175,114 @@ class MtImAutoReplyOrchestrationServiceTest {
         // 商家发图片是真实的人工介入，放行会让顾客同时收到人工回复和自动回复
         verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
         verify(chatService, never()).generate(anyString(), anyString(), any());
+    }
+
+    @Test
+    void holdsReplyWhileMerchantSilenceWindowIsOpen() {
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        merchant.setEventTime(LocalDateTime.now().minusSeconds(10));
+        when(autoReplyMapper.selectById(9L)).thenReturn(autoReply());
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(messageMapper.selectLatestMerchantMessageInConversation(11L)).thenReturn(merchant);
+
+        // 商家 10 秒前说过话，40 秒窗口未到期，任务应无损重排而非放弃
+        MtAsyncTaskDryRunException reschedule =
+                assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        assertEquals("MERCHANT_HOLD_WINDOW", reschedule.getMessage());
+        assertEquals(30L, reschedule.getRescheduleSeconds());
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+        verify(stateService, never()).markStatus(eq(9L), any(), anyString());
+    }
+
+    @Test
+    void generatesOnceMerchantSilenceWindowHasExpired() {
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        merchant.setEventTime(LocalDateTime.now().minusSeconds(41));
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        generated.setSendNotBefore(LocalDateTime.now().minusSeconds(1));
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setMessageCts(1784374000L);
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(messageMapper.selectLatestMerchantMessageInConversation(11L)).thenReturn(merchant);
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void holdsSendUntilRandomDelayElapsesAndDoesNotRerollAfterReschedule() {
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        generated.setSendNotBefore(LocalDateTime.now().plusSeconds(5));
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+
+        MtAsyncTaskDryRunException reschedule =
+                assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        assertEquals("SEND_DELAY", reschedule.getMessage());
+        verify(messageClient, never()).sendTwoPartyMessage(anyString(), any());
+        // sendNotBefore 已落库，重排后不得重新随机
+        verify(stateService, never()).assignSendNotBefore(anyLong(), anyLong());
+    }
+
+    @Test
+    void assignsSendDelayWithinConfiguredBoundsOnFirstAttempt() {
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        generated.setBilledAt(LocalDateTime.now());
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("固定回复");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(autoReplyMapper.selectById(9L)).thenReturn(generated);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        when(messageMapper.selectById(31L)).thenReturn(trigger());
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        when(stateService.assignSendNotBefore(eq(9L), anyLong()))
+                .thenAnswer(call -> LocalDateTime.now().plusSeconds(call.getArgument(1, Long.class)));
+
+        assertThrows(MtAsyncTaskDryRunException.class, () -> service.execute(payload()));
+
+        ArgumentCaptor<Long> delay = ArgumentCaptor.forClass(Long.class);
+        verify(stateService).assignSendNotBefore(eq(9L), delay.capture());
+        assertTrue(delay.getValue() >= 3L && delay.getValue() <= 10L,
+                "随机延迟应落在配置的 3-10 秒区间，实际=" + delay.getValue());
     }
 
     @Test

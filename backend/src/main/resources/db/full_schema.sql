@@ -626,6 +626,7 @@ CREATE TABLE `mt_im_auto_reply` (
   `power_amount` int DEFAULT NULL COMMENT '实际扣减算力',
   `rewrite_count` int NOT NULL DEFAULT '0' COMMENT '敏感词改写次数',
   `generated_at` datetime DEFAULT NULL COMMENT '生成完成时间',
+  `send_not_before` datetime DEFAULT NULL COMMENT '最早可发送时间，3-10秒随机延迟',
   `billed_at` datetime DEFAULT NULL COMMENT '算力扣减完成时间',
   `sent_at` datetime DEFAULT NULL COMMENT '发送成功时间',
   `last_error_code` varchar(128) DEFAULT NULL COMMENT '最近错误码',

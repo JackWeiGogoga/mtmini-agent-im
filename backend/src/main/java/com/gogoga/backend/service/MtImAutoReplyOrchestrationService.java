@@ -28,9 +28,11 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * IM 自动回复的防抖、生成、RAG、安全、计费和幂等发送编排。
@@ -112,6 +114,9 @@ public class MtImAutoReplyOrchestrationService {
             stateService.markStatus(autoReplyId, decision.status(), decision.reason());
             return;
         }
+        // 必须排在 checkNewerMessages 之后：商家在本条之后发言属于「亲自接手本条」，
+        // 走上面的 SKIPPED 终态；此处只处理「商家在本条之前说过话」的静默窗口。
+        awaitMerchantHoldWindow(trigger);
 
         if (autoReply.getReplyMessageId() == null) {
             generateAndPersist(autoReply, trigger);
@@ -144,6 +149,7 @@ public class MtImAutoReplyOrchestrationService {
             stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.DEAD, "REPLY_MESSAGE_NOT_FOUND");
             throw new MtAsyncTaskTerminalFailureException("REPLY_MESSAGE_NOT_FOUND");
         }
+        awaitSendDelay(autoReply);
         if (ImMessageDeliveryStatusEnum.SENT.name().equals(replyMessage.getDeliveryStatus())) {
             stateService.markSent(autoReplyId);
             return;
@@ -250,6 +256,65 @@ public class MtImAutoReplyOrchestrationService {
             return SkipDecision.skipped("AUTH_REQUIRED");
         }
         return null;
+    }
+
+    /**
+     * 商家静默窗口：商家人工发言后的一段时间内不抢答，把接待机会留给人工。
+     *
+     * <p>能走到这里说明商家最后一次发言早于本条触发消息（更晚的发言已被
+     * {@link #checkNewerMessages} 终结为 SKIPPED），因此窗口截止时刻是一个固定的历史时间点，
+     * 只会到期、不会被推迟，单次等待上限即为 merchantHoldSeconds，不存在无限等待。</p>
+     *
+     * <p>需求所说的「滚动重新计时」由每条新顾客消息各自计算窗口自然产生，无需额外状态。</p>
+     */
+    private void awaitMerchantHoldWindow(MtImMessage trigger) {
+        long holdSeconds = mtProperties.getImAutoReply().getMerchantHoldSeconds();
+        if (holdSeconds <= 0) {
+            return;
+        }
+        MtImMessage lastMerchant =
+                messageMapper.selectLatestMerchantMessageInConversation(trigger.getConversationId());
+        if (lastMerchant == null || lastMerchant.getEventTime() == null) {
+            return;
+        }
+        LocalDateTime releaseAt = lastMerchant.getEventTime().plusSeconds(holdSeconds);
+        long waitSeconds = secondsUntil(releaseAt);
+        if (waitSeconds > 0) {
+            throw new MtAsyncTaskDryRunException("MERCHANT_HOLD_WINDOW", waitSeconds);
+        }
+    }
+
+    /**
+     * 生成后的随机发送延迟，避免秒回显得机械。
+     *
+     * <p>延迟到期时刻必须落库：任务因等待被重排后会重新执行，若每次重新随机则永远到不了发送时刻。</p>
+     */
+    private void awaitSendDelay(MtImAutoReply autoReply) {
+        LocalDateTime sendNotBefore = autoReply.getSendNotBefore();
+        if (sendNotBefore == null) {
+            sendNotBefore = stateService.assignSendNotBefore(autoReply.getId(), randomSendDelaySeconds());
+        }
+        long waitSeconds = secondsUntil(sendNotBefore);
+        if (waitSeconds > 0) {
+            throw new MtAsyncTaskDryRunException("SEND_DELAY", waitSeconds);
+        }
+    }
+
+    private long randomSendDelaySeconds() {
+        long min = Math.max(mtProperties.getImAutoReply().getSendDelayMinSeconds(), 0L);
+        long max = Math.max(mtProperties.getImAutoReply().getSendDelayMaxSeconds(), min);
+        return min == max ? min : ThreadLocalRandom.current().nextLong(min, max + 1);
+    }
+
+    /**
+     * 向上取整的剩余秒数；worker 轮询精度约 1 秒，取整可避免因不足 1 秒被判为已到期而提前发送。
+     */
+    private long secondsUntil(LocalDateTime target) {
+        if (target == null) {
+            return 0L;
+        }
+        long millis = Duration.between(LocalDateTime.now(), target).toMillis();
+        return millis <= 0 ? 0L : (millis + 999L) / 1000L;
     }
 
     private SkipDecision checkNewerMessages(MtImMessage trigger) {

@@ -22,6 +22,7 @@
         <result column="power_amount" property="powerAmount"/>
         <result column="rewrite_count" property="rewriteCount"/>
         <result column="generated_at" property="generatedAt"/>
+        <result column="send_not_before" property="sendNotBefore"/>
         <result column="billed_at" property="billedAt"/>
         <result column="sent_at" property="sentAt"/>
         <result column="last_error_code" property="lastErrorCode"/>
@@ -33,7 +34,7 @@
         id, shop_id, conversation_id, session_id, trigger_message_id, reply_message_id,
         outbound_message_id, status, skip_reason, user_message_category, rag_used, rag_chunk_count, rag_max_score,
         model_provider, model_name, prompt_tokens, completion_tokens, power_amount, rewrite_count,
-        generated_at, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
+        generated_at, send_not_before, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
     </sql>
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImAutoReply"
             useGeneratedKeys="true" keyProperty="id">
@@ -41,12 +42,12 @@
             shop_id, conversation_id, session_id, trigger_message_id, reply_message_id,
             outbound_message_id, status, skip_reason, user_message_category, rag_used, rag_chunk_count, rag_max_score,
             model_provider, model_name, prompt_tokens, completion_tokens, power_amount, rewrite_count,
-            generated_at, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
+            generated_at, send_not_before, billed_at, sent_at, last_error_code, last_error_summary, create_time, update_time
         ) VALUES (
             #{shopId}, #{conversationId}, #{sessionId}, #{triggerMessageId}, #{replyMessageId},
             #{outboundMessageId}, #{status}, #{skipReason}, #{userMessageCategory}, #{ragUsed}, #{ragChunkCount}, #{ragMaxScore},
             #{modelProvider}, #{modelName}, #{promptTokens}, #{completionTokens}, #{powerAmount}, #{rewriteCount},
-            #{generatedAt}, #{billedAt}, #{sentAt}, #{lastErrorCode}, #{lastErrorSummary}, #{createTime}, #{updateTime}
+            #{generatedAt}, #{sendNotBefore}, #{billedAt}, #{sentAt}, #{lastErrorCode}, #{lastErrorSummary}, #{createTime}, #{updateTime}
         )
     </insert>
     <select id="selectById" resultMap="BaseResultMap">
@@ -78,7 +79,8 @@
             rag_used = #{ragUsed}, rag_chunk_count = #{ragChunkCount}, rag_max_score = #{ragMaxScore},
             model_provider = #{modelProvider}, model_name = #{modelName}, prompt_tokens = #{promptTokens},
             completion_tokens = #{completionTokens}, power_amount = #{powerAmount}, rewrite_count = #{rewriteCount},
-            generated_at = #{generatedAt}, billed_at = #{billedAt}, sent_at = #{sentAt},
+            generated_at = #{generatedAt}, send_not_before = #{sendNotBefore},
+            billed_at = #{billedAt}, sent_at = #{sentAt},
             last_error_code = #{lastErrorCode}, last_error_summary = #{lastErrorSummary},
             update_time = #{updateTime}
         WHERE id = #{id}

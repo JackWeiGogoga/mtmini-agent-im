@@ -236,6 +236,9 @@ mt:
     session-idle-minutes: ${MT_IM_AUTO_REPLY_SESSION_IDLE_MINUTES:30}
     history-max-rounds: ${MT_IM_AUTO_REPLY_HISTORY_MAX_ROUNDS:100}
     debounce-millis: ${MT_IM_AUTO_REPLY_DEBOUNCE_MILLIS:2000}
+    merchant-hold-seconds: ${MT_IM_AUTO_REPLY_MERCHANT_HOLD_SECONDS:40}
+    send-delay-min-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MIN_SECONDS:3}
+    send-delay-max-seconds: ${MT_IM_AUTO_REPLY_SEND_DELAY_MAX_SECONDS:10}
     max-context-chars: ${MT_IM_AUTO_REPLY_MAX_CONTEXT_CHARS:24000}
     max-completion-tokens: ${MT_IM_AUTO_REPLY_MAX_COMPLETION_TOKENS:512}
     temperature: ${MT_IM_AUTO_REPLY_TEMPERATURE:0.3}

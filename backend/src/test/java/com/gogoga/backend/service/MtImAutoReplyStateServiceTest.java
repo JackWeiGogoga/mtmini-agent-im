@@ -67,6 +67,38 @@ class MtImAutoReplyStateServiceTest {
     }
 
     @Test
+    void keepsExistingSendNotBeforeSoRescheduleDoesNotReroll() {
+        LocalDateTime original = LocalDateTime.now().plusSeconds(7);
+        MtImAutoReply row = new MtImAutoReply();
+        row.setId(9L);
+        row.setSendNotBefore(original);
+        when(autoReplyMapper.selectById(9L)).thenReturn(row);
+        MtImAutoReplyStateService service = new MtImAutoReplyStateService(
+                new MtProperties(), new PowerProperties(), autoReplyMapper, messageMapper,
+                cryptoService, conversationService, powerConsumeService);
+
+        LocalDateTime result = service.assignSendNotBefore(9L, 3L);
+
+        assertEquals(original, result);
+        verify(autoReplyMapper, never()).update(any());
+    }
+
+    @Test
+    void persistsSendNotBeforeOnFirstAssignment() {
+        MtImAutoReply row = new MtImAutoReply();
+        row.setId(9L);
+        when(autoReplyMapper.selectById(9L)).thenReturn(row);
+        MtImAutoReplyStateService service = new MtImAutoReplyStateService(
+                new MtProperties(), new PowerProperties(), autoReplyMapper, messageMapper,
+                cryptoService, conversationService, powerConsumeService);
+
+        LocalDateTime result = service.assignSendNotBefore(9L, 5L);
+
+        assertEquals(result, row.getSendNotBefore());
+        verify(autoReplyMapper).update(row);
+    }
+
+    @Test
     void doesNotChargeAgainWhenActualTokenBillingAlreadyCompleted() {
         MtImAutoReply row = new MtImAutoReply();
         row.setId(9L);

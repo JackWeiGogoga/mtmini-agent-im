@@ -149,6 +149,22 @@ public class MtProperties {
         private long debounceMillis = 2000L;
 
         /**
+         * 商家人工发言后的静默等待秒数。该窗口内不抢答，把接待机会留给人工；
+         * 窗口到期且商家未继续跟进时，AI 接管回复。
+         */
+        private long merchantHoldSeconds = 40L;
+
+        /**
+         * 回复生成后的随机发送延迟下限秒数，避免秒回显得机械。
+         */
+        private long sendDelayMinSeconds = 3L;
+
+        /**
+         * 回复生成后的随机发送延迟上限秒数。
+         */
+        private long sendDelayMaxSeconds = 10L;
+
+        /**
          * 模型上下文中消息正文的最大字符预算。
          */
         private int maxContextChars = 24000;

@@ -150,6 +150,23 @@ public class MtImAutoReplyStateService {
         }
     }
 
+    /**
+     * 固化随机发送延迟的到期时刻。已有值时直接返回，保证任务重排后不会重新随机。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public LocalDateTime assignSendNotBefore(Long autoReplyId, long delaySeconds) {
+        MtImAutoReply autoReply = requireAutoReply(autoReplyId);
+        if (autoReply.getSendNotBefore() != null) {
+            return autoReply.getSendNotBefore();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sendNotBefore = now.plusSeconds(Math.max(delaySeconds, 0L));
+        autoReply.setSendNotBefore(sendNotBefore);
+        autoReply.setUpdateTime(now);
+        autoReplyMapper.update(autoReply);
+        return sendNotBefore;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void markSending(Long autoReplyId) {
         MtImAutoReply autoReply = requireAutoReply(autoReplyId);
