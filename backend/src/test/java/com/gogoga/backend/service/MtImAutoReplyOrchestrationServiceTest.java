@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,8 +78,8 @@ class MtImAutoReplyOrchestrationServiceTest {
                 ragService, new ShopBasicInfoPromptService(), chatService,
                 promptService, sensitiveWordService, contactSuffixService, stateService, messageClient);
         // 默认无联系方式可拼：正文原样透传，个别用例再覆盖成有联系方式的门店。
-        lenient().when(contactSuffixService.append(anyLong(), anyString()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(contactSuffixService.appendPhone(anyString(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -375,17 +376,23 @@ class MtImAutoReplyOrchestrationServiceTest {
         ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
-        when(chatService.generate(eq("系统"), eq(""), any()))
+        ArgumentCaptor<String> modelContext = ArgumentCaptor.forClass(String.class);
+        when(chatService.generate(eq("系统"), modelContext.capture(), any()))
                 .thenReturn(new ImAutoReplyChatResult("答复", 10, 2));
         SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
         safe.setHit(false);
         when(sensitiveWordService.detect("答复")).thenReturn(safe);
-        when(contactSuffixService.append(1L, "答复")).thenReturn("答复\n可以联系门店 400-820-8820");
+        when(contactSuffixService.resolveContactPhone(1L)).thenReturn("400-820-8820");
+        when(contactSuffixService.appendPhone("答复", "400-820-8820"))
+                .thenReturn("答复\n可以联系门店 400-820-8820");
 
         service.execute(payload());
 
         verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n可以联系门店 400-820-8820"),
                 any(), any(), eq(0), eq("GENERAL"));
+        // 有号码时必须告知模型，否则它会答“没有联系方式”再被后缀拼上号码，自相矛盾
+        assertTrue(modelContext.getValue().contains("门店联系方式：已配置"));
+        assertFalse(modelContext.getValue().contains("400-820-8820"));
     }
 
     @Test

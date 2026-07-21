@@ -56,6 +56,8 @@ public class MtImBroadcastTimelineService {
         message.setRecordSource(ImMessageRecordSourceEnum.BROADCAST.name());
         message.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
         message.setDeliveryStatus(ImMessageDeliveryStatusEnum.SENT.name());
+        // 群发消息由本系统主动发出，不来自美团回调，没有签名可验；sign_verified 为 NOT NULL，不能留空
+        message.setSignVerified(false);
         message.setEventTime(now);
         message.setBizType(1);
         message.setPlatformMsgId(record.getOutboundMessageId());

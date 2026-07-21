@@ -251,7 +251,7 @@ mt:
     chat-model: ${MT_IM_AUTO_REPLY_CHAT_MODEL:${MT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}}
     safe-fallback-reply: ${MT_IM_AUTO_REPLY_SAFE_FALLBACK_REPLY:抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。}
   im-broadcast:
-    enabled: ${MT_IM_BROADCAST_ENABLED:false}
+    enabled: ${MT_IM_BROADCAST_ENABLED:true}
     schedule-cron: ${MT_IM_BROADCAST_SCHEDULE_CRON:0 * * * * ?}
     schedule-lock-seconds: ${MT_IM_BROADCAST_SCHEDULE_LOCK_SECONDS:50}
     schedule-page-size: ${MT_IM_BROADCAST_SCHEDULE_PAGE_SIZE:200}

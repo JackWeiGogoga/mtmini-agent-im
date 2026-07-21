@@ -312,18 +312,23 @@
             <text class="broadcast-select-text">{{ weekDaysText }}</text>
             <text class="broadcast-select-arrow">▼</text>
           </view>
-          <picker
-            class="broadcast-select"
-            mode="selector"
-            :range="repeatModeLabels"
-            :value="selectedRepeatModeIndex"
-            @change="handleRepeatModeChange"
+          <view class="broadcast-select" @tap="toggleRepeatModePanel">
+            <text class="broadcast-select-text">{{ repeatModeText }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+        </view>
+
+        <view v-if="repeatModePanelVisible" class="broadcast-option-panel">
+          <view
+            v-for="option in repeatModeOptions"
+            :key="option.value"
+            class="broadcast-option-item"
+            :class="{
+              'broadcast-option-item-active': form.repeatMode === option.value,
+            }"
+            @tap="selectRepeatMode(option.value)"
+            >{{ option.label }}</view
           >
-            <view class="broadcast-select-inner">
-              <text class="broadcast-select-text">{{ repeatModeText }}</text>
-              <text class="broadcast-select-arrow">▼</text>
-            </view>
-          </picker>
         </view>
 
         <view v-if="weekDayPanelVisible" class="broadcast-weekday-panel">
@@ -349,18 +354,33 @@
 
         <view class="broadcast-field">
           <text class="broadcast-field-label">时间：</text>
-          <picker
+          <view
             class="broadcast-select broadcast-select-grow"
-            mode="multiSelector"
-            :range="timePickerRange"
+            @tap="toggleTimePanel"
+          >
+            <text class="broadcast-select-text">{{ form.sendTime }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+        </view>
+
+        <view v-if="timePanelVisible" class="broadcast-time-panel">
+          <picker-view
+            class="broadcast-time-picker"
             :value="timePickerValue"
             @change="handleSendTimeChange"
           >
-            <view class="broadcast-select-inner">
-              <text class="broadcast-select-text">{{ form.sendTime }}</text>
-              <text class="broadcast-select-arrow">▼</text>
-            </view>
-          </picker>
+            <picker-view-column
+              v-for="(column, columnIndex) in timePickerRange"
+              :key="columnIndex"
+            >
+              <view
+                v-for="label in column"
+                :key="label"
+                class="broadcast-time-item"
+                >{{ label }}</view
+              >
+            </picker-view-column>
+          </picker-view>
         </view>
 
         <view class="broadcast-field broadcast-field-top">
@@ -562,7 +582,10 @@ export default {
       broadcastConfigured: false,
       broadcastTotalSentCount: 0,
       weekDayPanelVisible: false,
+      repeatModePanelVisible: false,
+      timePanelVisible: false,
       weekDayOptions: BROADCAST_WEEK_DAY_OPTIONS,
+      repeatModeOptions: BROADCAST_REPEAT_MODE_OPTIONS,
       form: {
         weekDays: [],
         repeatMode: "EVERY",
@@ -726,9 +749,6 @@ export default {
         )
         .filter(Boolean)
         .join("、");
-    },
-    repeatModeLabels() {
-      return BROADCAST_REPEAT_MODE_OPTIONS.map((item) => item.label);
     },
     selectedRepeatModeIndex() {
       const index = BROADCAST_REPEAT_MODE_OPTIONS.findIndex(
@@ -911,15 +931,37 @@ export default {
       };
     },
     openBroadcastDialog() {
-      this.weekDayPanelVisible = false;
+      this.closeBroadcastPanels();
       this.broadcastDialogVisible = true;
     },
     closeBroadcastDialog() {
       this.broadcastDialogVisible = false;
+      this.closeBroadcastPanels();
+    },
+    /** 三个下拉面板互斥展开，避免弹窗被撑高后按钮被挤出可视区。 */
+    closeBroadcastPanels() {
       this.weekDayPanelVisible = false;
+      this.repeatModePanelVisible = false;
+      this.timePanelVisible = false;
     },
     toggleWeekDayPanel() {
-      this.weekDayPanelVisible = !this.weekDayPanelVisible;
+      const next = !this.weekDayPanelVisible;
+      this.closeBroadcastPanels();
+      this.weekDayPanelVisible = next;
+    },
+    toggleRepeatModePanel() {
+      const next = !this.repeatModePanelVisible;
+      this.closeBroadcastPanels();
+      this.repeatModePanelVisible = next;
+    },
+    toggleTimePanel() {
+      const next = !this.timePanelVisible;
+      this.closeBroadcastPanels();
+      this.timePanelVisible = next;
+    },
+    selectRepeatMode(mode) {
+      this.form.repeatMode = mode;
+      this.repeatModePanelVisible = false;
     },
     isWeekDaySelected(day) {
       return this.form.weekDays.includes(day);
@@ -929,11 +971,6 @@ export default {
         ? this.form.weekDays.filter((item) => item !== day)
         : [...this.form.weekDays, day];
       this.form.weekDays = selected.sort((left, right) => left - right);
-    },
-    handleRepeatModeChange(event) {
-      const index = Number(event?.detail?.value || 0);
-      this.form.repeatMode =
-        BROADCAST_REPEAT_MODE_OPTIONS[index]?.value || "EVERY";
     },
     handleSendTimeChange(event) {
       const [hour = 0, minute = 0, second = 0] = event?.detail?.value || [];
@@ -1792,6 +1829,9 @@ export default {
 .broadcast-modal {
   width: 100%;
   max-width: 620rpx;
+  /* 展开时间面板后弹窗会变高，限高加滚动，保证底部按钮始终够得着 */
+  max-height: 86vh;
+  overflow-y: auto;
   padding: 36rpx 32rpx 28rpx;
   border-radius: 20rpx;
   background: #ffffff;
@@ -1844,15 +1884,6 @@ export default {
   min-width: 0;
 }
 
-/* picker 内部需要再包一层，才能让选中文案与箭头在 picker 内左右分布 */
-.broadcast-select-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  width: 100%;
-}
-
 .broadcast-select-text {
   flex: 1;
   font-size: 26rpx;
@@ -1865,6 +1896,55 @@ export default {
 .broadcast-select-arrow {
   font-size: 20rpx;
   color: #8a9099;
+}
+
+/* 频率与时间都改成弹窗内联面板：uni-app 原生 picker 的弹层挂在页面根节点，
+   层级低于自定义蒙层，会被弹窗盖住，只能内联展开。 */
+.broadcast-option-panel {
+  display: flex;
+  gap: 16rpx;
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 16rpx 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+.broadcast-option-item {
+  padding: 10rpx 28rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  background: #ffffff;
+  font-size: 26rpx;
+  color: #1f2329;
+}
+
+.broadcast-option-item-active {
+  border-color: #f5c73c;
+  background: #fdf4d6;
+}
+
+.broadcast-time-panel {
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 12rpx 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+/* 用 px 而非 rpx：picker-view 默认指示器固定 34px，rpx 换算随屏宽浮动会对不齐 */
+.broadcast-time-picker {
+  width: 100%;
+  height: 170px;
+}
+
+.broadcast-time-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  font-size: 28rpx;
+  color: #1f2329;
 }
 
 .broadcast-weekday-panel {

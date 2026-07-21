@@ -20,7 +20,8 @@ import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
 import PageContainer from "@/components/PageContainer";
 import { message, modal } from "@/components/AppMessageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, useCurrentUser } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import {
   clearKnowledge,
   createKnowledgeQa,
@@ -59,6 +60,10 @@ const knowledgeCategoryText: Record<string, string> = Object.fromEntries(
 
 export default function MerchantKnowledgeManage() {
   const { hasPermission } = useAuth();
+  const { isSuperAdmin } = usePermission();
+  const currentUser = useCurrentUser();
+  const canUseBindingDomain =
+    isSuperAdmin && currentUser?.activePortal === "ADMIN";
   const [form] = Form.useForm<KnowledgeQaParam>();
   const [shops, setShops] = useState<UserShopBinding[]>([]);
   const [shopId, setShopId] = useState<number>();
@@ -72,10 +77,19 @@ export default function MerchantKnowledgeManage() {
   const [chunkDocument, setChunkDocument] = useState<KnowledgeDocument>();
 
   const loadShops = useCallback(async () => {
-    const page = await getBoundShops({ pageNum: 1, pageSize: 200, bindingStatus: "BOUND" });
-    setShops(page.list || []);
-    setShopId((current) => current || page.list?.[0]?.shopId);
-  }, []);
+    try {
+      const page = await getBoundShops({
+        pageNum: 1,
+        pageSize: 200,
+        bindingDomain: canUseBindingDomain ? "ALL" : undefined,
+        bindingStatus: canUseBindingDomain ? "ALL" : undefined,
+      });
+      setShops(page.list || []);
+      setShopId((current) => current || page.list?.[0]?.shopId);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "加载门店列表失败");
+    }
+  }, [canUseBindingDomain]);
 
   const refresh = useCallback(async () => {
     if (!shopId) return;

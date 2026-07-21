@@ -25,29 +25,43 @@ public class ShopBasicInfoPromptService {
             "未在上面列出的门店信息，一律按“系统中没有该信息”处理，不得推断或补全。"
                     + "地址与营业时间存在同步延迟，回答时请提示以平台页面展示为准。";
 
+    /** 顾客问联系方式时的口径；仅在门店确实有可用号码时才加。 */
+    private static final String CONTACT_NOTICE =
+            "顾客询问联系方式时：门店联系方式已配置，系统会自动附在你回复的末尾，"
+                    + "你只需说明可拨打末尾的门店电话，不要自己写出号码，更不得回答门店没有联系方式。"
+                    + "本条关于联系方式的说明优先于其他规则。";
+
     /** 同步字段是任意文本，超长时截断，避免挤占上下文。 */
     private static final int MAX_FIELD_LENGTH = 120;
 
     /**
      * 构建门店基础信息块；没有任何可用字段时返回空串。
+     *
+     * @param hasContactPhone 门店是否有可用联系方式。这里只传布尔值不传号码：号码由
+     *                        {@link ImReplyContactSuffixService} 在敏感词改写之后确定性拼接，
+     *                        不经过模型就不会被改写或漏位；但模型必须知道它存在，否则会答
+     *                        “没有联系方式”，再被后缀拼上号码，出现自相矛盾的回复。
      */
-    public String build(MtShop shop) {
-        if (shop == null) {
-            return "";
+    public String build(MtShop shop, boolean hasContactPhone) {
+        List<String> lines = new ArrayList<>(3);
+        if (shop != null) {
+            String address = sanitize(shop.getAddress());
+            if (address != null) {
+                lines.add("- 门店地址：" + address);
+            }
+            String shippingTime = sanitize(shop.getShippingTime());
+            if (shippingTime != null) {
+                lines.add("- 营业时间：" + shippingTime);
+            }
         }
-        List<String> lines = new ArrayList<>(2);
-        String address = sanitize(shop.getAddress());
-        if (address != null) {
-            lines.add("- 门店地址：" + address);
-        }
-        String shippingTime = sanitize(shop.getShippingTime());
-        if (shippingTime != null) {
-            lines.add("- 营业时间：" + shippingTime);
+        if (hasContactPhone) {
+            lines.add("- 门店联系方式：已配置（系统会自动附在回复末尾）");
         }
         if (lines.isEmpty()) {
             return "";
         }
-        return HEADER + "\n" + String.join("\n", lines) + "\n" + FOOTER;
+        String block = HEADER + "\n" + String.join("\n", lines) + "\n" + FOOTER;
+        return hasContactPhone ? block + "\n" + CONTACT_NOTICE : block;
     }
 
     /**

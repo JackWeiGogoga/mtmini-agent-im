@@ -2,6 +2,7 @@ package com.gogoga.backend.vo;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -18,6 +19,21 @@ public class ImBroadcastSettingVO {
     private Boolean configured;
 
     private Boolean enabled;
+
+    /**
+     * NONE=未配置或已删除；ACTIVE=生效中；ONCE_COMPLETED=「一次」已执行完成。
+     *
+     * <p>{@link #configured} 只回答「当前有没有在跑的定时任务」，供 H5 决定按钮形态；
+     * 运营需要区分「从没配过」和「刚跑完一次性群发」，用这个字段。</p>
+     */
+    private String status;
+
+    private String statusName;
+
+    /**
+     * 最后一次触发日期，ONCE_COMPLETED 时即执行日期。
+     */
+    private LocalDate lastTriggerDate;
 
     /**
      * 触发星期，1=周一 … 7=周日。

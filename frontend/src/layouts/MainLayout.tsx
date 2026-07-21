@@ -38,6 +38,7 @@ import {
   ProfileOutlined,
   CreditCardOutlined,
   LineChartOutlined,
+  NotificationOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
@@ -72,6 +73,7 @@ const iconMap: Record<string, React.ReactNode> = {
   ProfileOutlined: <ProfileOutlined />,
   CreditCardOutlined: <CreditCardOutlined />,
   LineChartOutlined: <LineChartOutlined />,
+  NotificationOutlined: <NotificationOutlined />,
 };
 
 /**

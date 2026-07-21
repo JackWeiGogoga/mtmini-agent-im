@@ -1,4 +1,5 @@
 import type { PageParam } from "./common-types";
+import type { ImBroadcastSetting } from "./im-broadcast-types";
 import type {
   ShopBindingDomain,
   ShopBindingStatus,
@@ -53,6 +54,7 @@ export interface MasterConsoleShopRow {
   rightExpireAt?: string;
   bindTime?: string;
   autoReplyEnabled?: boolean;
+  broadcastSetting?: ImBroadcastSetting;
 }
 
 export interface ShopOperationSettingsUpdateParam {

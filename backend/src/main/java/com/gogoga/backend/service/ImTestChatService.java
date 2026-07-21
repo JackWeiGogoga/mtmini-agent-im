@@ -85,8 +85,10 @@ public class ImTestChatService {
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
                 PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+        String contactPhone = contactSuffixService.resolveContactPhone(shopId);
         String modelContext = shopBasicInfoPromptService.merge(
-                shopBasicInfoPromptService.build(shop), ragContext.promptContext());
+                shopBasicInfoPromptService.build(shop, StringUtils.isNotBlank(contactPhone)),
+                ragContext.promptContext());
 
         ImAutoReplyChatResult result = chatService.generate(
                 prompt.getContent(), modelContext, history);
@@ -109,7 +111,7 @@ public class ImTestChatService {
             blocked = true;
         }
         // 与线上自动回复保持一致：测试对话也要能看到结尾拼接的联系方式。
-        content = contactSuffixService.append(shopId, content);
+        content = contactSuffixService.appendPhone(content, contactPhone);
         if (triggerHit.isHit()) {
             log.warn("测试聊天回复命中敏感词，shopId={}, operator={}, categories={}, words={}, severity={}, rewriteCount={}, blocked={}",
                     shopId, UserContext.getUserId(), triggerHit.getCategories(), triggerHit.getHitWords(),

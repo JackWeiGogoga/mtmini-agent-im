@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImBroadcastSettingHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImBroadcastSettingHistory">
+        <id column="id" property="id"/>
+        <result column="setting_id" property="settingId"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="change_type" property="changeType"/>
+        <result column="change_source" property="changeSource"/>
+        <result column="enabled" property="enabled"/>
+        <result column="week_days" property="weekDays"/>
+        <result column="repeat_mode" property="repeatMode"/>
+        <result column="send_time" property="sendTime"/>
+        <result column="content" property="content"/>
+        <result column="operator_user_id" property="operatorUserId"/>
+        <result column="operator_name" property="operatorName"/>
+        <result column="before_snapshot_json" property="beforeSnapshotJson"/>
+        <result column="after_snapshot_json" property="afterSnapshotJson"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectMaxVersionNoByShopId" resultType="java.lang.Integer">
+        SELECT COALESCE(MAX(version_no), 0)
+        FROM mt_im_broadcast_setting_history
+        WHERE shop_id = #{shopId}
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImBroadcastSettingHistory"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_broadcast_setting_history (
+            setting_id, shop_id, version_no, change_type, change_source,
+            enabled, week_days, repeat_mode, send_time, content,
+            operator_user_id, operator_name,
+            before_snapshot_json, after_snapshot_json, create_time
+        ) VALUES (
+            #{settingId}, #{shopId}, #{versionNo}, #{changeType}, #{changeSource},
+            #{enabled}, #{weekDays}, #{repeatMode}, #{sendTime}, #{content},
+            #{operatorUserId}, #{operatorName},
+            #{beforeSnapshotJson}, #{afterSnapshotJson}, #{createTime}
+        )
+    </insert>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT id, setting_id, shop_id, version_no, change_type, change_source,
+               enabled, week_days, repeat_mode, send_time, content,
+               operator_user_id, operator_name,
+               before_snapshot_json, after_snapshot_json, create_time
+        FROM mt_im_broadcast_setting_history
+        WHERE shop_id = #{shopId}
+        ORDER BY version_no DESC
+    </select>
+</mapper>

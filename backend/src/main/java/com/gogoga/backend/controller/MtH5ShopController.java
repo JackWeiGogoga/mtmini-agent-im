@@ -142,7 +142,8 @@ public class MtH5ShopController {
     public ResultVO<ImBroadcastSettingVO> saveBroadcastSetting(
             @Valid @RequestBody ImBroadcastSettingUpdateParam param) {
         return ResultVO.success(mtImBroadcastSettingService.saveSettings(
-                mtH5ShopService.getCurrentShop().getId(), param));
+                mtH5ShopService.getCurrentShop().getId(), param,
+                MtImBroadcastSettingService.CHANGE_SOURCE_H5));
     }
 
     /**
@@ -153,7 +154,8 @@ public class MtH5ShopController {
     @DeleteMapping("/broadcast-setting")
     public ResultVO<ImBroadcastSettingVO> deleteBroadcastSetting() {
         return ResultVO.success(mtImBroadcastSettingService.deleteSettings(
-                mtH5ShopService.getCurrentShop().getId()));
+                mtH5ShopService.getCurrentShop().getId(),
+                MtImBroadcastSettingService.CHANGE_SOURCE_H5));
     }
 
     /**

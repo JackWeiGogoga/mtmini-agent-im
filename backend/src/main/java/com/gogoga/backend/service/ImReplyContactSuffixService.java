@@ -26,6 +26,16 @@ public class ImReplyContactSuffixService {
     }
 
     /**
+     * 取门店最终生效的联系方式。
+     *
+     * <p>生成前要据此告诉模型“联系方式已配置”，生成后又要拿它拼后缀，两处必须是同一个值：
+     * 若分别解析，中间商家改了配置就会出现模型说有、后缀没拼（或反之）的矛盾回复。</p>
+     */
+    public String resolveContactPhone(Long shopId) {
+        return settingsService.resolveEffectiveContactPhone(shopId);
+    }
+
+    /**
      * 已知联系方式时的拼接逻辑，便于单测与复用。
      */
     public String appendPhone(String content, String contactPhone) {

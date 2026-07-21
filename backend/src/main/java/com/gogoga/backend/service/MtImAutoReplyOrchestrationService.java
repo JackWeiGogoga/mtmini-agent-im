@@ -174,8 +174,10 @@ public class MtImAutoReplyOrchestrationService {
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
                 PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+        String contactPhone = contactSuffixService.resolveContactPhone(autoReply.getShopId());
         String modelContext = shopBasicInfoPromptService.merge(
-                shopBasicInfoPromptService.build(shop), ragContext.promptContext());
+                shopBasicInfoPromptService.build(shop, StringUtils.isNotBlank(contactPhone)),
+                ragContext.promptContext());
 
         ImAutoReplyChatResult result = chatService.generate(
                 prompt.getContent(), modelContext, context.messages());
@@ -196,7 +198,7 @@ public class MtImAutoReplyOrchestrationService {
                 throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
             }
         }
-        content = contactSuffixService.append(autoReply.getShopId(), content);
+        content = contactSuffixService.appendPhone(content, contactPhone);
         stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
                 userMessageCategory);
     }

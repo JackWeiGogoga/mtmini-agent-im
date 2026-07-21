@@ -17,6 +17,8 @@ mt:
   async-task:
     enabled: ${MT_ASYNC_TASK_ENABLED:true}
     worker-enabled: ${MT_ASYNC_TASK_WORKER_ENABLED:true}
+  im-broadcast:
+    enabled: ${MT_IM_BROADCAST_ENABLED:false}
 
 scheduled:
   enabled: ${SCHEDULED_ENABLED:false}
