@@ -3,6 +3,7 @@ package com.gogoga.backend.service;
 import com.gogoga.backend.config.MtProperties;
 import com.gogoga.backend.config.PowerProperties;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
+import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.dto.SensitiveWordHitDTO;
 import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
@@ -40,6 +41,7 @@ class ImBroadcastContentServiceTest {
     @Mock private OpenAiCompatibleChatService chatService;
     @Mock private SensitiveWordService sensitiveWordService;
     @Mock private MtPowerConsumeService powerConsumeService;
+    @Mock private SystemPromptService systemPromptService;
 
     private MtProperties mtProperties;
     private ImBroadcastContentService service;
@@ -48,8 +50,14 @@ class ImBroadcastContentServiceTest {
     void setUp() {
         mtProperties = new MtProperties();
         service = new ImBroadcastContentService(mtProperties, new PowerProperties(), shopRightService,
-                chatService, sensitiveWordService, powerConsumeService);
+                chatService, sensitiveWordService, powerConsumeService, systemPromptService);
         when(shopRightService.hasBroadcastRight(anyLong())).thenReturn(true);
+        // 提示词渲染直接回传兜底内容，测试聚焦优化/计费/敏感词流程本身。
+        when(systemPromptService.render(any(), any(), any())).thenAnswer(invocation -> {
+            ResolvedSystemPromptDTO dto = new ResolvedSystemPromptDTO();
+            dto.setContent(invocation.getArgument(2, String.class));
+            return dto;
+        });
     }
 
     @Test

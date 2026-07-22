@@ -14,10 +14,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
  * AI 群发文案优化：复用 IM 自动回复的模型通道，命中敏感词自动改写一次，产物按算力实际 token 计费。
+ *
+ * <p>两个提示词均托管在管理后台「系统提示词」：主提示词 {@link #PROMPT_KEY}、改写提示词 {@link #REWRITE_PROMPT_KEY}，
+ * 变量 {@code {{max_length}}} 由渲染时替换为文案上限字数。库表与资源都缺失时回落到 {@code MtProperties} 的代码兜底。</p>
  */
 @Slf4j
 @Service
@@ -25,6 +29,9 @@ import java.util.UUID;
 public class ImBroadcastContentService {
 
     private static final String POWER_SOURCE_TYPE = "IM_BROADCAST_CONTENT_OPTIMIZE";
+    private static final String PROMPT_KEY = "IM_BROADCAST_CONTENT_OPTIMIZE";
+    private static final String REWRITE_PROMPT_KEY = "IM_BROADCAST_CONTENT_OPTIMIZE_REWRITE";
+    private static final String VAR_MAX_LENGTH = "max_length";
 
     private final MtProperties mtProperties;
     private final PowerProperties powerProperties;
@@ -32,6 +39,7 @@ public class ImBroadcastContentService {
     private final OpenAiCompatibleChatService chatService;
     private final SensitiveWordService sensitiveWordService;
     private final MtPowerConsumeService powerConsumeService;
+    private final SystemPromptService systemPromptService;
 
     /**
      * @param shopId  发起门店，用于权益校验与算力扣减
@@ -53,7 +61,9 @@ public class ImBroadcastContentService {
 
         MtProperties.ContentOptimize config = mtProperties.getImBroadcast().getContentOptimize();
         int maxLength = Math.max(mtProperties.getImBroadcast().getMaxContentLength(), 1);
-        String systemPrompt = config.getSystemPrompt().replace("{maxLength}", String.valueOf(maxLength));
+        Map<String, Object> variables = Map.of(VAR_MAX_LENGTH, maxLength);
+        // 提示词优先取后台配置，其次资源文件，最后才是代码兜底；变量在渲染阶段统一替换。
+        String systemPrompt = systemPromptService.render(PROMPT_KEY, variables, config.getSystemPrompt()).getContent();
 
         // 首轮优化。
         LlmOutcome first = invoke(systemPrompt, source, null);
@@ -64,7 +74,8 @@ public class ImBroadcastContentService {
         // 命中敏感词则自动改写一次，两轮 token 一并计费。
         SensitiveWordHitDTO hit = sensitiveWordService.detect(optimized);
         if (hit != null && hit.isHit()) {
-            String rewriteHint = config.getSensitiveRewriteHint().replace("{maxLength}", String.valueOf(maxLength));
+            String rewriteHint = systemPromptService.render(
+                    REWRITE_PROMPT_KEY, variables, config.getSensitiveRewriteHint()).getContent();
             LlmOutcome second = invoke(systemPrompt, source, rewriteHint);
             promptTokens += second.promptTokens();
             completionTokens += second.completionTokens();

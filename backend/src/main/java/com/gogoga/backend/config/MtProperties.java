@@ -329,17 +329,19 @@ public class MtProperties {
     public static class ContentOptimize {
 
         /**
-         * 系统提示词。{maxLength} 会被替换为文案上限字数。
+         * 系统提示词代码兜底。优先级：后台配置 &gt; 资源文件 &gt; 此处。{@code {{max_length}}} 由渲染时替换为文案上限字数。
+         *
+         * <p>提示词托管在管理后台「系统提示词」，promptKey=IM_BROADCAST_CONTENT_OPTIMIZE，此处仅作库表与资源都缺失时的最后兜底。</p>
          */
         private String systemPrompt = "你是一名资深的外卖文案策划。优化用户给出的外卖群发文案，"
-                + "限制在{maxLength}字以内，语气亲切、带表情符号，只输出优化后的文案正文，"
+                + "限制在{{max_length}}字以内，语气亲切、带表情符号，只输出优化后的文案正文，"
                 + "不要解释、不要加引号、不要输出多余内容。";
 
         /**
-         * 命中敏感词后自动重写一次的提示词，追加在原提示词之后。
+         * 命中敏感词后自动重写一次的提示词代码兜底，promptKey=IM_BROADCAST_CONTENT_OPTIMIZE_REWRITE。
          */
         private String sensitiveRewriteHint = "上一版文案包含敏感信息，请在保持原意的前提下改写为合规文案，"
-                + "同样限制在{maxLength}字以内、带表情符号，只输出文案正文。";
+                + "同样限制在{{max_length}}字以内、带表情符号，只输出文案正文。";
 
         /**
          * 采样温度。文案优化允许比客服回复更活泼一些。
