@@ -303,8 +303,9 @@
       v-if="broadcastDialogVisible"
       class="modal-mask"
       @tap="closeBroadcastDialog"
+      @touchmove.stop.prevent="noop"
     >
-      <view class="broadcast-modal" @tap.stop>
+      <view class="broadcast-modal" @tap.stop @touchmove.stop>
         <text class="broadcast-modal-title">群发设置</text>
 
         <view class="broadcast-field">
