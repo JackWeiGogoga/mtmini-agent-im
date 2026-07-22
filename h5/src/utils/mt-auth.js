@@ -98,6 +98,10 @@ export function deleteMtH5BroadcastSetting() {
   return request("/api/h5/shop/broadcast-setting", "DELETE");
 }
 
+export function optimizeMtH5BroadcastContent(content) {
+  return request("/api/h5/shop/broadcast-content/optimize", "POST", { content });
+}
+
 export function getKnowledgeQaItems() {
   return request("/api/h5/knowledge/items", "GET");
 }

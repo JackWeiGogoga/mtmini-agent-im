@@ -310,6 +310,11 @@ public class MtProperties {
         private int maxContentLength = 100;
 
         /**
+         * AI 文案优化设置。
+         */
+        private ContentOptimize contentOptimize = new ContentOptimize();
+
+        /**
          * 编排任务策略。
          */
         private TaskPolicy planTask = new TaskPolicy();
@@ -318,6 +323,33 @@ public class MtProperties {
          * 分片发送任务策略。
          */
         private TaskPolicy sendTask = new TaskPolicy();
+    }
+
+    @Data
+    public static class ContentOptimize {
+
+        /**
+         * 系统提示词。{maxLength} 会被替换为文案上限字数。
+         */
+        private String systemPrompt = "你是一名资深的外卖文案策划。优化用户给出的外卖群发文案，"
+                + "限制在{maxLength}字以内，语气亲切、带表情符号，只输出优化后的文案正文，"
+                + "不要解释、不要加引号、不要输出多余内容。";
+
+        /**
+         * 命中敏感词后自动重写一次的提示词，追加在原提示词之后。
+         */
+        private String sensitiveRewriteHint = "上一版文案包含敏感信息，请在保持原意的前提下改写为合规文案，"
+                + "同样限制在{maxLength}字以内、带表情符号，只输出文案正文。";
+
+        /**
+         * 采样温度。文案优化允许比客服回复更活泼一些。
+         */
+        private double temperature = 0.7D;
+
+        /**
+         * 单次优化输出的最大 token 数。
+         */
+        private int maxCompletionTokens = 400;
     }
 
     @Data

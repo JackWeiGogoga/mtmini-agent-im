@@ -3,13 +3,16 @@ package com.gogoga.backend.controller;
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
 import com.gogoga.backend.param.ShopContactPhoneUpdateParam;
+import com.gogoga.backend.param.ImBroadcastContentOptimizeParam;
 import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
+import com.gogoga.backend.service.ImBroadcastContentService;
 import com.gogoga.backend.service.MtH5GuideStateService;
 import com.gogoga.backend.service.MtH5HomeDashboardService;
 import com.gogoga.backend.service.MtH5ShopService;
 import com.gogoga.backend.service.MtImBroadcastSettingService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
+import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
 import com.gogoga.backend.vo.ImBroadcastSettingVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.MtH5GuideStateVO;
@@ -46,6 +49,7 @@ public class MtH5ShopController {
     private final MtH5GuideStateService mtH5GuideStateService;
     private final ShopOperationSettingsService shopOperationSettingsService;
     private final MtImBroadcastSettingService mtImBroadcastSettingService;
+    private final ImBroadcastContentService imBroadcastContentService;
 
     /**
      * 获取 H5 首页门店信息
@@ -156,6 +160,19 @@ public class MtH5ShopController {
         return ResultVO.success(mtImBroadcastSettingService.deleteSettings(
                 mtH5ShopService.getCurrentShop().getId(),
                 MtImBroadcastSettingService.CHANGE_SOURCE_H5));
+    }
+
+    /**
+     * AI 优化当前门店的群发文案，消耗算力。
+     *
+     * @param param 待优化的文本框内容
+     * @return 优化后的文案
+     */
+    @PostMapping("/broadcast-content/optimize")
+    public ResultVO<ImBroadcastContentOptimizeVO> optimizeBroadcastContent(
+            @Valid @RequestBody ImBroadcastContentOptimizeParam param) {
+        return ResultVO.success(imBroadcastContentService.optimize(
+                mtH5ShopService.getCurrentShop().getId(), param.getContent()));
     }
 
     /**

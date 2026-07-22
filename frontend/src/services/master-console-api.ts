@@ -90,6 +90,17 @@ export async function deleteMasterConsoleBroadcastSetting(
   return response.data;
 }
 
+export async function optimizeMasterConsoleBroadcastContent(
+  shopId: number,
+  content: string,
+): Promise<string> {
+  const response = await request.post<unknown, { data: { content: string } }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-content/optimize`,
+    { content },
+  );
+  return response.data.content;
+}
+
 export async function getMasterConsoleBroadcastSettingHistory(
   shopId: number,
   params?: { pageNum?: number; pageSize?: number },

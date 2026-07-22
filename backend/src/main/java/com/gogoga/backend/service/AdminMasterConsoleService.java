@@ -11,6 +11,7 @@ import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
 import com.gogoga.backend.vo.ImBroadcastSettingVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.UserShopBindingVO;
@@ -44,6 +45,7 @@ public class AdminMasterConsoleService {
     private final ShopDashboardMetricsService shopDashboardMetricsService;
     private final ShopOperationSettingsService shopOperationSettingsService;
     private final MtImBroadcastSettingService mtImBroadcastSettingService;
+    private final ImBroadcastContentService imBroadcastContentService;
 
     public PageInfo<AdminMasterConsoleRowVO> listRows(String keyword,
                                                       String targetUserId,
@@ -131,6 +133,12 @@ public class AdminMasterConsoleService {
         userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
         return mtImBroadcastSettingService.deleteSettings(
                 shopId, MtImBroadcastSettingService.CHANGE_SOURCE_ADMIN);
+    }
+
+    public ImBroadcastContentOptimizeVO optimizeBroadcastContent(Long shopId, String content) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        // 代运营优化仍扣目标门店的算力，权益与算力校验都在 service 内按目标门店进行。
+        return imBroadcastContentService.optimize(shopId, content);
     }
 
     private String formatExportBroadcast(AdminMasterConsoleRowVO row) {

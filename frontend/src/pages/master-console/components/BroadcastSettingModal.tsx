@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Spin, Tabs, Tag, TimePicker, Typography } from "antd";
+import { ThunderboltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { message } from "@/components/AppMessageContext";
 import {
   deleteMasterConsoleBroadcastSetting,
   getMasterConsoleBroadcastSetting,
+  optimizeMasterConsoleBroadcastContent,
   saveMasterConsoleBroadcastSetting,
 } from "@/services/master-console-api";
 import type { ImBroadcastRepeatMode, ImBroadcastSetting } from "@/types";
@@ -13,7 +15,28 @@ import BroadcastSettingHistoryTable from "./BroadcastSettingHistory";
 const { Text } = Typography;
 const CONTENT_MAX_LENGTH = 100;
 const TIME_FORMAT = "HH:mm:ss";
-const DEFAULT_SEND_TIME = "10:00:00";
+const DEFAULT_SEND_TIME = "10:30:00";
+
+// 官方预设话术，与 H5 保持一致。点击只覆盖内容，不动日期/时间/频率。
+const PRESET_OPTIONS: { value: string; label: string; content: string }[] = [
+  {
+    value: "CANVASSING",
+    label: "餐前拉客",
+    content: "宝子，快到饭点啦~今天大厨元气满满，已为您准备了美味佳肴，快进店里看看呗~",
+  },
+  {
+    value: "PROMOTION",
+    label: "节日促销",
+    content: "宝子，小店即将迎来X周年店庆！收藏店铺即可获得丰厚大礼！联系客服咨询~",
+  },
+  {
+    value: "CLOSURE",
+    label: "歇业公告",
+    content: "宝子，X月X日-X月X日小店临时歇业哟~X月X日恢复营业，届时小店一定再恭迎您的大驾光临~记得收藏店铺避免迷路哟！",
+  },
+];
+// 首次进入（从未配置）时的默认表单。
+const DEFAULT_WEEK_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export const WEEK_DAY_OPTIONS = [
   { label: "周一", value: 1 },
@@ -54,18 +77,57 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [presetType, setPresetType] = useState<string>("");
   const [setting, setSetting] = useState<ImBroadcastSetting>();
   const [activeTab, setActiveTab] = useState<TabKey>("setting");
 
   const applySetting = useCallback((value: ImBroadcastSetting) => {
     setSetting(value);
+    if (!value.configured) {
+      // 从未配置：套用官方默认（周一至周日 / 10:30 / 每次 / 首个预设话术）。
+      form.setFieldsValue({
+        weekDays: DEFAULT_WEEK_DAYS,
+        repeatMode: "EVERY",
+        sendTime: dayjs(DEFAULT_SEND_TIME, TIME_FORMAT),
+        content: PRESET_OPTIONS[0].content,
+      });
+      setPresetType(PRESET_OPTIONS[0].value);
+      return;
+    }
+    const content = value.content || "";
     form.setFieldsValue({
       weekDays: value.weekDays || [],
       repeatMode: value.repeatMode || "EVERY",
       sendTime: dayjs(value.sendTime || DEFAULT_SEND_TIME, TIME_FORMAT),
-      content: value.content || "",
+      content,
     });
+    setPresetType(PRESET_OPTIONS.find((item) => item.content === content)?.value || "");
   }, [form]);
+
+  const handleSelectPreset = useCallback((option: (typeof PRESET_OPTIONS)[number]) => {
+    // 只覆盖内容，日期/时间/频率保持不变。
+    form.setFieldsValue({ content: option.content });
+    setPresetType(option.value);
+  }, [form]);
+
+  const handleOptimize = useCallback(async () => {
+    if (!shopId) return;
+    const content = (form.getFieldValue("content") || "").trim();
+    if (!content) {
+      message.warning("请先填写要优化的内容");
+      return;
+    }
+    setOptimizing(true);
+    try {
+      const optimized = await optimizeMasterConsoleBroadcastContent(shopId, content);
+      form.setFieldsValue({ content: optimized });
+      // 优化后不再是任何预设原文，取消高亮。
+      setPresetType("");
+    } finally {
+      setOptimizing(false);
+    }
+  }, [form, shopId]);
 
   // 弹窗本体常驻，destroyOnHidden 只销毁子节点；不重置的话换一家门店会停留在上次的 tab。
   useEffect(() => {
@@ -167,6 +229,26 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
         >
           <Input.TextArea rows={4} showCount maxLength={CONTENT_MAX_LENGTH} placeholder="请填写发送的内容…" />
         </Form.Item>
+        <Space size={8} wrap style={{ display: "flex", marginBottom: 16 }}>
+          {PRESET_OPTIONS.map((option) => (
+            <Tag.CheckableTag
+              key={option.value}
+              checked={presetType === option.value}
+              onChange={() => handleSelectPreset(option)}
+            >
+              {option.label}
+            </Tag.CheckableTag>
+          ))}
+          <Button
+            size="small"
+            type="link"
+            icon={<ThunderboltOutlined />}
+            loading={optimizing}
+            onClick={() => void handleOptimize()}
+          >
+            AI优化
+          </Button>
+        </Space>
         <Space size={8}>
           <Tag color={setting?.status === "ACTIVE" ? "green" : setting?.status === "ONCE_COMPLETED" ? "blue" : undefined}>
             {setting?.statusName || "未配置"}

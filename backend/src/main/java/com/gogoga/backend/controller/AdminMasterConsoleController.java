@@ -4,6 +4,7 @@ import com.github.pagehelper.PageInfo;
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.annotation.RequiresPermission;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.param.ImBroadcastContentOptimizeParam;
 import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.param.ImAutoReplyLogQueryParam;
@@ -12,6 +13,7 @@ import com.gogoga.backend.service.ImReplyLogQueryService;
 import com.gogoga.backend.service.AdminMasterConsoleService;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
 import com.gogoga.backend.vo.ImBroadcastSettingHistoryVO;
 import com.gogoga.backend.vo.ImBroadcastSettingVO;
 import com.gogoga.backend.vo.ResultVO;
@@ -25,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -138,6 +141,17 @@ public class AdminMasterConsoleController {
     @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
     public ResultVO<ImBroadcastSettingVO> deleteBroadcastSetting(@PathVariable Long shopId) {
         return ResultVO.success(adminMasterConsoleService.deleteBroadcastSetting(shopId));
+    }
+
+    /**
+     * 代商家 AI 优化群发文案，消耗目标门店算力。
+     */
+    @PostMapping("/shops/{shopId}/broadcast-content/optimize")
+    @RequiresPermission(value = "shop:master-console:list,sales:master-console:list", logical = RequiresPermission.Logical.OR)
+    public ResultVO<ImBroadcastContentOptimizeVO> optimizeBroadcastContent(
+            @PathVariable Long shopId,
+            @Valid @RequestBody ImBroadcastContentOptimizeParam param) {
+        return ResultVO.success(adminMasterConsoleService.optimizeBroadcastContent(shopId, param.getContent()));
     }
 
     /**

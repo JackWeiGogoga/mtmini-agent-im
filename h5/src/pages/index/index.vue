@@ -410,6 +410,31 @@
           </view>
         </view>
 
+        <view class="broadcast-preset-row">
+          <view
+            v-for="option in presetOptions"
+            :key="option.value"
+            class="broadcast-preset-chip"
+            :class="{
+              'broadcast-preset-chip-active': form.presetType === option.value,
+            }"
+            @tap="selectBroadcastPreset(option)"
+            >{{ option.label }}</view
+          >
+          <view
+            class="broadcast-preset-ai"
+            :class="{ 'broadcast-preset-ai-disabled': broadcastOptimizing }"
+            @tap="optimizeBroadcastContent"
+          >
+            <image
+              class="broadcast-preset-ai-icon"
+              src="/static/icons/ai.svg"
+              mode="aspectFit"
+            ></image>
+            <text class="broadcast-preset-ai-text">AI</text>
+          </view>
+        </view>
+
         <view class="broadcast-modal-actions">
           <view
             class="broadcast-modal-button broadcast-modal-button-primary"
@@ -443,6 +468,7 @@ import {
   deleteMtH5BroadcastSetting,
   getMtH5HomeDashboard,
   getShopInfo,
+  optimizeMtH5BroadcastContent,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
   saveMtH5BroadcastSetting,
@@ -473,6 +499,35 @@ const BROADCAST_REPEAT_MODE_OPTIONS = [
   { value: "EVERY", label: "每次" },
   { value: "ONCE", label: "一次" },
 ];
+// 官方预设话术：点击只覆盖内容框文字，不动已选的日期/时间/次数。
+const BROADCAST_PRESET_OPTIONS = [
+  {
+    value: "CANVASSING",
+    label: "餐前拉客",
+    content:
+      "宝子，快到饭点啦~今天大厨元气满满，已为您准备了美味佳肴，快进店里看看呗~",
+  },
+  {
+    value: "PROMOTION",
+    label: "节日促销",
+    content:
+      "宝子，小店即将迎来X周年店庆！收藏店铺即可获得丰厚大礼！联系客服咨询~",
+  },
+  {
+    value: "CLOSURE",
+    label: "歇业公告",
+    content:
+      "宝子，X月X日-X月X日小店临时歇业哟~X月X日恢复营业，届时小店一定再恭迎您的大驾光临~记得收藏店铺避免迷路哟！",
+  },
+];
+// 首次进入（从未配置）时的默认表单。
+const BROADCAST_DEFAULT_FORM = {
+  weekDays: [1, 2, 3, 4, 5, 6, 7],
+  repeatMode: "EVERY",
+  sendTime: "10:30:00",
+  presetType: BROADCAST_PRESET_OPTIONS[0].value,
+  content: BROADCAST_PRESET_OPTIONS[0].content,
+};
 
 function padTwoDigits(value) {
   return String(value).padStart(2, "0");
@@ -583,6 +638,7 @@ export default {
       activityPopupVisible: false,
       broadcastDialogVisible: false,
       broadcastSubmitting: false,
+      broadcastOptimizing: false,
       broadcastConfigured: false,
       broadcastTotalSentCount: 0,
       // 默认放行：接口数据回来前不置灰，避免首屏闪一下灰态。
@@ -592,10 +648,13 @@ export default {
       timePanelVisible: false,
       weekDayOptions: BROADCAST_WEEK_DAY_OPTIONS,
       repeatModeOptions: BROADCAST_REPEAT_MODE_OPTIONS,
+      presetOptions: BROADCAST_PRESET_OPTIONS,
       form: {
         weekDays: [],
         repeatMode: "EVERY",
         sendTime: "10:00:00",
+        // 高亮中的预设类型；手动改文案不清空高亮，直到切到另一个预设。
+        presetType: "",
         content: "",
       },
       statsRange: "TODAY",
@@ -923,20 +982,40 @@ export default {
     },
     applyBroadcastSetting(setting = {}) {
       const broadcastSetting = setting || {};
-      this.broadcastConfigured = Boolean(broadcastSetting.configured);
+      const configured = Boolean(broadcastSetting.configured);
+      this.broadcastConfigured = configured;
       this.broadcastTotalSentCount = Number(
         broadcastSetting.totalSentCount || 0,
       );
       // 只有后端明确回 false 才置灰，字段缺失时按放行处理。
       this.broadcastRightGranted = broadcastSetting.rightGranted !== false;
+      if (!configured) {
+        // 从未配置：套用官方默认（周一至周日 / 10:30 / 每次 / 首个预设话术）。
+        this.form = { ...BROADCAST_DEFAULT_FORM };
+        return;
+      }
+      // 已配置：原样回显商家自己存的值，预设高亮按内容是否等于某条话术推断。
+      const content = broadcastSetting.content || "";
       this.form = {
         weekDays: Array.isArray(broadcastSetting.weekDays)
           ? [...broadcastSetting.weekDays]
           : [],
         repeatMode: broadcastSetting.repeatMode || "EVERY",
         sendTime: broadcastSetting.sendTime || "10:00:00",
-        content: broadcastSetting.content || "",
+        presetType: this.matchPresetType(content),
+        content,
       };
+    },
+    matchPresetType(content) {
+      const matched = BROADCAST_PRESET_OPTIONS.find(
+        (item) => item.content === content,
+      );
+      return matched ? matched.value : "";
+    },
+    selectBroadcastPreset(option) {
+      // 只覆盖内容框，日期/时间/次数保持不变。
+      this.form.presetType = option.value;
+      this.form.content = option.content;
     },
     openBroadcastDialog() {
       if (!this.broadcastRightGranted) {
@@ -992,6 +1071,34 @@ export default {
       this.form.sendTime = `${padTwoDigits(hour)}:${padTwoDigits(
         minute,
       )}:${padTwoDigits(second)}`;
+    },
+    async optimizeBroadcastContent() {
+      if (this.broadcastOptimizing) {
+        return;
+      }
+      const content = String(this.form.content).trim();
+      if (!content) {
+        uni.showToast({ title: "请先填写要优化的内容", icon: "none" });
+        return;
+      }
+      this.broadcastOptimizing = true;
+      uni.showLoading({ title: "AI优化中…", mask: true });
+      try {
+        const result = await optimizeMtH5BroadcastContent(content);
+        if (result?.content) {
+          this.form.content = result.content;
+          // 优化后的文案已不再是任何预设原文，取消预设高亮。
+          this.form.presetType = "";
+        }
+      } catch (error) {
+        uni.showToast({
+          title: error?.message || "优化失败，请重试",
+          icon: "none",
+        });
+      } finally {
+        uni.hideLoading();
+        this.broadcastOptimizing = false;
+      }
     },
     async submitBroadcastSetting() {
       if (this.broadcastSubmitting) {
@@ -2019,7 +2126,7 @@ export default {
 
 .broadcast-textarea {
   width: 100%;
-  height: 132rpx;
+  height: 176rpx;
   font-size: 26rpx;
   color: #1f2329;
   box-sizing: border-box;
@@ -2045,6 +2152,52 @@ export default {
 .broadcast-textarea-counter {
   font-size: 22rpx;
   color: #b6bbc3;
+}
+
+.broadcast-preset-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.broadcast-preset-chip {
+  padding: 10rpx 16rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  background: #f4f5f7;
+  border: 2rpx solid #e5e6eb;
+  border-radius: 32rpx;
+}
+
+.broadcast-preset-chip-active {
+  color: #b9822a;
+  background: #fdf6e8;
+  border-color: #f5c66b;
+}
+
+.broadcast-preset-ai {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-left: auto;
+  padding: 8rpx 14rpx;
+  border-radius: 32rpx;
+}
+
+.broadcast-preset-ai-disabled {
+  opacity: 0.6;
+}
+
+.broadcast-preset-ai-icon {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.broadcast-preset-ai-text {
+  font-size: 22rpx;
+  color: #b9822a;
 }
 
 .broadcast-modal-actions {
