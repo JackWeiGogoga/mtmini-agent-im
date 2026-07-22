@@ -9,6 +9,7 @@ import com.gogoga.backend.exception.BusinessException;
 import com.gogoga.backend.mapper.MtPowerAccountMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeDetailMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
+import com.gogoga.backend.service.sms.notification.MerchantLifecycleSmsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -52,6 +55,9 @@ class MtPowerConsumeServiceTest {
 
     @Mock
     private ShopOperationSettingsService shopOperationSettingsService;
+
+    @Mock
+    private MerchantLifecycleSmsService lifecycleSmsService;
 
     @InjectMocks
     private MtPowerConsumeService mtPowerConsumeService;
@@ -171,6 +177,85 @@ class MtPowerConsumeServiceTest {
         assertEquals(1, details.size());
         assertEquals(MtPowerConsumeService.SOURCE_BALANCE_RECHARGE, details.get(0).getSourceBalanceType());
         assertEquals(100, details.get(0).getPowerAmount());
+    }
+
+    @Test
+    void shouldNotifyWhenImAutoReplyConsumeCrossesCriticalThreshold() {
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(2100);
+        account.setGrantBalance(2100);
+        account.setRechargeBalance(0);
+        account.setVersion(2);
+        when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.deductBySource(
+                eq(1L), eq(200), eq(200), eq(0), eq(2), any())).thenReturn(1);
+        when(mtPowerConsumeMapper.insert(any(MtPowerConsume.class))).thenAnswer(invocation -> {
+            MtPowerConsume consume = invocation.getArgument(0);
+            consume.setId(101L);
+            return 1;
+        });
+        PowerConsumeRequestDTO request = buildRequest();
+        request.setSourceType("IM_AUTO_REPLY");
+        request.setPowerAmount(200);
+
+        PowerConsumeResultDTO result = mtPowerConsumeService.consume(request);
+
+        assertEquals(2100, result.getBalanceBefore());
+        assertEquals(1900, result.getBalanceAfter());
+        verify(lifecycleSmsService).enqueuePowerExhausted(eq(1L), eq(result.getConsumeNo()), any());
+    }
+
+    @Test
+    void shouldNotNotifyForBroadcastOptimizationEvenWhenThresholdIsCrossed() {
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(2100);
+        account.setGrantBalance(2100);
+        account.setRechargeBalance(0);
+        account.setVersion(2);
+        when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.deductBySource(
+                eq(1L), eq(200), eq(200), eq(0), eq(2), any())).thenReturn(1);
+        when(mtPowerConsumeMapper.insert(any(MtPowerConsume.class))).thenAnswer(invocation -> {
+            MtPowerConsume consume = invocation.getArgument(0);
+            consume.setId(102L);
+            return 1;
+        });
+        PowerConsumeRequestDTO request = buildRequest();
+        request.setSourceType("IM_BROADCAST_CONTENT_OPTIMIZE");
+        request.setPowerAmount(200);
+
+        mtPowerConsumeService.consume(request);
+
+        verify(lifecycleSmsService, never()).enqueuePowerExhausted(any(), any(), any());
+    }
+
+    @Test
+    void shouldKeepImConsumptionSuccessfulWhenSmsTriggerFails() {
+        MtPowerAccount account = new MtPowerAccount();
+        account.setBalance(2100);
+        account.setGrantBalance(2100);
+        account.setRechargeBalance(0);
+        account.setVersion(2);
+        when(mtPowerConsumeMapper.selectByShopIdAndRequestNo(1L, "REQ-1")).thenReturn(null);
+        when(mtPowerAccountMapper.selectByShopIdForUpdate(1L)).thenReturn(account);
+        when(mtPowerAccountMapper.deductBySource(
+                eq(1L), eq(200), eq(200), eq(0), eq(2), any())).thenReturn(1);
+        when(mtPowerConsumeMapper.insert(any(MtPowerConsume.class))).thenAnswer(invocation -> {
+            MtPowerConsume consume = invocation.getArgument(0);
+            consume.setId(103L);
+            return 1;
+        });
+        doThrow(new IllegalStateException("sms unavailable"))
+                .when(lifecycleSmsService).enqueuePowerExhausted(any(), any(), any());
+        PowerConsumeRequestDTO request = buildRequest();
+        request.setSourceType("IM_AUTO_REPLY");
+        request.setPowerAmount(200);
+
+        assertDoesNotThrow(() -> mtPowerConsumeService.consume(request));
+
+        verify(mtPowerConsumeMapper).insert(any(MtPowerConsume.class));
     }
 
     private PowerConsumeRequestDTO buildRequest() {

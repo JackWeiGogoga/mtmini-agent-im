@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.SmsNotificationEventMapper">
+
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.sms.SmsNotificationEvent">
+        <id column="id" property="id"/>
+        <result column="scene" property="scene"/>
+        <result column="biz_key" property="bizKey"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="order_id" property="orderId"/>
+        <result column="template_id" property="templateId"/>
+        <result column="template_params_json" property="templateParamsJson"/>
+        <result column="context_json" property="contextJson"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="max_retry_count" property="maxRetryCount"/>
+        <result column="available_at" property="availableAt"/>
+        <result column="claimed_at" property="claimedAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="worker_id" property="workerId"/>
+        <result column="last_error" property="lastError"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="BaseColumnList">
+        id, scene, biz_key, shop_id, order_id, template_id, template_params_json, context_json,
+        status, retry_count, max_retry_count, available_at, claimed_at, finished_at, worker_id,
+        last_error, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM sms_notification_event
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectBySceneAndBizKey" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM sms_notification_event
+        WHERE scene = #{scene} AND biz_key = #{bizKey}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.sms.SmsNotificationEvent" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sms_notification_event (
+            scene, biz_key, shop_id, order_id, template_id, template_params_json, context_json,
+            status, retry_count, max_retry_count, available_at, claimed_at, finished_at, worker_id,
+            last_error, create_time, update_time
+        ) VALUES (
+            #{scene}, #{bizKey}, #{shopId}, #{orderId}, #{templateId}, #{templateParamsJson}, #{contextJson},
+            #{status}, #{retryCount}, #{maxRetryCount}, #{availableAt}, #{claimedAt}, #{finishedAt}, #{workerId},
+            #{lastError}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectExecutableIds" resultType="java.lang.Long">
+        SELECT id
+        FROM sms_notification_event
+        WHERE status = 'PENDING' AND available_at &lt;= #{availableAt}
+        ORDER BY available_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimPendingById">
+        UPDATE sms_notification_event
+        SET status = 'PROCESSING', worker_id = #{workerId}, claimed_at = #{claimedAt},
+            finished_at = NULL, update_time = #{claimedAt}
+        WHERE id = #{id} AND status = 'PENDING'
+    </update>
+
+    <update id="markTerminal">
+        UPDATE sms_notification_event
+        SET status = #{status}, finished_at = #{finishedAt}, last_error = #{lastError},
+            worker_id = NULL, claimed_at = NULL, update_time = #{finishedAt}
+        WHERE id = #{id} AND status = 'PROCESSING'
+    </update>
+
+    <update id="rescheduleFromProcessing">
+        UPDATE sms_notification_event
+        SET status = 'PENDING', retry_count = #{retryCount}, available_at = #{availableAt},
+            last_error = #{lastError}, worker_id = NULL, claimed_at = NULL, finished_at = NULL,
+            update_time = #{updatedAt}
+        WHERE id = #{id} AND status = 'PROCESSING'
+    </update>
+
+    <update id="markDead">
+        UPDATE sms_notification_event
+        SET status = 'DEAD', retry_count = #{retryCount}, finished_at = #{finishedAt},
+            last_error = #{lastError}, worker_id = NULL, claimed_at = NULL, update_time = #{finishedAt}
+        WHERE id = #{id} AND status = 'PROCESSING'
+    </update>
+
+    <select id="selectStaleProcessing" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM sms_notification_event
+        WHERE status = 'PROCESSING' AND claimed_at IS NOT NULL AND claimed_at &lt;= #{claimedBefore}
+        ORDER BY claimed_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+</mapper>

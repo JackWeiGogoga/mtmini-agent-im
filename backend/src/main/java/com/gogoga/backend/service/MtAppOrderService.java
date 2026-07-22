@@ -41,7 +41,7 @@ public class MtAppOrderService {
     private final MtShopService mtShopService;
     private final MeituanClient meituanClient;
     private final MtProperties mtProperties;
-    private final MtShopRightService mtShopRightService;
+    private final MtAppOrderRightApplicationService rightApplicationService;
 
     /**
      * 拉取近期订阅订单
@@ -209,20 +209,25 @@ public class MtAppOrderService {
                     pendingOrder.getDays(),
                     pendingOrder.getEndTime(),
                     pendingOrder.getType());
-            boolean applied = mtShopRightService.applyOrderRights(pendingOrder, consumedBuyInfoCreditKeys);
-            if (!applied) {
-                log.info("订阅订单权益暂未应用，orderId={}, shopId={}, version={}, days={}, endTime={}",
+            try {
+                MtAppOrderRightApplicationResult result = rightApplicationService
+                        .applyOne(pendingOrder, consumedBuyInfoCreditKeys);
+                if (!result.applied()) {
+                    log.info("订阅订单权益暂未应用，orderId={}, shopId={}, version={}, days={}, endTime={}",
+                            pendingOrder.getOrderId(), pendingOrder.getShopId(), pendingOrder.getVersion(),
+                            pendingOrder.getDays(), pendingOrder.getEndTime());
+                    continue;
+                }
+                consumedBuyInfoCreditKeys.clear();
+                consumedBuyInfoCreditKeys.addAll(result.consumedBuyInfoCreditKeys());
+                log.info("订阅订单权益处理完成并标记已应用，orderId={}, shopId={}, version={}, consumedBuyInfoCreditCount={}",
                         pendingOrder.getOrderId(), pendingOrder.getShopId(), pendingOrder.getVersion(),
-                        pendingOrder.getDays(), pendingOrder.getEndTime());
-                continue;
+                        consumedBuyInfoCreditKeys.size());
+                appliedCount++;
+            } catch (RuntimeException e) {
+                log.error("订阅订单权益事务处理失败，保留待补偿状态, orderId={}, shopId={}",
+                        pendingOrder.getOrderId(), pendingOrder.getShopId(), e);
             }
-            pendingOrder.setType(1);
-            pendingOrder.setUpdateTime(LocalDateTime.now());
-            mtAppOrderMapper.updateById(pendingOrder);
-            log.info("订阅订单权益处理完成并标记已应用，orderId={}, shopId={}, version={}, consumedBuyInfoCreditCount={}",
-                    pendingOrder.getOrderId(), pendingOrder.getShopId(), pendingOrder.getVersion(),
-                    consumedBuyInfoCreditKeys.size());
-            appliedCount++;
         }
         log.info("处理待补偿订阅订单权益完成，pendingCount={}, appliedCount={}", pendingOrders.size(), appliedCount);
         return appliedCount;

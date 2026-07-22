@@ -1173,6 +1173,57 @@ CREATE TABLE `yz_shop` (
   KEY `idx_yz_shop_root_kdt_id` (`root_kdt_id`),
   KEY `idx_yz_shop_open_id` (`open_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='有赞店铺表';
+CREATE TABLE IF NOT EXISTS `sms_notification_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `scene` varchar(64) NOT NULL COMMENT '短信业务场景',
+  `biz_key` varchar(255) NOT NULL COMMENT '场景内业务唯一键',
+  `shop_id` bigint DEFAULT NULL COMMENT '门店ID',
+  `order_id` varchar(255) DEFAULT NULL COMMENT '美团应用订单号',
+  `template_id` varchar(64) NOT NULL COMMENT '短信模板ID快照',
+  `template_params_json` longtext COMMENT '模板参数JSON快照',
+  `context_json` longtext COMMENT '业务校验上下文JSON',
+  `status` varchar(32) NOT NULL COMMENT '状态 PENDING/PROCESSING/EXPANDED/NO_RECIPIENT/CANCELLED/DEAD',
+  `retry_count` int NOT NULL DEFAULT 0 COMMENT '当前重试次数',
+  `max_retry_count` int NOT NULL DEFAULT 0 COMMENT '最大重试次数',
+  `available_at` datetime NOT NULL COMMENT '计划执行时间',
+  `claimed_at` datetime DEFAULT NULL COMMENT '领取时间',
+  `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
+  `worker_id` varchar(128) DEFAULT NULL COMMENT '工作器标识',
+  `last_error` varchar(1000) DEFAULT NULL COMMENT '最近错误或终态原因',
+  `create_time` datetime NOT NULL COMMENT '创建时间',
+  `update_time` datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_sms_notification_event_scene_biz` (`scene`, `biz_key`),
+  KEY `idx_sms_notification_event_status_available` (`status`, `available_at`, `id`),
+  KEY `idx_sms_notification_event_status_claimed` (`status`, `claimed_at`, `id`),
+  KEY `idx_sms_notification_event_shop_scene` (`shop_id`, `scene`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信通知业务事件表';
+
+CREATE TABLE IF NOT EXISTS `sms_notification_delivery` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `event_id` bigint NOT NULL COMMENT '短信通知事件ID',
+  `recipient_phone` varchar(32) NOT NULL COMMENT '标准化收件手机号',
+  `status` varchar(32) NOT NULL COMMENT '状态 PENDING/PROCESSING/SENT/CANCELLED/DEAD',
+  `retry_count` int NOT NULL DEFAULT 0 COMMENT '当前重试次数',
+  `max_retry_count` int NOT NULL DEFAULT 0 COMMENT '最大重试次数',
+  `available_at` datetime NOT NULL COMMENT '下次可执行时间',
+  `claimed_at` datetime DEFAULT NULL COMMENT '领取时间',
+  `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
+  `worker_id` varchar(128) DEFAULT NULL COMMENT '工作器标识',
+  `provider_request_id` varchar(128) DEFAULT NULL COMMENT '腾讯云请求ID',
+  `provider_serial_no` varchar(128) DEFAULT NULL COMMENT '腾讯云发送序列号',
+  `provider_code` varchar(128) DEFAULT NULL COMMENT '腾讯云结果码',
+  `provider_message` varchar(500) DEFAULT NULL COMMENT '腾讯云结果摘要',
+  `last_error` varchar(1000) DEFAULT NULL COMMENT '最近错误或终态原因',
+  `sent_at` datetime DEFAULT NULL COMMENT '发送成功时间',
+  `create_time` datetime NOT NULL COMMENT '创建时间',
+  `update_time` datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_sms_notification_delivery_event_phone` (`event_id`, `recipient_phone`),
+  KEY `idx_sms_notification_delivery_status_available` (`status`, `available_at`, `id`),
+  KEY `idx_sms_notification_delivery_status_claimed` (`status`, `claimed_at`, `id`),
+  KEY `idx_sms_notification_delivery_event_status` (`event_id`, `status`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信通知逐手机号投递表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

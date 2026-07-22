@@ -81,6 +81,14 @@
         LIMIT 1
     </select>
 
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/>
+        FROM mt_app_order
+        WHERE id = #{id}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
     <select id="selectByOrderId" resultMap="BaseResultMap">
         SELECT <include refid="BaseColumnList"/>
         FROM mt_app_order
