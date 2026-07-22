@@ -84,7 +84,8 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
 
   const applySetting = useCallback((value: ImBroadcastSetting) => {
     setSetting(value);
-    if (!value.configured) {
+    // 只有「从未配置或已删除」(NONE) 才套默认；「一次」已执行完(ONCE_COMPLETED)仍保留上次文案，须原样回显。
+    if ((value.status || "NONE") === "NONE") {
       // 从未配置：套用官方默认（周一至周日 / 10:30 / 每次 / 首个预设话术）。
       form.setFieldsValue({
         weekDays: DEFAULT_WEEK_DAYS,

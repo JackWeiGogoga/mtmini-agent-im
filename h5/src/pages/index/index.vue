@@ -641,6 +641,8 @@ export default {
       broadcastOptimizing: false,
       broadcastConfigured: false,
       broadcastTotalSentCount: 0,
+      // 最近一次服务端群发配置原始数据，供每次打开弹窗时重建表单、丢弃上次未提交的改动。
+      broadcastSettingSnapshot: null,
       // 默认放行：接口数据回来前不置灰，避免首屏闪一下灰态。
       broadcastRightGranted: true,
       weekDayPanelVisible: false,
@@ -982,6 +984,8 @@ export default {
     },
     applyBroadcastSetting(setting = {}) {
       const broadcastSetting = setting || {};
+      // 留存原始数据快照：取消未提交的改动后，下次打开可据此还原。
+      this.broadcastSettingSnapshot = broadcastSetting;
       const configured = Boolean(broadcastSetting.configured);
       this.broadcastConfigured = configured;
       this.broadcastTotalSentCount = Number(
@@ -989,12 +993,13 @@ export default {
       );
       // 只有后端明确回 false 才置灰，字段缺失时按放行处理。
       this.broadcastRightGranted = broadcastSetting.rightGranted !== false;
-      if (!configured) {
-        // 从未配置：套用官方默认（周一至周日 / 10:30 / 每次 / 首个预设话术）。
+      // 只有「从未配置或已删除」(NONE) 才套默认；「一次」已执行完(ONCE_COMPLETED)虽然 configured=false，
+      // 但保留着商家上次的文案，必须原样回显，不能被默认话术覆盖。
+      if ((broadcastSetting.status || "NONE") === "NONE") {
         this.form = { ...BROADCAST_DEFAULT_FORM };
         return;
       }
-      // 已配置：原样回显商家自己存的值，预设高亮按内容是否等于某条话术推断。
+      // 已配置或一次已完成：原样回显商家自己存的值，预设高亮按内容是否等于某条话术推断。
       const content = broadcastSetting.content || "";
       this.form = {
         weekDays: Array.isArray(broadcastSetting.weekDays)
@@ -1025,6 +1030,8 @@ export default {
         });
         return;
       }
+      // 每次打开都从服务端快照重建表单，丢弃上次「切了预设但点取消」残留的脏改动。
+      this.applyBroadcastSetting(this.broadcastSettingSnapshot || {});
       this.closeBroadcastPanels();
       this.broadcastDialogVisible = true;
     },
