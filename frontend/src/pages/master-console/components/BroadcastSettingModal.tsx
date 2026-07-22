@@ -176,6 +176,9 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
     }
   }, [onClose, onSaved, shopId]);
 
+  // 弹窗「忙」态：AI优化中或保存/删除提交中，此时禁用其余交互元素。
+  const busy = submitting || optimizing;
+
   return <Modal
     title={`${shopName || "门店"} · 群发配置`}
     open={open}
@@ -187,11 +190,12 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
         title="清空该门店的定时群发配置？"
         description="累计群发条数会保留，仅停止后续定时发送。"
         onConfirm={handleDelete}
+        disabled={busy}
       >
-        <Button danger loading={submitting}>删除</Button>
+        <Button danger loading={submitting} disabled={optimizing}>删除</Button>
       </Popconfirm> : null}
-      <Button onClick={onClose}>取消</Button>
-      <Button type="primary" loading={submitting} onClick={() => void handleSubmit()}>保存</Button>
+      <Button onClick={onClose} disabled={busy}>取消</Button>
+      <Button type="primary" loading={submitting} disabled={optimizing} onClick={() => void handleSubmit()}>保存</Button>
     </Space>}
   >
     <Tabs
@@ -205,7 +209,7 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
     {activeTab === "history"
       ? <BroadcastSettingHistoryTable shopId={shopId} />
       : <Spin spinning={loading}>
-      <Form form={form} layout="vertical" initialValues={{ repeatMode: "EVERY" }}>
+      <Form form={form} layout="vertical" initialValues={{ repeatMode: "EVERY" }} disabled={busy}>
         <Form.Item
           name="weekDays"
           label="发送日期"
@@ -235,7 +239,9 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
             <Tag.CheckableTag
               key={option.value}
               checked={presetType === option.value}
-              onChange={() => handleSelectPreset(option)}
+              // CheckableTag 不消费 Form 的 disabled 上下文，忙时手动拦截点击并置灰。
+              onChange={() => { if (!busy) handleSelectPreset(option); }}
+              style={busy ? { opacity: 0.5, pointerEvents: "none" } : undefined}
             >
               {option.label}
             </Tag.CheckableTag>
@@ -245,6 +251,7 @@ const BroadcastSettingModal: React.FC<BroadcastSettingModalProps> = ({
             type="link"
             icon={<ThunderboltOutlined />}
             loading={optimizing}
+            disabled={submitting}
             onClick={() => void handleOptimize()}
           >
             AI优化

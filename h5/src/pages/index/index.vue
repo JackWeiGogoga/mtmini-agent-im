@@ -312,12 +312,17 @@
           <text class="broadcast-field-label">日期：</text>
           <view
             class="broadcast-select broadcast-select-grow"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
             @tap="toggleWeekDayPanel"
           >
             <text class="broadcast-select-text">{{ weekDaysText }}</text>
             <text class="broadcast-select-arrow">▼</text>
           </view>
-          <view class="broadcast-select" @tap="toggleRepeatModePanel">
+          <view
+            class="broadcast-select"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
+            @tap="toggleRepeatModePanel"
+          >
             <text class="broadcast-select-text">{{ repeatModeText }}</text>
             <text class="broadcast-select-arrow">▼</text>
           </view>
@@ -361,6 +366,7 @@
           <text class="broadcast-field-label">时间：</text>
           <view
             class="broadcast-select broadcast-select-grow"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
             @tap="toggleTimePanel"
           >
             <text class="broadcast-select-text">{{ form.sendTime }}</text>
@@ -397,6 +403,7 @@
               placeholder="请填写发送的内容…"
               placeholder-class="broadcast-textarea-placeholder"
               :maxlength="broadcastContentMaxLength"
+              :disabled="broadcastOptimizing"
             ></textarea>
             <view class="broadcast-textarea-footer">
               <text class="broadcast-textarea-rule"
@@ -406,6 +413,15 @@
                 >{{ broadcastContentLength }}/{{
                   broadcastContentMaxLength
                 }}</text
+              >
+            </view>
+            <view
+              v-if="broadcastOptimizing"
+              class="broadcast-textarea-loading"
+            >
+              <view class="broadcast-textarea-loading-spinner"></view>
+              <text class="broadcast-textarea-loading-text"
+                >AI优化中…</text
               >
             </view>
           </view>
@@ -418,13 +434,14 @@
             class="broadcast-preset-chip"
             :class="{
               'broadcast-preset-chip-active': form.presetType === option.value,
+              'broadcast-preset-chip-disabled': broadcastBusy,
             }"
             @tap="selectBroadcastPreset(option)"
             >{{ option.label }}</view
           >
           <view
             class="broadcast-preset-ai"
-            :class="{ 'broadcast-preset-ai-disabled': broadcastOptimizing }"
+            :class="{ 'broadcast-preset-ai-disabled': broadcastBusy }"
             @tap="optimizeBroadcastContent"
           >
             <image
@@ -439,26 +456,35 @@
         <view class="broadcast-modal-actions">
           <view
             class="broadcast-modal-button broadcast-modal-button-primary"
-            :class="{ 'broadcast-modal-button-disabled': broadcastSubmitting }"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
             @tap="submitBroadcastSetting"
             >发送</view
           >
           <view
             v-if="broadcastConfigured"
             class="broadcast-modal-button"
-            :class="{ 'broadcast-modal-button-disabled': broadcastSubmitting }"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
             @tap="deleteBroadcastSetting"
             >删除</view
           >
           <view
             v-else
             class="broadcast-modal-button"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
             @tap="closeBroadcastDialog"
             >取消</view
           >
         </view>
       </view>
     </view>
+
+    <!-- AI优化期间罩住整屏，吃掉一切点击/触摸，避免中途切预设、改配置、发送或关弹窗。 -->
+    <view
+      v-if="broadcastOptimizing"
+      class="broadcast-blocking-mask"
+      @tap.stop.prevent="noop"
+      @touchmove.stop.prevent="noop"
+    ></view>
   </view>
 </template>
 
@@ -684,6 +710,10 @@ export default {
     };
   },
   computed: {
+    // 弹窗处于「忙」态：AI优化中或配置提交/删除中。此时弹窗内所有交互元素统一置灰禁用。
+    broadcastBusy() {
+      return this.broadcastOptimizing || this.broadcastSubmitting;
+    },
     statsTitle() {
       const selectedRange = this.statsRangeOptions.find(
         (item) => item.value === this.statsRange,
@@ -882,7 +912,28 @@ export default {
     this.showActivityPopupOnce();
     this.loadDashboard();
   },
+  onHide() {
+    // 兜底：万一弹窗开着就切走了页面，别把 body 滚动一直锁死。
+    this.lockPageScroll(false);
+  },
+  watch: {
+    // uniapp H5 端 @touchmove.prevent 因 passive 监听被忽略，拦不住背景滚动；改为直接锁 body。
+    broadcastDialogVisible(visible) {
+      this.lockPageScroll(visible);
+    },
+  },
   methods: {
+    lockPageScroll(locked) {
+      // #ifdef H5
+      const value = locked ? "hidden" : "";
+      if (document.documentElement) {
+        document.documentElement.style.overflow = value;
+      }
+      if (document.body) {
+        document.body.style.overflow = value;
+      }
+      // #endif
+    },
     showActivityPopupOnce() {
       if (!ACTIVITY_POPUP_ENABLED || activityPopupShownInCurrentApp) {
         return;
@@ -1089,8 +1140,8 @@ export default {
         uni.showToast({ title: "请先填写要优化的内容", icon: "none" });
         return;
       }
+      // 用文案框内嵌的读条表达加载态：uni.showLoading 会被弹窗 z-index 盖住，商家看不见易误触重复点。
       this.broadcastOptimizing = true;
-      uni.showLoading({ title: "AI优化中…", mask: true });
       try {
         const result = await optimizeMtH5BroadcastContent(content);
         if (result?.content) {
@@ -1104,7 +1155,6 @@ export default {
           icon: "none",
         });
       } finally {
-        uni.hideLoading();
         this.broadcastOptimizing = false;
       }
     },
@@ -2014,6 +2064,10 @@ export default {
   box-sizing: border-box;
 }
 
+.broadcast-select-disabled {
+  opacity: 0.5;
+}
+
 .broadcast-select-grow {
   flex: 1;
   min-width: 0;
@@ -2124,12 +2178,59 @@ export default {
 }
 
 .broadcast-textarea-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
   padding: 16rpx;
   border: 2rpx solid #d5d8dd;
   border-radius: 8rpx;
   box-sizing: border-box;
+}
+
+/* 优化期间的全屏拦截罩：透明但吃掉所有点击，z-index 高于弹窗(9999)，读条透过它仍可见。 */
+.broadcast-blocking-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: transparent;
+}
+
+/* 加载态直接盖在文案框上，读条明确，避免被弹窗遮住导致的无感误触。 */
+.broadcast-textarea-loading {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8rpx;
+}
+
+.broadcast-textarea-loading-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 4rpx solid #f5c66b;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: broadcast-spin 0.8s linear infinite;
+}
+
+.broadcast-textarea-loading-text {
+  font-size: 26rpx;
+  color: #b9822a;
+}
+
+@keyframes broadcast-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .broadcast-textarea {
@@ -2183,6 +2284,10 @@ export default {
   color: #b9822a;
   background: #fdf6e8;
   border-color: #f5c66b;
+}
+
+.broadcast-preset-chip-disabled {
+  opacity: 0.5;
 }
 
 .broadcast-preset-ai {
