@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -42,34 +43,38 @@ class MerchantLifecycleSmsServiceTest {
     }
 
     @Test
-    void shouldUseLatestPurchaseTemplateAndOrderedDayParameter() {
-        LocalDateTime now = LocalDateTime.now();
+    void shouldUseLatestPurchaseTemplateAndScheduleForNextDayAtTen() {
+        Instant occurredAt = Instant.parse("2026-07-22T16:30:00Z");
 
-        service.enqueuePurchaseGuide(10L, "order-1", 90, now);
+        service.enqueuePurchaseGuide(10L, "order-1", 90, occurredAt);
 
         SmsNotificationEventEnqueueRequest request = captureRequest();
         assertEquals(SmsNotificationSceneEnum.PURCHASE_GUIDE, request.scene());
         assertEquals("2685915", request.templateId());
         assertEquals(List.of("AI智能体消息管理", "90天"), request.templateParams());
         assertEquals("order-1", request.bizKey());
+        assertEquals(LocalDateTime.of(2026, 7, 24, 10, 0), request.availableAt());
     }
 
     @Test
     void shouldSkipUnsupportedDaysWithoutCreatingInvalidTemplateParameters() {
-        service.enqueuePurchaseGuide(10L, "order-1", 15, LocalDateTime.now());
+        service.enqueuePurchaseGuide(10L, "order-1", 15, Instant.now());
 
         verify(eventService, never()).enqueue(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void shouldUseLatestPowerTemplateWithConsumeNumberAsBusinessKey() {
-        service.enqueuePowerExhausted(10L, "PC-1", LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.of(2026, 7, 22, 23, 59, 59);
+
+        service.enqueuePowerExhausted(10L, "PC-1", now);
 
         SmsNotificationEventEnqueueRequest request = captureRequest();
         assertEquals(SmsNotificationSceneEnum.POWER_EXHAUSTED, request.scene());
         assertEquals("2687571", request.templateId());
         assertEquals(List.of("AI智能体消息管理"), request.templateParams());
         assertEquals("PC-1", request.bizKey());
+        assertEquals(now, request.availableAt());
     }
 
     @Test
@@ -89,7 +94,7 @@ class MerchantLifecycleSmsServiceTest {
     @Test
     void shouldDeferEventUntilActiveBusinessTransactionCommits() {
         TransactionSynchronization synchronization = registerAfterCommit(() ->
-                service.enqueuePurchaseGuide(10L, "order-1", 7, LocalDateTime.now())
+                service.enqueuePurchaseGuide(10L, "order-1", 7, Instant.now())
         );
 
         verify(eventService, never()).enqueue(any());
@@ -121,7 +126,7 @@ class MerchantLifecycleSmsServiceTest {
 
         try {
             TransactionSynchronization synchronization = registerAfterCommit(() ->
-                    service.enqueuePurchaseGuide(10L, "order-1", 7, LocalDateTime.now())
+                    service.enqueuePurchaseGuide(10L, "order-1", 7, Instant.now())
             );
 
             assertDoesNotThrow(synchronization::afterCommit);
@@ -165,8 +170,8 @@ class MerchantLifecycleSmsServiceTest {
         logger.addAppender(appender);
 
         try {
-            service.enqueuePurchaseGuide(10L, "order-1", 7, LocalDateTime.now());
-            service.enqueuePurchaseGuide(10L, "order-1", 7, LocalDateTime.now());
+            service.enqueuePurchaseGuide(10L, "order-1", 7, Instant.now());
+            service.enqueuePurchaseGuide(10L, "order-1", 7, Instant.now());
             service.enqueueAppExpired(
                     10L,
                     LocalDateTime.of(2026, 8, 1, 23, 59, 59),

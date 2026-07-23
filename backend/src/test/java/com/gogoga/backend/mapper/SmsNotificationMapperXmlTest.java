@@ -16,6 +16,7 @@ class SmsNotificationMapperXmlTest {
         String xml = read("mapper/SmsNotificationEventMapper.xml");
 
         assertTrue(xml.contains("selectBySceneAndBizKey"));
+        assertTrue(xml.contains("status = 'PENDING' AND available_at &lt;= #{availableAt}"));
         assertTrue(xml.contains("WHERE id = #{id} AND status = 'PENDING'"));
         assertTrue(xml.contains("WHERE status = 'PROCESSING' AND claimed_at IS NOT NULL"));
     }

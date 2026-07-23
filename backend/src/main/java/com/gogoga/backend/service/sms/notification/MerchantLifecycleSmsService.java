@@ -9,7 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +27,7 @@ import java.util.function.Supplier;
 public class MerchantLifecycleSmsService {
 
     private static final Set<Integer> SUPPORTED_APP_DAYS = Set.of(7, 30, 90, 360);
+    private static final LocalTime PURCHASE_GUIDE_SEND_TIME = LocalTime.of(10, 0);
     private static final int MAX_ERROR_MESSAGE_LENGTH = 500;
 
     private final SmsNotificationEventService eventService;
@@ -33,7 +37,7 @@ public class MerchantLifecycleSmsService {
             Long shopId,
             String orderId,
             Integer days,
-            LocalDateTime now
+            Instant occurredAt
     ) {
         if (days == null || !SUPPORTED_APP_DAYS.contains(days)) {
             log.warn("购买引导短信事件跳过，应用订单规格不受模板支持, shopId={}, orderId={}, days={}",
@@ -55,9 +59,16 @@ public class MerchantLifecycleSmsService {
                         config.getPurchaseGuideTemplateId(),
                         List.of(config.getApplicationName(), days + "天"),
                         Map.of("days", days),
-                        now
+                        purchaseGuideAvailableAt(occurredAt, config.getZoneId())
                 )
         );
+    }
+
+    private LocalDateTime purchaseGuideAvailableAt(Instant occurredAt, String zoneId) {
+        return occurredAt.atZone(ZoneId.of(zoneId))
+                .toLocalDate()
+                .plusDays(1)
+                .atTime(PURCHASE_GUIDE_SEND_TIME);
     }
 
     public SmsNotificationEventEnqueueResult enqueuePowerExhausted(

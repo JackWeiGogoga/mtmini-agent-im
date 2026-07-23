@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -44,7 +45,7 @@ public class SmsNotificationWorkerTask {
     public void recoverStale() {
         Duration lease = Duration.ofSeconds(Math.max(5L, smsProperties.getBusiness().getTimeoutSeconds()));
         distributedLockService.tryRun("SmsNotificationRecoveryWorker", lease, () -> {
-            int recovered = processingService.recoverStale(LocalDateTime.now());
+            int recovered = processingService.recoverStale(businessNow());
             if (recovered > 0) {
                 log.warn("业务短信超时任务已回收, recoveredCount={}", recovered);
             }
@@ -52,16 +53,20 @@ public class SmsNotificationWorkerTask {
     }
 
     private void processEvents() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = businessNow();
         for (Long eventId : eventService.selectExecutableIds(now)) {
-            processingService.processEvent(eventId, workerId, LocalDateTime.now());
+            processingService.processEvent(eventId, workerId, businessNow());
         }
     }
 
     private void processDeliveries() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = businessNow();
         for (Long deliveryId : processingService.selectExecutableDeliveryIds(now)) {
-            processingService.processDelivery(deliveryId, workerId, LocalDateTime.now());
+            processingService.processDelivery(deliveryId, workerId, businessNow());
         }
+    }
+
+    private LocalDateTime businessNow() {
+        return LocalDateTime.now(ZoneId.of(smsProperties.getBusiness().getZoneId()));
     }
 }

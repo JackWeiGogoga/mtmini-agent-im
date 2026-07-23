@@ -16,7 +16,8 @@
         <encoder><!-- 必须指定，否则不会往文件输出内容 -->
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{1}] [%method:%line] %msg%n</pattern>
         </encoder>
-        <append>false</append>
+        <!-- 同一天内重启应用时继续追加，避免覆盖重启前的生产日志 -->
+        <append>true</append>
         <prudent>false</prudent>
     </appender>
 

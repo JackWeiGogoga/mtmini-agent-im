@@ -9,7 +9,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -47,7 +49,8 @@ public class MtAppOrderRightApplicationService {
             return new MtAppOrderRightApplicationResult(false, consumedBuyInfoCreditKeys);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant occurredAt = Instant.now();
+        LocalDateTime now = LocalDateTime.ofInstant(occurredAt, ZoneId.systemDefault());
         current.setType(1);
         current.setUpdateTime(now);
         mtAppOrderMapper.updateById(current);
@@ -56,7 +59,7 @@ public class MtAppOrderRightApplicationService {
                     current.getShopId(),
                     current.getOrderId(),
                     current.getDays(),
-                    now
+                    occurredAt
             );
         } catch (RuntimeException error) {
             log.error("购买短信触发异常，已 fail-open 不影响权益和订单, shopId={}, orderId={}, days={}, "
