@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.gogoga.backend.config.SmsProperties;
 import com.gogoga.backend.entity.sms.SmsNotificationEvent;
 import com.gogoga.backend.enums.SmsNotificationSceneEnum;
+import com.gogoga.backend.service.sms.BusinessSmsSendWindowPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -39,7 +40,11 @@ class MerchantLifecycleSmsServiceTest {
         eventService = mock(SmsNotificationEventService.class);
         SmsProperties properties = new SmsProperties();
         properties.getBusiness().setEnabled(true);
-        service = new MerchantLifecycleSmsService(eventService, properties);
+        service = new MerchantLifecycleSmsService(
+                eventService,
+                properties,
+                new BusinessSmsSendWindowPolicy()
+        );
     }
 
     @Test
@@ -65,16 +70,26 @@ class MerchantLifecycleSmsServiceTest {
 
     @Test
     void shouldUseLatestPowerTemplateWithConsumeNumberAsBusinessKey() {
-        LocalDateTime now = LocalDateTime.of(2026, 7, 22, 23, 59, 59);
+        LocalDateTime now = LocalDateTime.of(2026, 7, 22, 12, 0);
 
         service.enqueuePowerExhausted(10L, "PC-1", now);
 
         SmsNotificationEventEnqueueRequest request = captureRequest();
         assertEquals(SmsNotificationSceneEnum.POWER_EXHAUSTED, request.scene());
-        assertEquals("2687571", request.templateId());
+        assertEquals("2693564", request.templateId());
         assertEquals(List.of("AI智能体消息管理"), request.templateParams());
         assertEquals("PC-1", request.bizKey());
         assertEquals(now, request.availableAt());
+    }
+
+    @Test
+    void shouldScheduleEarlyMorningPowerEventForNextDayAtEight() {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 24, 2, 0, 11);
+
+        service.enqueuePowerExhausted(10L, "PC-1", now);
+
+        SmsNotificationEventEnqueueRequest request = captureRequest();
+        assertEquals(LocalDateTime.of(2026, 7, 25, 8, 0), request.availableAt());
     }
 
     @Test
@@ -86,9 +101,20 @@ class MerchantLifecycleSmsServiceTest {
 
         SmsNotificationEventEnqueueRequest request = captureRequest();
         assertEquals(SmsNotificationSceneEnum.APP_EXPIRED, request.scene());
-        assertEquals("2687569", request.templateId());
+        assertEquals("2693563", request.templateId());
         assertEquals("10#2026-08-01T23:59:59", request.bizKey());
         assertEquals(scheduledAt, request.availableAt());
+    }
+
+    @Test
+    void shouldApplySendWindowGuardToExpiryEvent() {
+        LocalDateTime expectedExpireAt = LocalDateTime.of(2026, 8, 1, 23, 59, 59);
+        LocalDateTime scheduledAt = LocalDateTime.of(2026, 8, 2, 22, 0);
+
+        service.enqueueAppExpired(10L, expectedExpireAt, scheduledAt);
+
+        SmsNotificationEventEnqueueRequest request = captureRequest();
+        assertEquals(LocalDateTime.of(2026, 8, 3, 8, 0), request.availableAt());
     }
 
     @Test

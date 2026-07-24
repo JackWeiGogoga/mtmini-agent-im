@@ -7,6 +7,7 @@ import com.gogoga.backend.enums.BusinessSmsDeliveryModeEnum;
 import com.gogoga.backend.enums.SmsNotificationSceneEnum;
 import com.gogoga.backend.mapper.SmsNotificationDeliveryMapper;
 import com.gogoga.backend.mapper.SmsNotificationEventMapper;
+import com.gogoga.backend.service.sms.BusinessSmsSendWindowPolicy;
 import com.gogoga.backend.service.sms.BusinessTemplateSmsService;
 import com.gogoga.backend.service.sms.LoggingTemplateSmsGateway;
 import com.gogoga.backend.service.sms.TemplateSmsRequest;
@@ -52,7 +53,8 @@ class BusinessSmsLogOnlyEndToEndTest {
                 List.of(handler),
                 templateSmsService,
                 properties,
-                new SmsNotificationMetricsService()
+                new SmsNotificationMetricsService(),
+                new BusinessSmsSendWindowPolicy()
         );
 
         Map<Long, SmsNotificationEvent> events = buildEvents();
@@ -89,9 +91,9 @@ class BusinessSmsLogOnlyEndToEndTest {
         List<TemplateSmsRequest> requests = requestCaptor.getAllValues();
         assertEquals(2, requests.stream().filter(item -> "2685915".equals(item.templateId())
                 && item.templateParams().equals(List.of("AI智能体消息管理", "7天"))).count());
-        assertEquals(2, requests.stream().filter(item -> "2687571".equals(item.templateId())
+        assertEquals(2, requests.stream().filter(item -> "2693564".equals(item.templateId())
                 && item.templateParams().equals(List.of("AI智能体消息管理"))).count());
-        assertEquals(2, requests.stream().filter(item -> "2687569".equals(item.templateId())
+        assertEquals(2, requests.stream().filter(item -> "2693563".equals(item.templateId())
                 && item.templateParams().equals(List.of("AI智能体消息管理"))).count());
     }
 
@@ -99,9 +101,9 @@ class BusinessSmsLogOnlyEndToEndTest {
         Map<Long, SmsNotificationEvent> events = new LinkedHashMap<>();
         events.put(1L, event(1L, SmsNotificationSceneEnum.PURCHASE_GUIDE, "2685915",
                 "[\"AI智能体消息管理\",\"7天\"]"));
-        events.put(2L, event(2L, SmsNotificationSceneEnum.POWER_EXHAUSTED, "2687571",
+        events.put(2L, event(2L, SmsNotificationSceneEnum.POWER_EXHAUSTED, "2693564",
                 "[\"AI智能体消息管理\"]"));
-        events.put(3L, event(3L, SmsNotificationSceneEnum.APP_EXPIRED, "2687569",
+        events.put(3L, event(3L, SmsNotificationSceneEnum.APP_EXPIRED, "2693563",
                 "[\"AI智能体消息管理\"]"));
         return events;
     }

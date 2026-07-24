@@ -85,6 +85,13 @@
         WHERE id = #{id} AND status = 'PROCESSING'
     </update>
 
+    <update id="deferFromProcessing">
+        UPDATE sms_notification_delivery
+        SET status = 'PENDING', available_at = #{availableAt}, last_error = #{reason},
+            worker_id = NULL, claimed_at = NULL, finished_at = NULL, update_time = #{updatedAt}
+        WHERE id = #{id} AND status = 'PROCESSING'
+    </update>
+
     <update id="rescheduleFromProcessing">
         UPDATE sms_notification_delivery
         SET status = 'PENDING', retry_count = #{retryCount}, available_at = #{availableAt},

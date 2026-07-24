@@ -7,9 +7,10 @@ import com.gogoga.backend.enums.SmsNotificationEventStatusEnum;
 import com.gogoga.backend.enums.SmsNotificationSceneEnum;
 import com.gogoga.backend.mapper.SmsNotificationDeliveryMapper;
 import com.gogoga.backend.mapper.SmsNotificationEventMapper;
+import com.gogoga.backend.service.sms.BusinessSmsSendWindowPolicy;
+import com.gogoga.backend.service.sms.BusinessTemplateSmsService;
 import com.gogoga.backend.service.sms.TemplateSmsException;
 import com.gogoga.backend.service.sms.TemplateSmsResult;
-import com.gogoga.backend.service.sms.BusinessTemplateSmsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -51,7 +52,8 @@ class SmsNotificationProcessingServiceTest {
                 List.of(handler),
                 templateSmsService,
                 properties,
-                mock(SmsNotificationMetricsService.class)
+                mock(SmsNotificationMetricsService.class),
+                new BusinessSmsSendWindowPolicy()
         );
     }
 
@@ -123,6 +125,30 @@ class SmsNotificationProcessingServiceTest {
         verify(deliveryMapper).rescheduleFromProcessing(
                 eq(12L), eq(1), eq(now.plusSeconds(30)), eq("temporary"),
                 eq("InternalError"), eq("temporary"), eq(now)
+        );
+    }
+
+    @Test
+    void shouldDeferDeliveryOutsideSendWindowWithoutCallingGatewayOrUsingRetry() {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 24, 2, 0, 11);
+        SmsNotificationEvent event = event(1L);
+        SmsNotificationDelivery delivery = delivery(11L, "19355654200");
+        when(eventMapper.selectById(1L)).thenReturn(event);
+        when(deliveryMapper.claimPendingById(11L, "worker", now)).thenReturn(1);
+        when(deliveryMapper.selectById(11L)).thenReturn(delivery);
+
+        service.processDelivery(11L, "worker", now);
+
+        verify(deliveryMapper).deferFromProcessing(
+                11L,
+                LocalDateTime.of(2026, 7, 25, 8, 0),
+                "OUTSIDE_BUSINESS_SMS_SEND_WINDOW",
+                now
+        );
+        verify(handler, never()).canSend(any(), anyString());
+        verify(templateSmsService, never()).send(any());
+        verify(deliveryMapper, never()).rescheduleFromProcessing(
+                any(), anyInt(), any(), anyString(), anyString(), anyString(), any()
         );
     }
 

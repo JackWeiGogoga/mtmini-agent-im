@@ -4,9 +4,19 @@ import com.gogoga.backend.enums.BusinessSmsDeliveryModeEnum;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SmsPropertiesTest {
+
+    @Test
+    void shouldUseLatestBusinessTemplateDefaults() {
+        SmsProperties properties = new SmsProperties();
+
+        assertEquals("2685915", properties.getBusiness().getPurchaseGuideTemplateId());
+        assertEquals("2693564", properties.getBusiness().getPowerExhaustedTemplateId());
+        assertEquals("2693563", properties.getBusiness().getAppExpiredTemplateId());
+    }
 
     @Test
     void shouldAllowLogOnlyBusinessSmsWhileLoginUsesRealGateway() {

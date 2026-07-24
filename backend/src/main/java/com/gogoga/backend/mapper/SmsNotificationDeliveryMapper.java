@@ -36,6 +36,11 @@ public interface SmsNotificationDeliveryMapper {
                       @Param("finishedAt") LocalDateTime finishedAt,
                       @Param("reason") String reason);
 
+    int deferFromProcessing(@Param("id") Long id,
+                            @Param("availableAt") LocalDateTime availableAt,
+                            @Param("reason") String reason,
+                            @Param("updatedAt") LocalDateTime updatedAt);
+
     int rescheduleFromProcessing(@Param("id") Long id,
                                  @Param("retryCount") int retryCount,
                                  @Param("availableAt") LocalDateTime availableAt,

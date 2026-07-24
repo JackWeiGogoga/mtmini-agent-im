@@ -8,10 +8,11 @@ import com.gogoga.backend.enums.SmsNotificationEventStatusEnum;
 import com.gogoga.backend.enums.SmsNotificationSceneEnum;
 import com.gogoga.backend.mapper.SmsNotificationDeliveryMapper;
 import com.gogoga.backend.mapper.SmsNotificationEventMapper;
+import com.gogoga.backend.service.sms.BusinessSmsSendWindowPolicy;
+import com.gogoga.backend.service.sms.BusinessTemplateSmsService;
 import com.gogoga.backend.service.sms.TemplateSmsException;
 import com.gogoga.backend.service.sms.TemplateSmsRequest;
 import com.gogoga.backend.service.sms.TemplateSmsResult;
-import com.gogoga.backend.service.sms.BusinessTemplateSmsService;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +32,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SmsNotificationProcessingService {
 
+    private static final String OUTSIDE_SEND_WINDOW = "OUTSIDE_BUSINESS_SMS_SEND_WINDOW";
+
     private final SmsNotificationEventMapper eventMapper;
     private final SmsNotificationDeliveryMapper deliveryMapper;
     private final List<SmsNotificationSceneHandler> sceneHandlers;
     private final BusinessTemplateSmsService templateSmsService;
     private final SmsProperties smsProperties;
     private final SmsNotificationMetricsService metricsService;
+    private final BusinessSmsSendWindowPolicy sendWindowPolicy;
 
     @Transactional(rollbackFor = Exception.class)
     public void processEvent(Long eventId, String workerId, LocalDateTime now) {
@@ -76,6 +80,19 @@ public class SmsNotificationProcessingService {
         }
         SmsNotificationDelivery delivery = deliveryMapper.selectById(deliveryId);
         SmsNotificationEvent event = eventMapper.selectById(delivery.getEventId());
+        LocalDateTime nextAvailableAt = sendWindowPolicy.resolveAvailableAt(now);
+        if (nextAvailableAt.isAfter(now)) {
+            deliveryMapper.deferFromProcessing(
+                    deliveryId,
+                    nextAvailableAt,
+                    OUTSIDE_SEND_WINDOW,
+                    now
+            );
+            metricsService.increment(event.getScene(), "delivery_deferred_send_window");
+            log.info("业务短信投递已延迟至营销发送窗口, scene={}, eventId={}, deliveryId={}, availableAt={}",
+                    event.getScene(), event.getId(), deliveryId, nextAvailableAt);
+            return;
+        }
         try {
             SmsNotificationSceneHandler handler = resolveHandler(event);
             if (!handler.canSend(event, delivery.getRecipientPhone())) {

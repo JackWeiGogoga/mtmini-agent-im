@@ -172,10 +172,10 @@ public class SmsProperties {
         private String purchaseGuideTemplateId = "2685915";
 
         /** 业务算力耗尽模板 ID */
-        private String powerExhaustedTemplateId = "2687571";
+        private String powerExhaustedTemplateId = "2693564";
 
         /** 应用到期模板 ID */
-        private String appExpiredTemplateId = "2687569";
+        private String appExpiredTemplateId = "2693563";
 
         /** 业务时间计算时区 */
         private String zoneId = "Asia/Shanghai";

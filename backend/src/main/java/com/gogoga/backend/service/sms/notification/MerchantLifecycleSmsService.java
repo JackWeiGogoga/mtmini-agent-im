@@ -2,6 +2,7 @@ package com.gogoga.backend.service.sms.notification;
 
 import com.gogoga.backend.config.SmsProperties;
 import com.gogoga.backend.enums.SmsNotificationSceneEnum;
+import com.gogoga.backend.service.sms.BusinessSmsSendWindowPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +33,7 @@ public class MerchantLifecycleSmsService {
 
     private final SmsNotificationEventService eventService;
     private final SmsProperties smsProperties;
+    private final BusinessSmsSendWindowPolicy sendWindowPolicy;
 
     public SmsNotificationEventEnqueueResult enqueuePurchaseGuide(
             Long shopId,
@@ -59,7 +61,9 @@ public class MerchantLifecycleSmsService {
                         config.getPurchaseGuideTemplateId(),
                         List.of(config.getApplicationName(), days + "天"),
                         Map.of("days", days),
-                        purchaseGuideAvailableAt(occurredAt, config.getZoneId())
+                        sendWindowPolicy.resolveAvailableAt(
+                                purchaseGuideAvailableAt(occurredAt, config.getZoneId())
+                        )
                 )
         );
     }
@@ -91,7 +95,7 @@ public class MerchantLifecycleSmsService {
                         config.getPowerExhaustedTemplateId(),
                         List.of(config.getApplicationName()),
                         Map.of("consumeNo", consumeNo),
-                        now
+                        sendWindowPolicy.resolveAvailableAt(now)
                 )
         );
     }
@@ -119,7 +123,7 @@ public class MerchantLifecycleSmsService {
                             config.getAppExpiredTemplateId(),
                             List.of(config.getApplicationName()),
                             Map.of("expectedExpireAt", expireAtText),
-                            scheduledAt
+                            sendWindowPolicy.resolveAvailableAt(scheduledAt)
                     );
                 }
         );

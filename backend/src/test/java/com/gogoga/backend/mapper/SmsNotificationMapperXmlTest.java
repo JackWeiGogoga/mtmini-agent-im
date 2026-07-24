@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +31,9 @@ class SmsNotificationMapperXmlTest {
         assertTrue(xml.contains("provider_request_id"));
         assertTrue(xml.contains("provider_serial_no"));
         assertTrue(xml.contains("recipient_phone"));
+        assertTrue(xml.contains("id=\"deferFromProcessing\""));
+        assertTrue(xml.contains("available_at = #{availableAt}"));
+        assertTrue(xml.contains("last_error = #{reason}"));
     }
 
     @Test
@@ -52,6 +57,20 @@ class SmsNotificationMapperXmlTest {
         assertTrue(migration.contains("`status`, `claimed_at`, `id`"));
         assertTrue(baseline.contains("CREATE TABLE IF NOT EXISTS `sms_notification_event`"));
         assertTrue(baseline.contains("CREATE TABLE IF NOT EXISTS `sms_notification_delivery`"));
+    }
+
+    @Test
+    void templateUpgradeShouldOnlyRefreshPendingOldTemplateSnapshots() throws IOException {
+        String migration = read("db/migration/20260724_update_business_sms_template_ids.sql");
+
+        assertTrue(migration.contains("`scene` = 'POWER_EXHAUSTED'"));
+        assertTrue(migration.contains("`template_id` = '2687571'"));
+        assertTrue(migration.contains("`template_id` = '2693564'"));
+        assertTrue(migration.contains("`scene` = 'APP_EXPIRED'"));
+        assertTrue(migration.contains("`template_id` = '2687569'"));
+        assertTrue(migration.contains("`template_id` = '2693563'"));
+        assertEquals(2, migration.split("`status` = 'PENDING'", -1).length - 1);
+        assertFalse(migration.contains("`status` = 'EXPANDED'"));
     }
 
     private String read(String resource) throws IOException {
