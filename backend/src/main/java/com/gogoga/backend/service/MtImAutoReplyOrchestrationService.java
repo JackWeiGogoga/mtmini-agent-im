@@ -2,6 +2,7 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.constant.ImAutoReplyPromptConstant;
 import com.gogoga.backend.dto.ImAutoReplyChatResult;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.dto.SensitiveWordHitDTO;
@@ -41,9 +42,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class MtImAutoReplyOrchestrationService {
 
     private static final String PROMPT_KEY = "IM_AUTO_REPLY_SYSTEM";
-    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史与门店知识片段简洁、礼貌地回复。"
-            + "联系方式、营业时间、门店地址、价格与订单进度等信息，只有知识片段中有明确内容时才可回复，"
-            + "否则说明没有确切信息并建议联系人工客服，严禁猜测或编造任何可能误导顾客的内容。";
 
     private final MtProperties mtProperties;
     private final MtImAutoReplyMapper autoReplyMapper;
@@ -182,20 +180,21 @@ public class MtImAutoReplyOrchestrationService {
         String shopName = shop == null ? "当前门店"
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
-                PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+                PROMPT_KEY, Map.of("shop_name", shopName), ImAutoReplyPromptConstant.FALLBACK_SYSTEM_PROMPT);
         String contactPhone = contactSuffixService.resolveContactPhone(autoReply.getShopId());
         String modelContext = shopBasicInfoPromptService.merge(
                 shopBasicInfoPromptService.build(shop, StringUtils.isNotBlank(contactPhone)),
                 ragContext.promptContext());
+        String protectedSystemPrompt = ImAutoReplyPromptConstant.enforceBusinessScopePolicy(prompt.getContent());
 
         ImAutoReplyChatResult result = chatService.generate(
-                prompt.getContent(), modelContext, context.messages());
+                protectedSystemPrompt, modelContext, context.messages());
         String content = result.content();
         int rewriteCount = 0;
         int maxRewriteAttempts = Math.max(mtProperties.getSensitiveWord().getMaxRewriteAttempts(), 0);
         while (isSensitive(content) && rewriteCount < maxRewriteAttempts) {
             ImAutoReplyChatResult rewritten = chatService.rewrite(
-                    prompt.getContent(), modelContext, context.messages(), content);
+                    protectedSystemPrompt, modelContext, context.messages(), content);
             result = result.plusUsage(rewritten);
             content = result.content();
             rewriteCount++;

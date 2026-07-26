@@ -2,6 +2,7 @@ package com.gogoga.backend.service;
 
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.constant.ImAutoReplyPromptConstant;
 import com.gogoga.backend.dto.ImAutoReplyChatMessage;
 import com.gogoga.backend.dto.ImAutoReplyChatResult;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
@@ -392,9 +393,10 @@ class MtImAutoReplyOrchestrationServiceTest {
         ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
-        when(chatService.generate(eq("系统"), eq(""), any()))
+        String protectedPrompt = ImAutoReplyPromptConstant.enforceBusinessScopePolicy("系统");
+        when(chatService.generate(eq(protectedPrompt), eq(""), any()))
                 .thenReturn(new ImAutoReplyChatResult("风险答复", 10, 2));
-        when(chatService.rewrite(eq("系统"), eq(""), any(), eq("风险答复")))
+        when(chatService.rewrite(eq(protectedPrompt), eq(""), any(), eq("风险答复")))
                 .thenReturn(new ImAutoReplyChatResult("安全答复", 5, 1));
         SensitiveWordHitDTO hit = new SensitiveWordHitDTO();
         hit.setHit(true);
@@ -440,7 +442,8 @@ class MtImAutoReplyOrchestrationServiceTest {
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
         ArgumentCaptor<String> modelContext = ArgumentCaptor.forClass(String.class);
-        when(chatService.generate(eq("系统"), modelContext.capture(), any()))
+        when(chatService.generate(
+                eq(ImAutoReplyPromptConstant.enforceBusinessScopePolicy("系统")), modelContext.capture(), any()))
                 .thenReturn(new ImAutoReplyChatResult("答复", 10, 2));
         SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
         safe.setHit(false);
