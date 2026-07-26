@@ -9,6 +9,7 @@ import type {
   ImConversationHistoryPage,
   PageInfo,
 } from "@/types";
+import { BRAND_MODEL_NAME } from "@/config/brandModel";
 import ConversationHistoryDrawer from "./ConversationHistoryDrawer";
 import { MessageBody } from "./MessageBody";
 
@@ -101,7 +102,11 @@ export default function ImReplyLogTable({ loadPage, loadHistory, showShopFilter 
       {
         title: "AI 自动回复", key: "ai", width: 330,
         render: (_, row) => <Space direction="vertical" size={4} style={{ width: "100%" }}>
-          <Space wrap><Tag color={STATUS_COLORS[row.status]}>{row.status}</Tag>{row.deliveryStatus ? <Tag>{row.deliveryStatus}</Tag> : null}</Space>
+          <Space wrap>
+            <Tag color={STATUS_COLORS[row.status]}>{row.status}</Tag>
+            {row.deliveryStatus ? <Tag>{row.deliveryStatus}</Tag> : null}
+            <Tag color="purple">模型：{BRAND_MODEL_NAME}</Tag>
+          </Space>
           <Paragraph ellipsis={{ rows: 3, expandable: true, symbol: "展开" }} style={{ margin: 0, whiteSpace: "pre-wrap" }}>{row.aiContent || `（${row.skipReason || "尚未生成"}）`}</Paragraph>
           <Text type="secondary">{row.aiMessageTime ? dayjs(row.aiMessageTime).format("YYYY-MM-DD HH:mm:ss") : "-"}</Text>
         </Space>,
