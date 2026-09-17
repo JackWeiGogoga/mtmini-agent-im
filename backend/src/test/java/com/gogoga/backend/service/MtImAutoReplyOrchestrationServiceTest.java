@@ -309,7 +309,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         MtImMessage trigger = trigger(ImMessageTypeEnum.IMAGE);
         MtImMessage reply = new MtImMessage();
         reply.setId(32L);
-        reply.setMsgContentPlaintext("商家正在忙\n可以联系门店 13800000000");
+        reply.setMsgContentPlaintext("商家正在忙\n-门店13800000000");
         reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
         when(messageMapper.selectById(31L)).thenReturn(trigger);
         when(messageMapper.selectById(32L)).thenReturn(reply);
@@ -319,7 +319,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         safe.setHit(false);
         when(sensitiveWordService.detect("商家正在忙")).thenReturn(safe);
         when(contactSuffixService.append(1L, "商家正在忙"))
-                .thenReturn("商家正在忙\n可以联系门店 13800000000");
+                .thenReturn("商家正在忙\n-门店13800000000");
         when(messageClient.sendTwoPartyMessage(anyString(), any()))
                 .thenReturn(new MtImMessageClient.SendResult(true, null, null));
 
@@ -330,7 +330,7 @@ class MtImAutoReplyOrchestrationServiceTest {
         verify(ragService, never()).retrieve(anyLong(), any(), anyString());
         verify(messageClassificationService, never()).classify(any());
         // 兜底话术仍要拼联系方式，并按零 token 过账后正常发送
-        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("商家正在忙\n可以联系门店 13800000000"),
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("商家正在忙\n-门店13800000000"),
                 any(), eq(null), eq(0), eq("GENERAL"));
         verify(stateService).markBilledFree(9L);
         verify(stateService, never()).bill(anyLong());
@@ -450,11 +450,11 @@ class MtImAutoReplyOrchestrationServiceTest {
         when(sensitiveWordService.detect("答复")).thenReturn(safe);
         when(contactSuffixService.resolveContactPhone(1L)).thenReturn("400-820-8820");
         when(contactSuffixService.appendPhone("答复", "400-820-8820"))
-                .thenReturn("答复\n可以联系门店 400-820-8820");
+                .thenReturn("答复\n-门店400-820-8820");
 
         service.execute(payload());
 
-        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n可以联系门店 400-820-8820"),
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n-门店400-820-8820"),
                 any(), any(), eq(0), eq("GENERAL"));
         // 有号码时必须告知模型，否则它会答“没有联系方式”再被后缀拼上号码，自相矛盾
         assertTrue(modelContext.getValue().contains("门店联系方式：已配置"));

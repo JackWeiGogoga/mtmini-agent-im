@@ -332,10 +332,10 @@ const knowledgeRows = computed(() => {
 
 const contactHint = computed(() => {
   if (!contactPhoneFallback.value) {
-    return '填写后，自动回复结尾会附上「可以联系门店 电话」'
+    return '填写后，自动回复结尾会附上「-门店」+电话'
   }
   if (contactPhoneSaved.value) {
-    return `自动回复结尾会附上：可以联系门店 ${contactPhoneFallback.value}`
+    return `自动回复结尾会附上：-门店${contactPhoneFallback.value}`
   }
   return `未填写时使用门店电话：${contactPhoneFallback.value}`
 })

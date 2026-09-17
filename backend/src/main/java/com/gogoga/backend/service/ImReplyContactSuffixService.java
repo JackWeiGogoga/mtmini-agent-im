@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ImReplyContactSuffixService {
 
-    private static final String SUFFIX_PREFIX = "可以联系门店 ";
+    private static final String SUFFIX_PREFIX = "-门店";
 
     private final ShopOperationSettingsService settingsService;
 

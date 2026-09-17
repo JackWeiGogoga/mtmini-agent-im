@@ -23,7 +23,7 @@ class ImReplyContactSuffixServiceTest {
     void appendsSuffixWhenShopHasContactPhone() {
         when(settingsService.resolveEffectiveContactPhone(100L)).thenReturn("400-820-8820");
 
-        assertEquals("好的，已经为您备注。\n可以联系门店 400-820-8820",
+        assertEquals("好的，已经为您备注。\n-门店400-820-8820",
                 service.append(100L, "好的，已经为您备注。"));
     }
 
@@ -43,13 +43,13 @@ class ImReplyContactSuffixServiceTest {
 
     @Test
     void appendsWhenReplyMentionsADifferentNumber() {
-        assertEquals("订单尾号 1234 已确认。\n可以联系门店 400-820-8820",
+        assertEquals("订单尾号 1234 已确认。\n-门店400-820-8820",
                 service.appendPhone("订单尾号 1234 已确认。", "400-820-8820"));
     }
 
     @Test
     void trimsContentBeforeAppending() {
-        assertEquals("已收到。\n可以联系门店 13800000000",
+        assertEquals("已收到。\n-门店13800000000",
                 service.appendPhone("  已收到。\n\n ", "13800000000"));
     }
 
