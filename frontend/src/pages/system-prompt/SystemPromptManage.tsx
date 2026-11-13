@@ -6,6 +6,7 @@ import { message } from "@/components/AppMessageContext";
 import PageContainer from "@/components/PageContainer";
 import PromptVariableEditor from "@/components/PromptVariableEditor";
 import type { PromptVariableOption } from "@/components/PromptVariableEditor";
+import { BRAND_MODEL_NAME } from "@/config/brandModel";
 import {
   getSystemPrompt,
   listSystemPrompts,
@@ -288,7 +289,7 @@ export default function SystemPromptManage() {
             <Descriptions.Item label="名称">{editing.promptName}</Descriptions.Item>
             <Descriptions.Item label="类型">{editing.promptType}</Descriptions.Item>
             <Descriptions.Item label="默认资源">{editing.defaultResourcePath || "无"}</Descriptions.Item>
-            <Descriptions.Item label="建议模型">{editing.modelHint || "无"}</Descriptions.Item>
+            <Descriptions.Item label="品牌模型">{BRAND_MODEL_NAME}</Descriptions.Item>
             <Descriptions.Item label="变量说明" span={2}>
               <Table
                 size="small"

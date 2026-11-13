@@ -24,7 +24,7 @@ public final class PhoneUtil {
             return null;
         }
 
-        String normalized = phone.trim().replace(" ", "").replace("-", "");
+        String normalized = phone.trim().replaceAll("[\\s-]", "");
         if (normalized.startsWith("+86")) {
             normalized = normalized.substring(3);
         } else if (normalized.startsWith("86") && normalized.length() == 13) {
@@ -53,5 +53,16 @@ public final class PhoneUtil {
      */
     public static String toE164CnPhone(String phone) {
         return "+86" + normalizeCnPhone(phone);
+    }
+
+    /**
+     * 日志展示用手机号脱敏。
+     */
+    public static String maskPhone(String phone) {
+        String normalized = normalizeCnPhone(phone);
+        if (!isValidCnPhone(normalized)) {
+            return "***";
+        }
+        return normalized.substring(0, 3) + "****" + normalized.substring(normalized.length() - 4);
     }
 }

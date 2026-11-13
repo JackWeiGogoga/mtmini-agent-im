@@ -3,7 +3,7 @@ import { Button, Drawer, Form, Input, Select, Segmented, Space, Switch, Table, T
 import { createStyles } from "antd-style";
 import type { ColumnsType } from "antd/es/table";
 import type { SortOrder } from "antd/es/table/interface";
-import { DatabaseOutlined, DownloadOutlined, MessageOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
+import { DatabaseOutlined, DownloadOutlined, MessageOutlined, NotificationOutlined, ReloadOutlined, ShopOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import PageContainer, { usePageStyles } from "@/components/PageContainer";
@@ -27,8 +27,9 @@ import type {
   ShopBindingStatus,
   VisibleUserOption,
 } from "@/types";
-import type { ImAutoReplyLogQuery } from "@/types";
+import type { ImAutoReplyLogQuery, ImBroadcastSetting } from "@/types";
 import ImReplyLogTable from "@/pages/im-auto-replies/components/ImReplyLogTable";
+import BroadcastSettingModal, { WEEK_DAY_OPTIONS } from "./components/BroadcastSettingModal";
 
 const { Text } = Typography;
 const USER_SEARCH_DEBOUNCE_MS = 300;
@@ -69,6 +70,14 @@ function formatDateTime(value?: string) {
   return parsed.isValid() ? parsed.format("YYYY-MM-DD HH:mm") : value;
 }
 
+function formatWeekDays(weekDays?: number[]) {
+  if (!weekDays?.length) return "-";
+  return weekDays
+    .map((day) => WEEK_DAY_OPTIONS.find((option) => option.value === day)?.label)
+    .filter(Boolean)
+    .join("、");
+}
+
 function buildUserLabel(user: VisibleUserOption) {
   return user.displayName || user.nickname || user.username || user.userId;
 }
@@ -91,6 +100,7 @@ const MasterConsole: React.FC = () => {
   const [userLoading, setUserLoading] = useState(false);
   const [savingShopIds, setSavingShopIds] = useState<number[]>([]);
   const [logShop, setLogShop] = useState<MasterConsoleShopRow>();
+  const [broadcastShop, setBroadcastShop] = useState<MasterConsoleShopRow>();
   const userSearchTimer = useRef<number | null>(null);
 
   const buildRequestQuery = useCallback((value: MasterConsoleQueryParam) => {
@@ -198,11 +208,43 @@ const MasterConsole: React.FC = () => {
         onChange={(checked) => void saveImSwitch(record, checked)}
       />,
     },
+    {
+      title: "消息群发", key: "broadcast", width: 230,
+      render: (_, record) => {
+        const setting = record.broadcastSetting;
+        const status = setting?.status ?? "NONE";
+        if (status === "NONE") {
+          return <Space direction="vertical" size={2}>
+            <Tag>{setting?.statusName || "未配置"}</Tag>
+            <Text type="secondary">累计 {setting?.totalSentCount ?? 0} 条</Text>
+          </Space>;
+        }
+        // ONCE_COMPLETED 的配置内容仍保留，一并展示，运营才能看出这家店刚跑完什么。
+        const completed = status === "ONCE_COMPLETED";
+        return <Space direction="vertical" size={2}>
+          <Space size={6} wrap>
+            {completed
+              ? <Tag color="blue">{setting?.statusName}</Tag>
+              : <Tag color="gold">{formatWeekDays(setting?.weekDays)}</Tag>}
+            <Tag>{setting?.repeatMode === "ONCE" ? "一次" : "每次"}</Tag>
+          </Space>
+          <Text type="secondary">
+            {completed
+              ? `执行于 ${setting?.lastTriggerDate || "-"} ${setting?.sendTime || ""}`
+              : `${setting?.sendTime || "-"}`} · 累计 {setting?.totalSentCount ?? 0} 条
+          </Text>
+          <Tooltip title={setting?.content}>
+            <Text type="secondary" ellipsis style={{ maxWidth: 210 }}>{setting?.content || "-"}</Text>
+          </Tooltip>
+        </Space>;
+      },
+    },
     { title: "绑定时间", dataIndex: "bindTime", width: 160, render: formatDateTime },
     {
-      title: "操作", key: "actions", width: 190, fixed: isCompact ? undefined : "right",
+      title: "操作", key: "actions", width: 280, fixed: isCompact ? undefined : "right",
       render: (_, record) => <Space size={0}>
         <Button type="link" icon={<MessageOutlined />} onClick={() => setLogShop(record)}>回复日志</Button>
+        <Button type="link" icon={<NotificationOutlined />} onClick={() => setBroadcastShop(record)}>群发配置</Button>
         <Button type="link" icon={<DatabaseOutlined />} onClick={() => {
           reportAdminBehaviorEvent("PC_KNOWLEDGE_VIEW", record.shopId, { portalType: currentUser?.activePortal, entrySource: "MASTER_CONSOLE" });
           navigate(`/merchant-knowledge?shopId=${record.shopId}`);
@@ -210,6 +252,12 @@ const MasterConsole: React.FC = () => {
       </Space>,
     },
   ], [currentUser?.activePortal, isCompact, navigate, query.sortField, query.sortOrder, saveImSwitch, savingShopIds]);
+
+  const applyBroadcastSetting = useCallback((shopId: number, setting: ImBroadcastSetting) => {
+    setData((rows) => rows.map((row) => row.shopId === shopId
+      ? { ...row, broadcastSetting: setting }
+      : row));
+  }, []);
 
   return <PageContainer title="总控台">
     <div className={cx(styles.toolbar, pageStyles.toolbar)}>
@@ -264,6 +312,13 @@ const MasterConsole: React.FC = () => {
         loadHistory={loadShopConversationHistory}
       /> : null}
     </Drawer>
+    <BroadcastSettingModal
+      open={Boolean(broadcastShop)}
+      shopId={broadcastShop?.shopId}
+      shopName={broadcastShop?.shopName}
+      onClose={() => setBroadcastShop(undefined)}
+      onSaved={applyBroadcastSetting}
+    />
   </PageContainer>;
 };
 

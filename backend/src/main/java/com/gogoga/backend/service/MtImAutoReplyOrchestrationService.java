@@ -1,9 +1,8 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
+import com.gogoga.backend.constant.ImAutoReplyPromptConstant;
 import com.gogoga.backend.dto.ImAutoReplyChatResult;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
 import com.gogoga.backend.dto.SensitiveWordHitDTO;
@@ -15,6 +14,7 @@ import com.gogoga.backend.enums.ImMessageDeliveryStatusEnum;
 import com.gogoga.backend.enums.ImMessageSenderRoleEnum;
 import com.gogoga.backend.enums.ImMessageTypeEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
+import com.gogoga.backend.enums.KnowledgeCategoryEnum;
 import com.gogoga.backend.enums.MtImAutoReplyStatusEnum;
 import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtImAutoReplyMapper;
@@ -23,7 +23,7 @@ import com.gogoga.backend.mapper.MtShopMapper;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
 import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
-import com.gogoga.backend.util.MeituanAuthFailureUtil;
+import com.meituan.sdk.internal.exceptions.MtSdkException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -42,9 +42,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class MtImAutoReplyOrchestrationService {
 
     private static final String PROMPT_KEY = "IM_AUTO_REPLY_SYSTEM";
-    private static final String FALLBACK_SYSTEM_PROMPT = "你是门店在线客服，请基于短期会话历史与门店知识片段简洁、礼貌地回复。"
-            + "联系方式、营业时间、门店地址、价格与订单进度等信息，只有知识片段中有明确内容时才可回复，"
-            + "否则说明没有确切信息并建议联系人工客服，严禁猜测或编造任何可能误导顾客的内容。";
 
     private final MtProperties mtProperties;
     private final MtImAutoReplyMapper autoReplyMapper;
@@ -127,12 +124,18 @@ public class MtImAutoReplyOrchestrationService {
             autoReply = autoReplyMapper.selectById(autoReplyId);
         }
         if (autoReply.getBilledAt() == null) {
-            try {
-                autoReply = stateService.bill(autoReplyId);
-            } catch (PowerInsufficientException insufficient) {
-                stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.SKIPPED,
-                        PowerInsufficientException.REASON_CODE);
-                throw new MtAsyncTaskTerminalFailureException(PowerInsufficientException.REASON_CODE);
+            if (usesModel(trigger)) {
+                try {
+                    autoReply = stateService.bill(autoReplyId);
+                } catch (PowerInsufficientException insufficient) {
+                    stateService.markStatus(autoReplyId, MtImAutoReplyStatusEnum.SKIPPED,
+                            PowerInsufficientException.REASON_CODE);
+                    throw new MtAsyncTaskTerminalFailureException(PowerInsufficientException.REASON_CODE);
+                }
+            } else {
+                // 非文本兜底话术没有 token 用量，算力按实际 token 计费，因此这里零消耗直接过账，
+                // 只推进状态机，避免按 token 计费的公式拿到 0 用量后抛异常把任务卡死。
+                autoReply = stateService.markBilledFree(autoReplyId);
             }
         }
         if (!lock.isValid()) {
@@ -163,6 +166,10 @@ public class MtImAutoReplyOrchestrationService {
 
     private void generateAndPersist(MtImAutoReply autoReply, MtImMessage trigger) {
         stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.GENERATING, null);
+        if (!usesModel(trigger)) {
+            generateNonTextFallback(autoReply, trigger);
+            return;
+        }
         ImAutoReplyContextService.Context context = contextService.build(autoReply.getSessionId());
         List<String> recentUserMessages = context.latestUserMessages(
                 mtProperties.getImAutoReply().getRagRecentUserMessages());
@@ -173,18 +180,21 @@ public class MtImAutoReplyOrchestrationService {
         String shopName = shop == null ? "当前门店"
                 : StringUtils.defaultIfBlank(shop.getPoiName(), StringUtils.defaultIfBlank(shop.getName(), "当前门店"));
         ResolvedSystemPromptDTO prompt = systemPromptService.render(
-                PROMPT_KEY, Map.of("shop_name", shopName), FALLBACK_SYSTEM_PROMPT);
+                PROMPT_KEY, Map.of("shop_name", shopName), ImAutoReplyPromptConstant.FALLBACK_SYSTEM_PROMPT);
+        String contactPhone = contactSuffixService.resolveContactPhone(autoReply.getShopId());
         String modelContext = shopBasicInfoPromptService.merge(
-                shopBasicInfoPromptService.build(shop), ragContext.promptContext());
+                shopBasicInfoPromptService.build(shop, StringUtils.isNotBlank(contactPhone)),
+                ragContext.promptContext());
+        String protectedSystemPrompt = ImAutoReplyPromptConstant.enforceBusinessScopePolicy(prompt.getContent());
 
         ImAutoReplyChatResult result = chatService.generate(
-                prompt.getContent(), modelContext, context.messages());
+                protectedSystemPrompt, modelContext, context.messages());
         String content = result.content();
         int rewriteCount = 0;
         int maxRewriteAttempts = Math.max(mtProperties.getSensitiveWord().getMaxRewriteAttempts(), 0);
         while (isSensitive(content) && rewriteCount < maxRewriteAttempts) {
             ImAutoReplyChatResult rewritten = chatService.rewrite(
-                    prompt.getContent(), modelContext, context.messages(), content);
+                    protectedSystemPrompt, modelContext, context.messages(), content);
             result = result.plusUsage(rewritten);
             content = result.content();
             rewriteCount++;
@@ -196,9 +206,36 @@ public class MtImAutoReplyOrchestrationService {
                 throw new MtAsyncTaskTerminalFailureException("SAFE_FALLBACK_REJECTED");
             }
         }
-        content = contactSuffixService.append(autoReply.getShopId(), content);
+        content = contactSuffixService.appendPhone(content, contactPhone);
         stateService.saveGenerated(autoReply.getId(), trigger, content, result, ragContext, rewriteCount,
                 userMessageCategory);
+    }
+
+    /**
+     * 图片等非文本消息的固定兜底回复。
+     *
+     * <p>不做多模态解析、不召回知识、不调用大模型：这类消息没有可用文本，模型只能凭空猜测，
+     * 代价与出错风险都不划算。回复内容是固定话术加常规联系方式后缀，其余环节（商家静默窗口、
+     * 更新消息顶替、发送延迟、幂等发送）与文本回复完全一致。</p>
+     */
+    private void generateNonTextFallback(MtImAutoReply autoReply, MtImMessage trigger) {
+        String content = mtProperties.getImAutoReply().getNonTextFallbackReply();
+        if (isSensitive(content)) {
+            // 兜底话术是配置项，可能被改成命中敏感词的内容；此时没有改写余地，只能不发。
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.DEAD, "NON_TEXT_FALLBACK_REJECTED");
+            throw new MtAsyncTaskTerminalFailureException("NON_TEXT_FALLBACK_REJECTED");
+        }
+        content = contactSuffixService.append(autoReply.getShopId(), content);
+        stateService.saveGenerated(autoReply.getId(), trigger, content,
+                new ImAutoReplyChatResult(content, 0, 0), null, 0,
+                KnowledgeCategoryEnum.GENERAL.name());
+    }
+
+    /**
+     * 本条触发消息是否走大模型生成。只有承载真实话语的文本消息才值得让模型作答。
+     */
+    private boolean usesModel(MtImMessage trigger) {
+        return ImMessageTypeEnum.isConversational(trigger.getMsgType());
     }
 
     private void send(MtImAutoReply autoReply, MtImMessage trigger, MtImMessage replyMessage) {
@@ -215,25 +252,42 @@ public class MtImAutoReplyOrchestrationService {
         }
 
         stateService.markSending(autoReply.getId());
-        MtImMessageClient.SendResult result = sendOnce(token.getAccessToken(), autoReply, trigger, replyMessage);
-        if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-            MtAccessTokenService.TokenRefreshResult refresh = accessTokenService.refreshTokenForShopWithResult(autoReply.getShopId());
-            MtAccessToken refreshed = refresh == null ? null : refresh.token();
-            if (isUsableToken(refreshed)) {
-                result = sendOnce(refreshed.getAccessToken(), autoReply, trigger, replyMessage);
-            }
-            if (!result.success() && MeituanAuthFailureUtil.isAuthFailure(result.errorCode(), result.responseSummary())) {
-                authorizationFailureHandler.handleConfirmedAuthFailure(
-                        autoReply.getShopId(), "IM_AUTO_REPLY_SEND", result.errorCode(), result.responseSummary());
-                stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
-                throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
-            }
+        MtMeituanAuthorizationFailureHandler.AuthorizedCallResult<MtImMessageClient.SendResult> authorizedCallResult;
+        try {
+            authorizedCallResult = authorizationFailureHandler.invokeWithRefreshRetry(
+                    autoReply.getShopId(),
+                    token.getAccessToken(),
+                    "IM_AUTO_REPLY_SEND",
+                    accessToken -> sendOnce(accessToken, autoReply, trigger, replyMessage),
+                    MtImAutoReplyOrchestrationService::inspectAuthFailure
+            );
+        } catch (MtSdkException e) {
+            // 发送实现自身不抛 MtSdkException，这里只为满足封装的受检签名兜底。
+            throw new IllegalStateException("IM_SEND_FAILED", e);
         }
-        if (!result.success()) {
-            stateService.markSendFailure(autoReply.getId(), result.errorCode(), result.responseSummary());
-            throw new IllegalStateException(StringUtils.defaultIfBlank(result.errorCode(), "IM_SEND_FAILED"));
+        // 鉴权失败的刷新重试与「仍失败则标记重新授权」已由封装完成，此处只收敛本地状态。
+        if (authorizedCallResult.confirmedAuthFailure()) {
+            stateService.markStatus(autoReply.getId(), MtImAutoReplyStatusEnum.SKIPPED, "AUTH_REQUIRED");
+            throw new MtAsyncTaskTerminalFailureException("AUTH_REQUIRED");
+        }
+        MtImMessageClient.SendResult result = authorizedCallResult.response();
+        if (result == null || !result.success()) {
+            String errorCode = result == null ? null : result.errorCode();
+            stateService.markSendFailure(autoReply.getId(), errorCode, result == null ? null : result.responseSummary());
+            throw new IllegalStateException(StringUtils.defaultIfBlank(errorCode, "IM_SEND_FAILED"));
         }
         stateService.markSent(autoReply.getId());
+    }
+
+    /**
+     * 只有业务失败且命中鉴权错误码时才需要刷新 token 重试，成功响应一律不触发。
+     */
+    private static MtMeituanAuthorizationFailureHandler.AuthFailureInfo inspectAuthFailure(
+            MtImMessageClient.SendResult result) {
+        if (result == null || result.success()) {
+            return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.notAuthFailure();
+        }
+        return MtMeituanAuthorizationFailureHandler.AuthFailureInfo.of(result.errorCode(), result.responseSummary());
     }
 
     private MtImMessageClient.SendResult sendOnce(String accessToken,
@@ -254,8 +308,7 @@ public class MtImAutoReplyOrchestrationService {
         if (!settingsService.isAutoReplyEnabled(shopId)) {
             return SkipDecision.skipped("SHOP_SWITCH_DISABLED");
         }
-        if (!shopRightService.hasShopRight(shopId, RequiresShopRight.Logical.OR,
-                MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION)) {
+        if (!shopRightService.hasAutoReplyRight(shopId)) {
             return SkipDecision.skipped("SHOP_RIGHT_MISSING");
         }
         MtAccessToken token = accessTokenService.findByShopId(shopId);
@@ -340,7 +393,7 @@ public class MtImAutoReplyOrchestrationService {
             // 只有能自己触发回复的用户消息才可以顶掉本次回复；否则 CARD 之类顶掉后无人接手，
             // 用户的提问会静默地得不到任何答复
             if (ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
-                    && ImMessageTypeEnum.isConversational(message.getMsgType())) {
+                    && ImMessageTypeEnum.isReplyTriggerable(message.getMsgType())) {
                 return new SkipDecision(MtImAutoReplyStatusEnum.SUPERSEDED, "NEWER_USER_MESSAGE");
             }
         }

@@ -142,6 +142,25 @@ sms:
     login-template-id: ${TENCENT_SMS_LOGIN_TEMPLATE_ID:000000}
     region: ${TENCENT_SMS_REGION:ap-guangzhou}
     endpoint: ${TENCENT_SMS_ENDPOINT:sms.tencentcloudapi.com}
+  business:
+    enabled: ${SMS_BUSINESS_ENABLED:false}
+    worker-enabled: ${SMS_BUSINESS_WORKER_ENABLED:true}
+    expiry-planner-enabled: ${SMS_BUSINESS_EXPIRY_PLANNER_ENABLED:true}
+    delivery-mode: ${SMS_BUSINESS_DELIVERY_MODE:LOG_ONLY}
+    application-name: ${SMS_BUSINESS_APPLICATION_NAME:AI智能体消息管理}
+    purchase-guide-template-id: ${TENCENT_SMS_PURCHASE_GUIDE_TEMPLATE_ID:2685915}
+    power-exhausted-template-id: ${TENCENT_SMS_POWER_EXHAUSTED_TEMPLATE_ID:2693564}
+    app-expired-template-id: ${TENCENT_SMS_APP_EXPIRED_TEMPLATE_ID:2693563}
+    zone-id: ${SMS_BUSINESS_ZONE_ID:Asia/Shanghai}
+    poll-size: ${SMS_BUSINESS_POLL_SIZE:20}
+    planner-batch-size: ${SMS_BUSINESS_PLANNER_BATCH_SIZE:200}
+    max-retry-count: ${SMS_BUSINESS_MAX_RETRY_COUNT:3}
+    timeout-seconds: ${SMS_BUSINESS_TIMEOUT_SECONDS:180}
+    initial-backoff-seconds: ${SMS_BUSINESS_INITIAL_BACKOFF_SECONDS:30}
+    max-backoff-seconds: ${SMS_BUSINESS_MAX_BACKOFF_SECONDS:300}
+    poll-delay-ms: ${SMS_BUSINESS_POLL_DELAY_MS:1000}
+    recovery-delay-ms: ${SMS_BUSINESS_RECOVERY_DELAY_MS:30000}
+    expiry-planner-cron: ${SMS_BUSINESS_EXPIRY_PLANNER_CRON:0 */10 * * * ?}
 
 cos:
   enabled: ${COS_ENABLED:true}
@@ -250,6 +269,33 @@ mt:
     model-api-key: ${MT_IM_AUTO_REPLY_MODEL_API_KEY:${MT_KNOWLEDGE_MODEL_API_KEY:}}
     chat-model: ${MT_IM_AUTO_REPLY_CHAT_MODEL:${MT_KNOWLEDGE_CHAT_MODEL:deepseek-v4-flash}}
     safe-fallback-reply: ${MT_IM_AUTO_REPLY_SAFE_FALLBACK_REPLY:抱歉，我暂时无法准确回答这个问题，请联系门店人工客服。}
+    non-text-fallback-reply: ${MT_IM_AUTO_REPLY_NON_TEXT_FALLBACK_REPLY:商家正在忙}
+  im-broadcast:
+    enabled: ${MT_IM_BROADCAST_ENABLED:true}
+    schedule-cron: ${MT_IM_BROADCAST_SCHEDULE_CRON:0 * * * * ?}
+    schedule-lock-seconds: ${MT_IM_BROADCAST_SCHEDULE_LOCK_SECONDS:50}
+    schedule-page-size: ${MT_IM_BROADCAST_SCHEDULE_PAGE_SIZE:200}
+    active-within-days: ${MT_IM_BROADCAST_ACTIVE_WITHIN_DAYS:30}
+    max-targets-per-batch: ${MT_IM_BROADCAST_MAX_TARGETS_PER_BATCH:5000}
+    plan-page-size: ${MT_IM_BROADCAST_PLAN_PAGE_SIZE:500}
+    shard-size: ${MT_IM_BROADCAST_SHARD_SIZE:500}
+    trigger-jitter-seconds: ${MT_IM_BROADCAST_TRIGGER_JITTER_SECONDS:60}
+    executor-concurrency: ${MT_IM_BROADCAST_EXECUTOR_CONCURRENCY:4}
+    shop-concurrency: ${MT_IM_BROADCAST_SHOP_CONCURRENCY:1}
+    global-qps: ${MT_IM_BROADCAST_GLOBAL_QPS:20}
+    throttle-backoff-millis: ${MT_IM_BROADCAST_THROTTLE_BACKOFF_MILLIS:2000}
+    persist-timeline-message: ${MT_IM_BROADCAST_PERSIST_TIMELINE_MESSAGE:true}
+    max-content-length: ${MT_IM_BROADCAST_MAX_CONTENT_LENGTH:100}
+    plan-task:
+      max-retry-count: ${MT_IM_BROADCAST_PLAN_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_IM_BROADCAST_PLAN_TIMEOUT_SECONDS:600}
+      initial-backoff-seconds: ${MT_IM_BROADCAST_PLAN_INITIAL_BACKOFF_SECONDS:30}
+      max-backoff-seconds: ${MT_IM_BROADCAST_PLAN_MAX_BACKOFF_SECONDS:300}
+    send-task:
+      max-retry-count: ${MT_IM_BROADCAST_SEND_MAX_RETRY_COUNT:3}
+      timeout-seconds: ${MT_IM_BROADCAST_SEND_TIMEOUT_SECONDS:1800}
+      initial-backoff-seconds: ${MT_IM_BROADCAST_SEND_INITIAL_BACKOFF_SECONDS:30}
+      max-backoff-seconds: ${MT_IM_BROADCAST_SEND_MAX_BACKOFF_SECONDS:600}
   sensitive-word:
     enabled: ${MT_SENSITIVE_WORD_ENABLED:true}
     max-rewrite-attempts: ${MT_SENSITIVE_WORD_MAX_REWRITE_ATTEMPTS:1}

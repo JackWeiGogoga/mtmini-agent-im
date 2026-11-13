@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gogoga.backend.mapper.MtImBroadcastSettingMapper">
+    <resultMap id="BaseResultMap" type="com.gogoga.backend.entity.mt.MtImBroadcastSetting">
+        <id column="id" property="id"/>
+        <result column="shop_id" property="shopId"/>
+        <result column="enabled" property="enabled"/>
+        <result column="week_days" property="weekDays"/>
+        <result column="repeat_mode" property="repeatMode"/>
+        <result column="send_time" property="sendTime"/>
+        <result column="content" property="content"/>
+        <result column="total_sent_count" property="totalSentCount"/>
+        <result column="last_trigger_date" property="lastTriggerDate"/>
+        <result column="last_task_id" property="lastTaskId"/>
+        <result column="operator_user_id" property="operatorUserId"/>
+        <result column="operator_name" property="operatorName"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+    <sql id="BaseColumnList">
+        id, shop_id, enabled, week_days, repeat_mode, send_time, content,
+        total_sent_count, last_trigger_date, last_task_id,
+        operator_user_id, operator_name, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtImBroadcastSetting"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mt_im_broadcast_setting (
+            shop_id, enabled, week_days, repeat_mode, send_time, content,
+            total_sent_count, last_trigger_date, last_task_id,
+            operator_user_id, operator_name, create_time, update_time
+        ) VALUES (
+            #{shopId}, #{enabled}, #{weekDays}, #{repeatMode}, #{sendTime}, #{content},
+            #{totalSentCount}, #{lastTriggerDate}, #{lastTaskId},
+            #{operatorUserId}, #{operatorName}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.gogoga.backend.entity.mt.MtImBroadcastSetting">
+        UPDATE mt_im_broadcast_setting
+        SET enabled = #{enabled},
+            week_days = #{weekDays},
+            repeat_mode = #{repeatMode},
+            send_time = #{sendTime},
+            content = #{content},
+            last_trigger_date = #{lastTriggerDate},
+            operator_user_id = #{operatorUserId},
+            operator_name = #{operatorName},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_broadcast_setting WHERE id = #{id} LIMIT 1
+    </select>
+
+    <select id="selectByShopId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_broadcast_setting WHERE shop_id = #{shopId} LIMIT 1
+    </select>
+
+    <update id="clearSchedule">
+        UPDATE mt_im_broadcast_setting
+        SET enabled = 0,
+            week_days = '',
+            send_time = '00:00:00',
+            content = '',
+            last_trigger_date = NULL,
+            update_time = NOW()
+        WHERE shop_id = #{shopId}
+    </update>
+
+    <select id="selectEnabledAfterId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumnList"/> FROM mt_im_broadcast_setting
+        WHERE enabled = 1 AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <update id="markTriggered">
+        UPDATE mt_im_broadcast_setting
+        SET last_trigger_date = #{triggerDate},
+            update_time = NOW()
+        WHERE id = #{id}
+        <choose>
+            <when test="previousTriggerDate == null">
+                AND last_trigger_date IS NULL
+            </when>
+            <otherwise>
+                AND last_trigger_date = #{previousTriggerDate}
+            </otherwise>
+        </choose>
+    </update>
+
+    <update id="bindLastTask">
+        UPDATE mt_im_broadcast_setting
+        SET last_task_id = #{taskId}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="disable">
+        UPDATE mt_im_broadcast_setting
+        SET enabled = 0, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="increaseTotalSentCount">
+        UPDATE mt_im_broadcast_setting
+        SET total_sent_count = total_sent_count + #{delta}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

@@ -41,6 +41,40 @@
         ORDER BY service_code ASC, id ASC
     </select>
 
+    <select id="selectActiveAppExpiryCandidatesByCursor"
+            resultType="com.gogoga.backend.entity.sms.SmsAppExpiryCandidate">
+        SELECT shop_id AS shopId, MAX(expire_at) AS expectedExpireAt
+        FROM mt_shop_right
+        WHERE shop_id &gt; #{lastShopId}
+          AND service_code IN ('VIP_CODE', 'H5_PROMOTION', 'MT_APP_OPEN_ONLY', 'IM_AUTO_REPLY_ONLY')
+          AND type = 2
+          AND expire_at IS NOT NULL
+          AND expire_at &gt; #{now}
+        GROUP BY shop_id
+        ORDER BY shop_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMaxAppRightExpireAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(expire_at)
+        FROM mt_shop_right
+        WHERE shop_id = #{shopId}
+          AND service_code IN ('VIP_CODE', 'H5_PROMOTION', 'MT_APP_OPEN_ONLY', 'IM_AUTO_REPLY_ONLY')
+          AND type = 2
+          AND expire_at IS NOT NULL
+    </select>
+
+    <select id="existsActiveAppRight" resultType="boolean">
+        SELECT COUNT(1) &gt; 0
+        FROM mt_shop_right
+        WHERE shop_id = #{shopId}
+          AND service_code IN ('VIP_CODE', 'H5_PROMOTION', 'MT_APP_OPEN_ONLY', 'IM_AUTO_REPLY_ONLY')
+          AND (
+                (type = 2 AND expire_at IS NOT NULL AND expire_at &gt; #{now})
+                OR (type != 2 AND remaining_times IS NOT NULL AND remaining_times &gt; 0)
+              )
+    </select>
+
     <insert id="insert" parameterType="com.gogoga.backend.entity.mt.MtShopRight" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mt_shop_right (
             shop_id, service_code, type, expire_at, remaining_times, source_version, last_order_id, create_time, update_time

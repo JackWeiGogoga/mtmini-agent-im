@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ImReplyContactSuffixService {
 
-    private static final String SUFFIX_PREFIX = "可以联系门店 ";
+    private static final String SUFFIX_PREFIX = "-门店";
 
     private final ShopOperationSettingsService settingsService;
 
@@ -23,6 +23,16 @@ public class ImReplyContactSuffixService {
      */
     public String append(Long shopId, String content) {
         return appendPhone(content, settingsService.resolveEffectiveContactPhone(shopId));
+    }
+
+    /**
+     * 取门店最终生效的联系方式。
+     *
+     * <p>生成前要据此告诉模型“联系方式已配置”，生成后又要拿它拼后缀，两处必须是同一个值：
+     * 若分别解析，中间商家改了配置就会出现模型说有、后缀没拼（或反之）的矛盾回复。</p>
+     */
+    public String resolveContactPhone(Long shopId) {
+        return settingsService.resolveEffectiveContactPhone(shopId);
     }
 
     /**

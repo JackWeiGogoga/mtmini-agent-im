@@ -1,8 +1,8 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.client.MtImMessageClient;
 import com.gogoga.backend.config.MtProperties;
+import com.gogoga.backend.constant.ImAutoReplyPromptConstant;
 import com.gogoga.backend.dto.ImAutoReplyChatMessage;
 import com.gogoga.backend.dto.ImAutoReplyChatResult;
 import com.gogoga.backend.dto.ResolvedSystemPromptDTO;
@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,7 +52,6 @@ class MtImAutoReplyOrchestrationServiceTest {
     @Mock private ShopOperationSettingsService settingsService;
     @Mock private MtShopRightService rightService;
     @Mock private MtAccessTokenService tokenService;
-    @Mock private MtMeituanAuthorizationFailureHandler authFailureHandler;
     @Mock private ImConversationLockService lockService;
     @Mock private ImConversationLockService.LockHandle lockHandle;
     @Mock private ImAutoReplyContextService contextService;
@@ -71,14 +71,17 @@ class MtImAutoReplyOrchestrationServiceTest {
     void setUp() {
         properties = new MtProperties();
         properties.getImAutoReply().setEnabled(true);
+        // 用真实的鉴权失败封装，让刷新重试与标记重新授权的行为真正被覆盖，而不是被 mock 掉。
+        MtMeituanAuthorizationFailureHandler authFailureHandler =
+                new MtMeituanAuthorizationFailureHandler(tokenService);
         service = new MtImAutoReplyOrchestrationService(
                 properties, autoReplyMapper, messageMapper, shopMapper, settingsService, rightService,
                 tokenService, authFailureHandler, lockService, contextService, messageClassificationService,
                 ragService, new ShopBasicInfoPromptService(), chatService,
                 promptService, sensitiveWordService, contactSuffixService, stateService, messageClient);
         // 默认无联系方式可拼：正文原样透传，个别用例再覆盖成有联系方式的门店。
-        lenient().when(contactSuffixService.append(anyLong(), anyString()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(contactSuffixService.appendPhone(anyString(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -291,6 +294,68 @@ class MtImAutoReplyOrchestrationServiceTest {
     }
 
     @Test
+    void repliesFixedFallbackWithoutModelWhenTriggerIsNotText() {
+        MtImAutoReply pending = autoReply();
+        MtImAutoReply generated = autoReply();
+        generated.setReplyMessageId(32L);
+        MtImAutoReply billed = autoReply();
+        billed.setReplyMessageId(32L);
+        billed.setBilledAt(LocalDateTime.now());
+        billed.setSendNotBefore(LocalDateTime.now().minusSeconds(1));
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending, pending, generated);
+        when(stateService.markBilledFree(9L)).thenReturn(billed);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(lockHandle.isValid()).thenReturn(true);
+        MtImMessage trigger = trigger(ImMessageTypeEnum.IMAGE);
+        MtImMessage reply = new MtImMessage();
+        reply.setId(32L);
+        reply.setMsgContentPlaintext("商家正在忙\n-门店13800000000");
+        reply.setDeliveryStatus(ImMessageDeliveryStatusEnum.FAILED.name());
+        when(messageMapper.selectById(31L)).thenReturn(trigger);
+        when(messageMapper.selectById(32L)).thenReturn(reply);
+        mockReadyShop();
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of());
+        SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
+        safe.setHit(false);
+        when(sensitiveWordService.detect("商家正在忙")).thenReturn(safe);
+        when(contactSuffixService.append(1L, "商家正在忙"))
+                .thenReturn("商家正在忙\n-门店13800000000");
+        when(messageClient.sendTwoPartyMessage(anyString(), any()))
+                .thenReturn(new MtImMessageClient.SendResult(true, null, null));
+
+        service.execute(payload());
+
+        // 不解析图片、不召回知识、不分类、不生成：整条链路都不碰大模型
+        verify(chatService, never()).generate(anyString(), anyString(), any());
+        verify(ragService, never()).retrieve(anyLong(), any(), anyString());
+        verify(messageClassificationService, never()).classify(any());
+        // 兜底话术仍要拼联系方式，并按零 token 过账后正常发送
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("商家正在忙\n-门店13800000000"),
+                any(), eq(null), eq(0), eq("GENERAL"));
+        verify(stateService).markBilledFree(9L);
+        verify(stateService, never()).bill(anyLong());
+        verify(messageClient).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
+    void skipsNonTextFallbackWhenMerchantAlreadyRepliedAfterTrigger() {
+        MtImAutoReply pending = autoReply();
+        when(autoReplyMapper.selectById(9L)).thenReturn(pending);
+        when(lockService.tryAcquire(11L)).thenReturn(lockHandle);
+        when(messageMapper.selectById(31L)).thenReturn(trigger(ImMessageTypeEnum.IMAGE));
+        mockReadyShop();
+        MtImMessage merchant = new MtImMessage();
+        merchant.setSenderRole(ImMessageSenderRoleEnum.MERCHANT.name());
+        merchant.setMsgType(ImMessageTypeEnum.TEXT.getCode());
+        when(messageMapper.selectAfterMessageInConversation(11L, 31L)).thenReturn(List.of(merchant));
+
+        service.execute(payload());
+
+        verify(stateService).markStatus(9L, MtImAutoReplyStatusEnum.SKIPPED, "MANUAL_REPLY_AFTER_TRIGGER");
+        verify(messageClient, never()).sendTwoPartyMessage(anyString(), any());
+    }
+
+    @Test
     void reschedulesWithoutRetryWhenConversationLockIsBusy() {
         when(autoReplyMapper.selectById(9L)).thenReturn(autoReply());
         when(lockService.tryAcquire(11L)).thenReturn(null);
@@ -328,9 +393,10 @@ class MtImAutoReplyOrchestrationServiceTest {
         ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
-        when(chatService.generate(eq("系统"), eq(""), any()))
+        String protectedPrompt = ImAutoReplyPromptConstant.enforceBusinessScopePolicy("系统");
+        when(chatService.generate(eq(protectedPrompt), eq(""), any()))
                 .thenReturn(new ImAutoReplyChatResult("风险答复", 10, 2));
-        when(chatService.rewrite(eq("系统"), eq(""), any(), eq("风险答复")))
+        when(chatService.rewrite(eq(protectedPrompt), eq(""), any(), eq("风险答复")))
                 .thenReturn(new ImAutoReplyChatResult("安全答复", 5, 1));
         SensitiveWordHitDTO hit = new SensitiveWordHitDTO();
         hit.setHit(true);
@@ -375,17 +441,24 @@ class MtImAutoReplyOrchestrationServiceTest {
         ResolvedSystemPromptDTO prompt = new ResolvedSystemPromptDTO();
         prompt.setContent("系统");
         when(promptService.render(eq("IM_AUTO_REPLY_SYSTEM"), any(), anyString())).thenReturn(prompt);
-        when(chatService.generate(eq("系统"), eq(""), any()))
+        ArgumentCaptor<String> modelContext = ArgumentCaptor.forClass(String.class);
+        when(chatService.generate(
+                eq(ImAutoReplyPromptConstant.enforceBusinessScopePolicy("系统")), modelContext.capture(), any()))
                 .thenReturn(new ImAutoReplyChatResult("答复", 10, 2));
         SensitiveWordHitDTO safe = new SensitiveWordHitDTO();
         safe.setHit(false);
         when(sensitiveWordService.detect("答复")).thenReturn(safe);
-        when(contactSuffixService.append(1L, "答复")).thenReturn("答复\n可以联系门店 400-820-8820");
+        when(contactSuffixService.resolveContactPhone(1L)).thenReturn("400-820-8820");
+        when(contactSuffixService.appendPhone("答复", "400-820-8820"))
+                .thenReturn("答复\n-门店400-820-8820");
 
         service.execute(payload());
 
-        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n可以联系门店 400-820-8820"),
+        verify(stateService).saveGenerated(eq(9L), eq(trigger), eq("答复\n-门店400-820-8820"),
                 any(), any(), eq(0), eq("GENERAL"));
+        // 有号码时必须告知模型，否则它会答“没有联系方式”再被后缀拼上号码，自相矛盾
+        assertTrue(modelContext.getValue().contains("门店联系方式：已配置"));
+        assertFalse(modelContext.getValue().contains("400-820-8820"));
     }
 
     @Test
@@ -434,7 +507,7 @@ class MtImAutoReplyOrchestrationServiceTest {
 
     private void mockReadyShop() {
         when(settingsService.isAutoReplyEnabled(1L)).thenReturn(true);
-        when(rightService.hasShopRight(eq(1L), eq(RequiresShopRight.Logical.OR), any(), any())).thenReturn(true);
+        when(rightService.hasAutoReplyRight(1L)).thenReturn(true);
         MtAccessToken token = new MtAccessToken();
         token.setAccessToken("token");
         token.setAuthStatus(MtAccessTokenAuthStatusEnum.VALID.getCode());
@@ -455,11 +528,17 @@ class MtImAutoReplyOrchestrationServiceTest {
     }
 
     private MtImMessage trigger() {
+        return trigger(ImMessageTypeEnum.TEXT);
+    }
+
+    private MtImMessage trigger(ImMessageTypeEnum msgType) {
         MtImMessage message = new MtImMessage();
         message.setId(31L);
         message.setConversationId(11L);
         message.setOrderId(0L);
         message.setOpenUserId(41L);
+        // 触发消息类型决定是否走大模型，缺省会被当成非文本消息回兜底话术
+        message.setMsgType(msgType.getCode());
         return message;
     }
 

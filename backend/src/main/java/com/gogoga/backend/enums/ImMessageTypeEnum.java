@@ -11,19 +11,21 @@ import java.util.Optional;
  */
 public enum ImMessageTypeEnum {
 
-    TEXT(1, true, true),
-    IMAGE(2, true, false),
-    OTHER(3, true, false),
-    CARD(17, false, false);
+    TEXT(1, true, true, true),
+    IMAGE(2, true, false, true),
+    OTHER(3, true, false, true),
+    CARD(17, false, false, false);
 
     private final int code;
     private final boolean sendSupported;
     private final boolean conversational;
+    private final boolean replyTriggerable;
 
-    ImMessageTypeEnum(int code, boolean sendSupported, boolean conversational) {
+    ImMessageTypeEnum(int code, boolean sendSupported, boolean conversational, boolean replyTriggerable) {
         this.code = code;
         this.sendSupported = sendSupported;
         this.conversational = conversational;
+        this.replyTriggerable = replyTriggerable;
     }
 
     public int getCode() {
@@ -47,6 +49,23 @@ public enum ImMessageTypeEnum {
 
     public static boolean isConversational(Integer code) {
         return fromCode(code).map(ImMessageTypeEnum::isConversational).orElse(false);
+    }
+
+    /**
+     * 顾客发来该类型时是否需要自动回复。
+     *
+     * <p>比 {@link #isConversational()} 宽：图片等非文本消息没有可用文本，进不了模型上下文，
+     * 但顾客确实在等回应，因此仍要触发一条固定兜底话术；CARD 由平台推送，不代表顾客提问。</p>
+     *
+     * <p>这也是「更新的用户消息能否顶掉待发送回复」的判定口径：只有能自己触发回复的消息
+     * 才可以顶掉前一条，否则顶掉之后无人接手，顾客的提问会静默得不到答复。</p>
+     */
+    public boolean isReplyTriggerable() {
+        return replyTriggerable;
+    }
+
+    public static boolean isReplyTriggerable(Integer code) {
+        return fromCode(code).map(ImMessageTypeEnum::isReplyTriggerable).orElse(false);
     }
 
     /**

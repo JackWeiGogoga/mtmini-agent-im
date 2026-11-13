@@ -55,6 +55,11 @@ public class AdminMasterConsoleRowVO implements Serializable {
 
     private Boolean autoReplyEnabled;
 
+    /**
+     * 门店定时群发配置，未配置时 configured=false。
+     */
+    private ImBroadcastSettingVO broadcastSetting;
+
     @JsonIgnore
     private Integer ordinaryBindingCount;
 

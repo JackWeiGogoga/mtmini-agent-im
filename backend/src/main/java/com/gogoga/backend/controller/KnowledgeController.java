@@ -27,7 +27,9 @@ import java.util.List;
 @RequestMapping("/api/h5/knowledge/items")
 @RequiredArgsConstructor
 @RequiresLogin
-@RequiresShopRight({MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION})
+// 知识库是自动回复的组成部分，权益范围必须与 MtShopRightService#hasAutoReplyRight 保持一致。
+@RequiresShopRight({MtShopRightCodeConstant.VIP_CODE, MtShopRightCodeConstant.H5_PROMOTION,
+        MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY})
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;

@@ -11,6 +11,7 @@ import {
 } from "@/services/im-auto-reply-api";
 import type { ImConversation, ImConversationQuery } from "@/types";
 import ConversationHistoryDrawer from "./components/ConversationHistoryDrawer";
+import { isImageMessage } from "./components/MessageBody";
 import ImReplyLogTable from "./components/ImReplyLogTable";
 
 const { Text, Paragraph } = Typography;
@@ -65,7 +66,10 @@ function ConversationList() {
       title: "最新消息", key: "latest", width: 330,
       render: (_, row) => <Space direction="vertical" size={2} style={{ width: "100%" }}>
         <Space><Tag>{row.lastMessageRole || "-"}</Tag><Text type="secondary">{row.lastMessageAt ? dayjs(row.lastMessageAt).format("YYYY-MM-DD HH:mm:ss") : "-"}</Text></Space>
-        <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0 }}>{row.lastMessageContent || "-"}</Paragraph>
+        <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0 }}>
+          {/* 列表只做摘要，一行图床 URL 既占地方又没信息量，缩成图片标记 */}
+          {isImageMessage(row.lastMessageType, row.lastMessageContent) ? "[图片]" : row.lastMessageContent || "-"}
+        </Paragraph>
       </Space>,
     },
     {

@@ -27,6 +27,11 @@ public interface MtAppOrderMapper {
     MtAppOrder selectById(@Param("id") Long id);
 
     /**
+     * 在单笔权益应用事务中锁定订单。
+     */
+    MtAppOrder selectByIdForUpdate(@Param("id") Long id);
+
+    /**
      * 根据订单号查询
      *
      * @param orderId 订单号

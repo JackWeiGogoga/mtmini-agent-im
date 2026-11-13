@@ -3,11 +3,17 @@ package com.gogoga.backend.controller;
 import com.gogoga.backend.annotation.RequiresLogin;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
 import com.gogoga.backend.param.ShopContactPhoneUpdateParam;
+import com.gogoga.backend.param.ImBroadcastContentOptimizeParam;
+import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
+import com.gogoga.backend.service.ImBroadcastContentService;
 import com.gogoga.backend.service.MtH5GuideStateService;
 import com.gogoga.backend.service.MtH5HomeDashboardService;
 import com.gogoga.backend.service.MtH5ShopService;
+import com.gogoga.backend.service.MtImBroadcastSettingService;
 import com.gogoga.backend.service.ShopOperationSettingsService;
+import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
+import com.gogoga.backend.vo.ImBroadcastSettingVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.MtH5GuideStateVO;
 import com.gogoga.backend.vo.MtH5HomeDashboardVO;
@@ -16,6 +22,7 @@ import com.gogoga.backend.vo.MtH5TabStatusVO;
 import com.gogoga.backend.vo.ResultVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +48,8 @@ public class MtH5ShopController {
     private final MtH5ShopService mtH5ShopService;
     private final MtH5GuideStateService mtH5GuideStateService;
     private final ShopOperationSettingsService shopOperationSettingsService;
+    private final MtImBroadcastSettingService mtImBroadcastSettingService;
+    private final ImBroadcastContentService imBroadcastContentService;
 
     /**
      * 获取 H5 首页门店信息
@@ -114,6 +123,56 @@ public class MtH5ShopController {
                 param.getCustomContactPhone(),
                 ShopOperationSettingsService.CHANGE_SOURCE_H5
         ));
+    }
+
+    /**
+     * 获取当前门店的消息群发配置。
+     *
+     * @return 群发配置
+     */
+    @GetMapping("/broadcast-setting")
+    public ResultVO<ImBroadcastSettingVO> getBroadcastSetting() {
+        return ResultVO.success(mtImBroadcastSettingService.getSettings(
+                mtH5ShopService.getCurrentShop().getId()));
+    }
+
+    /**
+     * 保存当前门店的消息群发配置。
+     *
+     * @param param 群发配置参数
+     * @return 保存后的群发配置
+     */
+    @PutMapping("/broadcast-setting")
+    public ResultVO<ImBroadcastSettingVO> saveBroadcastSetting(
+            @Valid @RequestBody ImBroadcastSettingUpdateParam param) {
+        return ResultVO.success(mtImBroadcastSettingService.saveSettings(
+                mtH5ShopService.getCurrentShop().getId(), param,
+                MtImBroadcastSettingService.CHANGE_SOURCE_H5));
+    }
+
+    /**
+     * 删除当前门店的定时群发配置。
+     *
+     * @return 清空后的群发配置
+     */
+    @DeleteMapping("/broadcast-setting")
+    public ResultVO<ImBroadcastSettingVO> deleteBroadcastSetting() {
+        return ResultVO.success(mtImBroadcastSettingService.deleteSettings(
+                mtH5ShopService.getCurrentShop().getId(),
+                MtImBroadcastSettingService.CHANGE_SOURCE_H5));
+    }
+
+    /**
+     * AI 优化当前门店的群发文案，消耗算力。
+     *
+     * @param param 待优化的文本框内容
+     * @return 优化后的文案
+     */
+    @PostMapping("/broadcast-content/optimize")
+    public ResultVO<ImBroadcastContentOptimizeVO> optimizeBroadcastContent(
+            @Valid @RequestBody ImBroadcastContentOptimizeParam param) {
+        return ResultVO.success(imBroadcastContentService.optimize(
+                mtH5ShopService.getCurrentShop().getId(), param.getContent()));
     }
 
     /**

@@ -140,6 +140,30 @@ public class MtShopRightService {
     }
 
     /**
+     * 校验门店是否具备 IM 自动回复能力（含知识库配置）。
+     *
+     * <p>自动回复与群发的权益范围已经不同，各调用点一律走这两个语义方法，不要再各自罗列权益码，
+     * 否则新增权益时极易漏改其中一处，造成权益穿透。</p>
+     */
+    public boolean hasAutoReplyRight(Long shopId) {
+        return hasShopRight(shopId, RequiresShopRight.Logical.OR,
+                MtShopRightCodeConstant.VIP_CODE,
+                MtShopRightCodeConstant.H5_PROMOTION,
+                MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY);
+    }
+
+    /**
+     * 校验门店是否具备消息群发能力。
+     *
+     * <p>{@link MtShopRightCodeConstant#IM_AUTO_REPLY_ONLY} 不含群发，故刻意不在此列。</p>
+     */
+    public boolean hasBroadcastRight(Long shopId) {
+        return hasShopRight(shopId, RequiresShopRight.Logical.OR,
+                MtShopRightCodeConstant.VIP_CODE,
+                MtShopRightCodeConstant.H5_PROMOTION);
+    }
+
+    /**
      * 授权后同步权益
      *
      * @param shop 门店
@@ -375,7 +399,8 @@ public class MtShopRightService {
         return StringUtils.equalsAny(
                 right.getServiceCode(),
                 MtShopRightCodeConstant.VIP_CODE,
-                MtShopRightCodeConstant.H5_PROMOTION
+                MtShopRightCodeConstant.H5_PROMOTION,
+                MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY
         );
     }
 
@@ -403,7 +428,10 @@ public class MtShopRightService {
         if (StringUtils.equals(serviceCode, MtShopRightCodeConstant.H5_PROMOTION)) {
             return 1;
         }
-        return 2;
+        if (StringUtils.equals(serviceCode, MtShopRightCodeConstant.IM_AUTO_REPLY_ONLY)) {
+            return 2;
+        }
+        return 3;
     }
 
     private AdAppBuyInfoResponse fetchBuyInfo(String accessToken) {

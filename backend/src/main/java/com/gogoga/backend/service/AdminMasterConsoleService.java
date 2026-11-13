@@ -4,10 +4,15 @@ import com.github.pagehelper.PageInfo;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtPowerAccount;
 import com.gogoga.backend.enums.DashboardStatsRangeTypeEnum;
+import com.gogoga.backend.enums.ImBroadcastRepeatModeEnum;
+import com.gogoga.backend.enums.ImBroadcastSettingStatusEnum;
 import com.gogoga.backend.enums.MtAccessTokenAuthStatusEnum;
+import com.gogoga.backend.param.ImBroadcastSettingUpdateParam;
 import com.gogoga.backend.param.ShopOperationSettingsUpdateParam;
 import com.gogoga.backend.util.ExcelExportUtil;
 import com.gogoga.backend.vo.AdminMasterConsoleRowVO;
+import com.gogoga.backend.vo.ImBroadcastContentOptimizeVO;
+import com.gogoga.backend.vo.ImBroadcastSettingVO;
 import com.gogoga.backend.vo.ShopOperationSettingsVO;
 import com.gogoga.backend.vo.UserShopBindingVO;
 import com.gogoga.backend.vo.VisibleUserOptionVO;
@@ -18,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,11 +34,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminMasterConsoleService {
 
+    /** 群发星期数字与中文名的映射，1=周一 … 7=周日。 */
+    private static final Map<Integer, String> WEEK_DAY_NAMES = Map.of(
+            1, "周一", 2, "周二", 3, "周三", 4, "周四",
+            5, "周五", 6, "周六", 7, "周日");
+
     private final UserShopBindingService userShopBindingService;
     private final MtAccessTokenService mtAccessTokenService;
     private final MtPowerAccountService mtPowerAccountService;
     private final ShopDashboardMetricsService shopDashboardMetricsService;
     private final ShopOperationSettingsService shopOperationSettingsService;
+    private final MtImBroadcastSettingService mtImBroadcastSettingService;
+    private final ImBroadcastContentService imBroadcastContentService;
 
     public PageInfo<AdminMasterConsoleRowVO> listRows(String keyword,
                                                       String targetUserId,
@@ -83,6 +96,9 @@ public class AdminMasterConsoleService {
                 ExcelExportUtil.column("网销手机号", AdminMasterConsoleRowVO::getSalesBoundUserPhone),
                 ExcelExportUtil.column("授权状态", AdminMasterConsoleRowVO::getAuthStatusText),
                 ExcelExportUtil.column("IM自动回复开关", row -> Boolean.TRUE.equals(row.getAutoReplyEnabled()) ? "开启" : "关闭"),
+                ExcelExportUtil.column("定时群发", this::formatExportBroadcast),
+                ExcelExportUtil.column("累计群发条数", row -> row.getBroadcastSetting() == null
+                        ? 0L : row.getBroadcastSetting().getTotalSentCount()),
                 ExcelExportUtil.column("本期消耗算力", AdminMasterConsoleRowVO::getCurrentConsumedPower),
                 ExcelExportUtil.column("剩余算力", AdminMasterConsoleRowVO::getPowerBalance),
                 ExcelExportUtil.column("功能剩余时间", row -> formatRemainingRightTime(row.getRightExpireAt()))
@@ -100,6 +116,44 @@ public class AdminMasterConsoleService {
                 param,
                 ShopOperationSettingsService.CHANGE_SOURCE_ADMIN
         );
+    }
+
+    public ImBroadcastSettingVO getBroadcastSetting(Long shopId) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        return mtImBroadcastSettingService.getSettings(shopId);
+    }
+
+    public ImBroadcastSettingVO saveBroadcastSetting(Long shopId, ImBroadcastSettingUpdateParam param) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        return mtImBroadcastSettingService.saveSettings(
+                shopId, param, MtImBroadcastSettingService.CHANGE_SOURCE_ADMIN);
+    }
+
+    public ImBroadcastSettingVO deleteBroadcastSetting(Long shopId) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        return mtImBroadcastSettingService.deleteSettings(
+                shopId, MtImBroadcastSettingService.CHANGE_SOURCE_ADMIN);
+    }
+
+    public ImBroadcastContentOptimizeVO optimizeBroadcastContent(Long shopId, String content) {
+        userShopBindingService.requireCurrentUserVisibleShop(shopId, null);
+        // 代运营优化仍扣目标门店的算力，权益与算力校验都在 service 内按目标门店进行。
+        return imBroadcastContentService.optimize(shopId, content);
+    }
+
+    private String formatExportBroadcast(AdminMasterConsoleRowVO row) {
+        ImBroadcastSettingVO setting = row.getBroadcastSetting();
+        if (setting == null || ImBroadcastSettingStatusEnum.NONE.name().equals(setting.getStatus())) {
+            return ImBroadcastSettingStatusEnum.NONE.getDesc();
+        }
+        String weekDays = setting.getWeekDays() == null ? "" : setting.getWeekDays().stream()
+                .map(WEEK_DAY_NAMES::get)
+                .collect(Collectors.joining("、"));
+        String repeatMode = ImBroadcastRepeatModeEnum.ONCE.name().equals(setting.getRepeatMode()) ? "一次" : "每次";
+        String schedule = weekDays + " " + setting.getSendTime() + " " + repeatMode;
+        return ImBroadcastSettingStatusEnum.ONCE_COMPLETED.name().equals(setting.getStatus())
+                ? setting.getStatusName() + "，执行于 " + setting.getLastTriggerDate() + "（" + schedule + "）"
+                : schedule;
     }
 
     public void requireVisibleShop(Long shopId) {
@@ -174,6 +228,7 @@ public class AdminMasterConsoleService {
         row.setBindTime(binding.getBindTime());
         row.setAutoReplyEnabled(operationSettings != null
                 && Boolean.TRUE.equals(operationSettings.getAutoReplyEnabled()));
+        row.setBroadcastSetting(mtImBroadcastSettingService.getSettings(binding.getShopId()));
         return row;
     }
 

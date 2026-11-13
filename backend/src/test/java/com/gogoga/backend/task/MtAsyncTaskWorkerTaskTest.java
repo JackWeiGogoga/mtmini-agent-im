@@ -8,6 +8,8 @@ import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
 import com.gogoga.backend.service.MtImAutoReplyOrchestrationService;
+import com.gogoga.backend.service.MtImBroadcastPlanService;
+import com.gogoga.backend.service.MtImBroadcastSendService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtApiDryRunException;
 import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
@@ -37,9 +39,12 @@ class MtAsyncTaskWorkerTaskTest {
     @Mock private MtAuthAsyncTaskService authAsyncTaskService;
     @Mock private KnowledgeDocumentService knowledgeDocumentService;
     @Mock private MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService;
+    @Mock private MtImBroadcastPlanService imBroadcastPlanService;
+    @Mock private MtImBroadcastSendService imBroadcastSendService;
     @Mock private RedisDistributedLockService lockService;
     @Mock private Executor ordinaryExecutor;
     @Mock private ThreadPoolTaskExecutor llmExecutor;
+    @Mock private ThreadPoolTaskExecutor broadcastExecutor;
 
     private MtAsyncTaskWorkerTask worker;
 
@@ -50,11 +55,14 @@ class MtAsyncTaskWorkerTaskTest {
                 authAsyncTaskService,
                 knowledgeDocumentService,
                 imAutoReplyOrchestrationService,
+                imBroadcastPlanService,
+                imBroadcastSendService,
                 lockService,
                 new MtProperties(),
                 new LlmRateLimitProperties(),
                 ordinaryExecutor,
-                llmExecutor
+                llmExecutor,
+                broadcastExecutor
         );
     }
 

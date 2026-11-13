@@ -3,6 +3,7 @@ import { Button, Drawer, Empty, Input, Space, Table, Tabs, Tag, Tooltip, Typogra
 import type { ColumnsType } from "antd/es/table";
 import { ClearOutlined, HistoryOutlined, SendOutlined } from "@ant-design/icons";
 import { message } from "@/components/AppMessageContext";
+import { BRAND_MODEL_NAME } from "@/config/brandModel";
 import { useAuth } from "@/contexts/AuthContext";
 import { listTestChatLogs, sendTestChat } from "@/services/knowledge-api";
 import type { TestChatLog, TestChatReply } from "@/types";
@@ -135,7 +136,7 @@ function RecallDiagnostics({ diagnostics }: { diagnostics: NonNullable<TestChatR
           {"，"}门店有可用知识：{diagnostics.hasShopKnowledge ? "是" : "否"}
           {"，"}匹配当前配置候选：{diagnostics.candidateCount ?? 0}
         </div>
-        <div style={{ color: "rgba(0,0,0,0.35)" }}>embedding：{diagnostics.embeddingConfig || "-"}</div>
+        <div style={{ color: "rgba(0,0,0,0.35)" }}>向量模型：{BRAND_MODEL_NAME}</div>
         {noCandidateButHasKnowledge && (
           <div style={{ color: "#d4380d" }}>
             门店有知识但当前 embedding 配置无匹配候选，可能是配置变更后未重算向量，请到「知识问答」重新保存该条 QA。
@@ -230,6 +231,12 @@ export default function TestChatPanel({ shopId }: { shopId?: number }) {
     { title: "测试输入", dataIndex: "userMessage" },
     { title: "AI回复", dataIndex: "aiReply" },
     {
+      title: "模型",
+      key: "brandModel",
+      width: 110,
+      render: () => <Tag color="purple">{BRAND_MODEL_NAME}</Tag>,
+    },
+    {
       title: "分类",
       dataIndex: "userMessageCategory",
       width: 90,
@@ -311,6 +318,7 @@ export default function TestChatPanel({ shopId }: { shopId?: number }) {
             <b>AI：</b>
             {log.aiReply}
             <Space size={4} wrap style={{ marginLeft: 8 }}>
+              <Tag color="purple">{BRAND_MODEL_NAME}</Tag>
               <Tag>{categoryLabel(log.userMessageCategory)}</Tag>
               {log.ragUsed ? <Tag color="green">{log.ragChunkCount ?? 0} 片段</Tag> : <Tag>未命中</Tag>}
               {(log.rewriteCount ?? 0) > 0 && <Tag color="orange">改写{log.rewriteCount}</Tag>}
@@ -375,6 +383,11 @@ export default function TestChatPanel({ shopId }: { shopId?: number }) {
                 >
                   {turn.content}
                 </div>
+                {turn.role === "assistant" && (
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="purple" style={{ marginInlineEnd: 0 }}>模型：{BRAND_MODEL_NAME}</Tag>
+                  </div>
+                )}
                 {turn.role === "assistant" && turn.debug && isAdminView && <DebugPanel debug={turn.debug} />}
               </div>
             </div>

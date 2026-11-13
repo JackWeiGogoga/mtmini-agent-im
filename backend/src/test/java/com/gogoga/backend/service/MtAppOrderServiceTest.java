@@ -48,7 +48,7 @@ class MtAppOrderServiceTest {
     private MtProperties mtProperties;
 
     @Mock
-    private MtShopRightService mtShopRightService;
+    private MtAppOrderRightApplicationService rightApplicationService;
 
     @InjectMocks
     private MtAppOrderService mtAppOrderService;
@@ -58,15 +58,16 @@ class MtAppOrderServiceTest {
         MtAppOrder appliedOrder = buildPendingOrder(1L, "order-applied");
         MtAppOrder unappliedOrder = buildPendingOrder(2L, "order-unapplied");
         when(mtAppOrderMapper.selectPendingRightOrders()).thenReturn(List.of(appliedOrder, unappliedOrder));
-        when(mtShopRightService.applyOrderRights(any(MtAppOrder.class), any())).thenReturn(true, false);
+        when(rightApplicationService.applyOne(any(MtAppOrder.class), any())).thenReturn(
+                new MtAppOrderRightApplicationResult(true, Set.of()),
+                new MtAppOrderRightApplicationResult(false, Set.of())
+        );
 
         mtAppOrderService.applyPendingRights();
 
-        ArgumentCaptor<MtAppOrder> captor = ArgumentCaptor.forClass(MtAppOrder.class);
-        verify(mtAppOrderMapper).updateById(captor.capture());
-        assertSame(appliedOrder, captor.getValue());
-        assertEquals(1, appliedOrder.getType());
-        assertEquals(0, unappliedOrder.getType());
+        verify(rightApplicationService).applyOne(eq(appliedOrder), any());
+        verify(rightApplicationService).applyOne(eq(unappliedOrder), any());
+        verify(mtAppOrderMapper, never()).updateById(any());
     }
 
     @Test
@@ -75,14 +76,18 @@ class MtAppOrderServiceTest {
         MtAppOrder firstOrder = buildPendingOrder(1L, "order-1");
         MtAppOrder secondOrder = buildPendingOrder(2L, "order-2");
         when(mtAppOrderMapper.selectPendingRightOrders()).thenReturn(List.of(firstOrder, secondOrder));
-        when(mtShopRightService.applyOrderRights(any(MtAppOrder.class), any())).thenReturn(true, true);
+        when(rightApplicationService.applyOne(any(MtAppOrder.class), any())).thenReturn(
+                new MtAppOrderRightApplicationResult(true, Set.of("credit-1")),
+                new MtAppOrderRightApplicationResult(true, Set.of("credit-1"))
+        );
 
         mtAppOrderService.applyPendingRights();
 
         ArgumentCaptor<Set<String>> setCaptor = ArgumentCaptor.forClass(Set.class);
-        verify(mtShopRightService).applyOrderRights(eq(firstOrder), setCaptor.capture());
-        verify(mtShopRightService).applyOrderRights(eq(secondOrder), setCaptor.capture());
+        verify(rightApplicationService).applyOne(eq(firstOrder), setCaptor.capture());
+        verify(rightApplicationService).applyOne(eq(secondOrder), setCaptor.capture());
         assertSame(setCaptor.getAllValues().get(0), setCaptor.getAllValues().get(1));
+        assertEquals(Set.of("credit-1"), setCaptor.getAllValues().get(1));
     }
 
     @Test
@@ -91,7 +96,7 @@ class MtAppOrderServiceTest {
 
         mtAppOrderService.applyPendingRights();
 
-        verify(mtShopRightService, never()).applyOrderRights(any(MtAppOrder.class), any());
+        verify(rightApplicationService, never()).applyOne(any(MtAppOrder.class), any());
         verify(mtAppOrderMapper, never()).updateById(any());
     }
 

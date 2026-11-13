@@ -1,5 +1,6 @@
 package com.gogoga.backend.service;
 
+import com.gogoga.backend.constant.PowerThresholdConstant;
 import com.gogoga.backend.dto.PowerConsumeRequestDTO;
 import com.gogoga.backend.dto.PowerConsumeResultDTO;
 import com.gogoga.backend.entity.mt.MtPowerAccount;
@@ -10,7 +11,9 @@ import com.gogoga.backend.exception.PowerInsufficientException;
 import com.gogoga.backend.mapper.MtPowerAccountMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeDetailMapper;
 import com.gogoga.backend.mapper.MtPowerConsumeMapper;
+import com.gogoga.backend.service.sms.notification.MerchantLifecycleSmsService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,16 +31,19 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MtPowerConsumeService {
 
     public static final String SOURCE_BALANCE_GRANT = "GRANT";
     public static final String SOURCE_BALANCE_RECHARGE = "RECHARGE";
+    private static final String IM_AUTO_REPLY_SOURCE_TYPE = "IM_AUTO_REPLY";
 
     private final MtPowerAccountService mtPowerAccountService;
     private final MtPowerAccountMapper mtPowerAccountMapper;
     private final MtPowerConsumeMapper mtPowerConsumeMapper;
     private final MtPowerConsumeDetailMapper mtPowerConsumeDetailMapper;
     private final ShopOperationSettingsService shopOperationSettingsService;
+    private final MerchantLifecycleSmsService lifecycleSmsService;
 
     /**
      * 执行算力消费
@@ -99,7 +105,9 @@ public class MtPowerConsumeService {
         PowerConsumeResultDTO result = new PowerConsumeResultDTO();
         result.setDuplicate(false);
         result.setConsumeNo(consume.getConsumeNo());
+        result.setBalanceBefore(consume.getBalanceBefore());
         result.setBalanceAfter(consume.getBalanceAfter());
+        notifyPowerExhaustedFailOpen(request, result);
         return result;
     }
 
@@ -139,8 +147,35 @@ public class MtPowerConsumeService {
         PowerConsumeResultDTO result = new PowerConsumeResultDTO();
         result.setDuplicate(true);
         result.setConsumeNo(existing.getConsumeNo());
+        result.setBalanceBefore(existing.getBalanceBefore());
         result.setBalanceAfter(existing.getBalanceAfter());
         return result;
+    }
+
+    private void notifyPowerExhaustedFailOpen(
+            PowerConsumeRequestDTO request,
+            PowerConsumeResultDTO result
+    ) {
+        if (request == null || result == null || result.isDuplicate()
+                || !StringUtils.equals(request.getSourceType(), IM_AUTO_REPLY_SOURCE_TYPE)
+                || result.getBalanceBefore() == null || result.getBalanceAfter() == null
+                || result.getBalanceBefore() < PowerThresholdConstant.CRITICAL_POWER_BALANCE
+                || result.getBalanceAfter() >= PowerThresholdConstant.CRITICAL_POWER_BALANCE) {
+            return;
+        }
+        try {
+            lifecycleSmsService.enqueuePowerExhausted(
+                    request.getShopId(), result.getConsumeNo(), LocalDateTime.now());
+        } catch (RuntimeException error) {
+            log.error("算力耗尽短信触发异常，已 fail-open 不影响 IM 自动回复消费, shopId={}, consumeNo={}, "
+                            + "sourceType={}, balanceBefore={}, balanceAfter={}, errorType={}, errorMessage={}",
+                    request.getShopId(), result.getConsumeNo(), request.getSourceType(),
+                    result.getBalanceBefore(), result.getBalanceAfter(),
+                    error.getClass().getSimpleName(),
+                    StringUtils.abbreviate(StringUtils.defaultIfBlank(
+                            error.getMessage(), error.getClass().getSimpleName()), 500),
+                    error);
+        }
     }
 
     private void validateRequest(PowerConsumeRequestDTO request) {

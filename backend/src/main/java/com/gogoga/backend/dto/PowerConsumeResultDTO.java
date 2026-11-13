@@ -17,6 +17,11 @@ public class PowerConsumeResultDTO {
     private boolean duplicate;
 
     /**
+     * 消费前余额
+     */
+    private Integer balanceBefore;
+
+    /**
      * 消费后余额
      */
     private Integer balanceAfter;

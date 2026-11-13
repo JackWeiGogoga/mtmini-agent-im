@@ -1,8 +1,6 @@
 package com.gogoga.backend.service;
 
-import com.gogoga.backend.annotation.RequiresShopRight;
 import com.gogoga.backend.config.MtProperties;
-import com.gogoga.backend.constant.MtShopRightCodeConstant;
 import com.gogoga.backend.entity.mt.MtAccessToken;
 import com.gogoga.backend.entity.mt.MtImAutoReply;
 import com.gogoga.backend.entity.mt.MtImMessage;
@@ -21,6 +19,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+
 /**
  * 在 IM 入库事务内创建自动回复事实和数据库异步任务。
  */
@@ -85,24 +84,25 @@ public class MtImAutoReplyEnqueueService {
             return false;
         }
         if (!ImMessageParseStatusEnum.SUCCESS.name().equals(message.getParseStatus())
-                || !ImMessageDecryptStatusEnum.SUCCESS.name().equals(message.getDecryptStatus())
                 || !ImMessageSenderRoleEnum.USER.name().equals(message.getSenderRole())
                 || !Integer.valueOf(1).equals(message.getBizType())
-                || !ImMessageTypeEnum.isConversational(message.getMsgType())
+                || !ImMessageTypeEnum.isReplyTriggerable(message.getMsgType())
                 || Integer.valueOf(2).equals(message.getHasReply())
-                || StringUtils.isBlank(message.getMsgContentPlaintext())
                 || message.getShopId() == null || message.getConversationId() == null
                 || message.getSessionId() == null || message.getOpenUserId() == null) {
+            return false;
+        }
+        // 正文只对文本消息是必需的：图片等非文本消息一律回固定兜底话术，正文既不喂模型也不做解析，
+        // 此时密文缺失（解密态 NOT_APPLICABLE）或解密失败都不影响回复，不能因此漏回。
+        if (ImMessageTypeEnum.isConversational(message.getMsgType())
+                && (!ImMessageDecryptStatusEnum.SUCCESS.name().equals(message.getDecryptStatus())
+                || StringUtils.isBlank(message.getMsgContentPlaintext()))) {
             return false;
         }
         if (!shopOperationSettingsService.isAutoReplyEnabled(message.getShopId())) {
             return false;
         }
-        if (!mtShopRightService.hasShopRight(
-                message.getShopId(),
-                RequiresShopRight.Logical.OR,
-                MtShopRightCodeConstant.VIP_CODE,
-                MtShopRightCodeConstant.H5_PROMOTION)) {
+        if (!mtShopRightService.hasAutoReplyRight(message.getShopId())) {
             return false;
         }
         MtAccessToken token = mtAccessTokenService.findByShopId(message.getShopId());

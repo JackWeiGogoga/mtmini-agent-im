@@ -26,6 +26,8 @@ export interface ImAutoReplyLog {
   openUserId?: number;
   orderId?: number;
   userMessageId: number;
+  /** 顾客消息类型，见后端 ImMessageTypeEnum：1 文本 / 2 图片 / 3 其他 / 17 卡片 */
+  userMsgType?: number;
   userContent?: string;
   /** 后端从顾客消息里识别出的手机号（已去分隔符） */
   userPhones?: string[];
@@ -71,6 +73,7 @@ export interface ImConversation {
   merchantMessageCount: number;
   sessionCount: number;
   lastMessageRole?: string;
+  lastMessageType?: number;
   lastMessageContent?: string;
   firstMessageAt?: string;
   lastMessageAt?: string;
@@ -86,6 +89,7 @@ export interface ImConversationMessage {
   sessionStartedAt?: string;
   senderRole: "USER" | "MERCHANT" | "AI";
   recordSource?: string;
+  msgType?: number;
   content?: string;
   deliveryStatus?: string;
   autoReplyStatus?: string;

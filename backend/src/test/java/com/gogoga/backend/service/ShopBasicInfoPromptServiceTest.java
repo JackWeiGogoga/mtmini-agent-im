@@ -20,7 +20,7 @@ class ShopBasicInfoPromptServiceTest {
 
     @Test
     void buildsBlockWithBothFields() {
-        String block = service.build(shop("上海市徐汇区漕溪北路 100 号", "09:00-22:00"));
+        String block = service.build(shop("上海市徐汇区漕溪北路 100 号", "09:00-22:00"), false);
 
         assertTrue(block.contains("- 门店地址：上海市徐汇区漕溪北路 100 号"));
         assertTrue(block.contains("- 营业时间：09:00-22:00"));
@@ -29,7 +29,7 @@ class ShopBasicInfoPromptServiceTest {
 
     @Test
     void omitsMissingFieldRatherThanWritingPlaceholder() {
-        String block = service.build(shop("上海市徐汇区漕溪北路 100 号", null));
+        String block = service.build(shop("上海市徐汇区漕溪北路 100 号", null), false);
 
         assertTrue(block.contains("- 门店地址："));
         // 写“营业时间：无”会被模型读成这家店不营业，只能整行省略（块尾说明里提到营业时间不算）
@@ -38,24 +38,51 @@ class ShopBasicInfoPromptServiceTest {
 
     @Test
     void returnsEmptyWhenNoFieldUsable() {
-        assertEquals("", service.build(shop(null, "   ")));
-        assertEquals("", service.build(null));
+        assertEquals("", service.build(shop(null, "   "), false));
+        assertEquals("", service.build(null, false));
     }
 
     @Test
     void flattensNewlinesFromSyncedData() {
         // 同步字段进入 system 消息，换行会被模型读成新的指令行
-        String block = service.build(shop("上海市\n徐汇区\r\n漕溪北路", "09:00-22:00"));
+        String block = service.build(shop("上海市\n徐汇区\r\n漕溪北路", "09:00-22:00"), false);
 
         assertTrue(block.contains("- 门店地址：上海市 徐汇区 漕溪北路"));
     }
 
     @Test
     void truncatesOverlongField() {
-        String block = service.build(shop("很长的地址".repeat(50), null));
+        String block = service.build(shop("很长的地址".repeat(50), null), false);
 
         assertTrue(block.contains("…"));
-        assertTrue(block.length() < 400);
+        assertTrue(block.length() < 500);
+    }
+
+    @Test
+    void announcesContactWithoutLeakingTheNumberWhenShopHasPhone() {
+        // 模型必须知道联系方式存在，否则会答“没有联系方式”再被后缀拼上号码，自相矛盾
+        String block = service.build(shop(null, null), true);
+
+        assertTrue(block.contains("- 门店联系方式：已配置"));
+        assertTrue(block.contains("不得回答门店没有联系方式"));
+        // 号码本身不进提示词，由后缀确定性拼接
+        assertFalse(block.contains("025"));
+    }
+
+    @Test
+    void omitsContactNoticeWhenShopHasNoPhone() {
+        // 没号码时后缀也不会拼，模型答“没有联系方式”才是对的
+        String block = service.build(shop("上海市徐汇区漕溪北路 100 号", null), false);
+
+        assertFalse(block.contains("门店联系方式"));
+        assertFalse(block.contains("不得回答门店没有联系方式"));
+    }
+
+    @Test
+    void buildsContactOnlyBlockWhenShopFieldsAreAllEmpty() {
+        String block = service.build(null, true);
+
+        assertTrue(block.contains("- 门店联系方式：已配置"));
     }
 
     @Test

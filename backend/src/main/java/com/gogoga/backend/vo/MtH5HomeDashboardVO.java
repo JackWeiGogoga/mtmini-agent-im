@@ -33,6 +33,11 @@ public class MtH5HomeDashboardVO implements Serializable {
 
     private ShopOperationSettingsVO operationSettings;
 
+    /**
+     * 消息群发配置与累计群发条数，供首页入口行展示。
+     */
+    private ImBroadcastSettingVO broadcastSetting;
+
     @Data
     public static class ShopSummary implements Serializable {
 

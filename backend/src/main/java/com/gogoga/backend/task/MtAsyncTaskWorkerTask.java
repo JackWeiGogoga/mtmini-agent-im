@@ -7,6 +7,8 @@ import com.gogoga.backend.enums.MtAsyncTaskTypeEnum;
 import com.gogoga.backend.service.MtAsyncTaskService;
 import com.gogoga.backend.service.MtAuthAsyncTaskService;
 import com.gogoga.backend.service.MtImAutoReplyOrchestrationService;
+import com.gogoga.backend.service.MtImBroadcastPlanService;
+import com.gogoga.backend.service.MtImBroadcastSendService;
 import com.gogoga.backend.service.KnowledgeDocumentService;
 import com.gogoga.backend.service.RedisDistributedLockService;
 import com.gogoga.backend.service.async.MtAsyncTaskDryRunException;
@@ -15,6 +17,8 @@ import com.gogoga.backend.service.async.MtAsyncTaskTerminalFailureException;
 import com.gogoga.backend.service.async.MtAuthPostProcessTaskPayload;
 import com.gogoga.backend.service.async.MtKnowledgeDocumentParseTaskPayload;
 import com.gogoga.backend.service.async.MtImAutoReplyTaskPayload;
+import com.gogoga.backend.service.async.MtImBroadcastPlanTaskPayload;
+import com.gogoga.backend.service.async.MtImBroadcastSendTaskPayload;
 import com.gogoga.backend.service.llm.LlmCapacityDeferredException;
 import com.gogoga.backend.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -59,13 +63,25 @@ public class MtAsyncTaskWorkerTask {
             MtAsyncTaskTypeEnum.AUTH_BLOCK_ORDER_PUSH,
             MtAsyncTaskTypeEnum.AUTH_CONFIGURE_IM,
             MtAsyncTaskTypeEnum.KNOWLEDGE_DOCUMENT_PARSE,
-            MtAsyncTaskTypeEnum.IM_AUTO_REPLY
+            MtAsyncTaskTypeEnum.IM_AUTO_REPLY,
+            MtAsyncTaskTypeEnum.IM_BROADCAST_PLAN,
+            MtAsyncTaskTypeEnum.IM_BROADCAST_SEND
+    );
+
+    /**
+     * 群发任务走独立线程池，并按 scopeKey（门店）轮转取任务，避免大商家饿死其他商家。
+     */
+    private static final List<MtAsyncTaskTypeEnum> BROADCAST_TASK_TYPES = List.of(
+            MtAsyncTaskTypeEnum.IM_BROADCAST_PLAN,
+            MtAsyncTaskTypeEnum.IM_BROADCAST_SEND
     );
 
     private final MtAsyncTaskService mtAsyncTaskService;
     private final MtAuthAsyncTaskService mtAuthAsyncTaskService;
     private final KnowledgeDocumentService knowledgeDocumentService;
     private final MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService;
+    private final MtImBroadcastPlanService imBroadcastPlanService;
+    private final MtImBroadcastSendService imBroadcastSendService;
     private final RedisDistributedLockService redisDistributedLockService;
     private final MtProperties mtProperties;
     private final LlmRateLimitProperties llmRateLimitProperties;
@@ -74,8 +90,11 @@ public class MtAsyncTaskWorkerTask {
     private final Executor mtAsyncTaskExecutor;
 
     private final ThreadPoolTaskExecutor mtLlmTaskExecutor;
+    private final ThreadPoolTaskExecutor mtBroadcastTaskExecutor;
     private final AtomicInteger llmScheduleCursor = new AtomicInteger();
+    private final AtomicInteger broadcastScheduleCursor = new AtomicInteger();
     private final Map<MtAsyncTaskTypeEnum, String> llmScopeCursors = new ConcurrentHashMap<>();
+    private final Map<MtAsyncTaskTypeEnum, String> broadcastScopeCursors = new ConcurrentHashMap<>();
 
     private final String workerInstanceId = "mt-async-" + UUID.randomUUID();
 
@@ -84,27 +103,34 @@ public class MtAsyncTaskWorkerTask {
             MtAuthAsyncTaskService mtAuthAsyncTaskService,
             KnowledgeDocumentService knowledgeDocumentService,
             MtImAutoReplyOrchestrationService imAutoReplyOrchestrationService,
+            MtImBroadcastPlanService imBroadcastPlanService,
+            MtImBroadcastSendService imBroadcastSendService,
             RedisDistributedLockService redisDistributedLockService,
             MtProperties mtProperties,
             LlmRateLimitProperties llmRateLimitProperties,
             @Qualifier("mtAsyncTaskExecutor") Executor mtAsyncTaskExecutor,
-            @Qualifier("mtLlmTaskExecutor") ThreadPoolTaskExecutor mtLlmTaskExecutor
+            @Qualifier("mtLlmTaskExecutor") ThreadPoolTaskExecutor mtLlmTaskExecutor,
+            @Qualifier("mtBroadcastTaskExecutor") ThreadPoolTaskExecutor mtBroadcastTaskExecutor
     ) {
         this.mtAsyncTaskService = mtAsyncTaskService;
         this.mtAuthAsyncTaskService = mtAuthAsyncTaskService;
         this.knowledgeDocumentService = knowledgeDocumentService;
         this.imAutoReplyOrchestrationService = imAutoReplyOrchestrationService;
+        this.imBroadcastPlanService = imBroadcastPlanService;
+        this.imBroadcastSendService = imBroadcastSendService;
         this.redisDistributedLockService = redisDistributedLockService;
         this.mtProperties = mtProperties;
         this.llmRateLimitProperties = llmRateLimitProperties;
         this.mtAsyncTaskExecutor = mtAsyncTaskExecutor;
         this.mtLlmTaskExecutor = mtLlmTaskExecutor;
+        this.mtBroadcastTaskExecutor = mtBroadcastTaskExecutor;
     }
 
     @Scheduled(fixedDelayString = "${mt.async-task.poll-delay-ms:1000}")
     public void pollAsyncTasks() {
         ORDINARY_TASK_TYPES.forEach(this::submitExecutableTasks);
         submitAvailableLlmTasks();
+        submitAvailableBroadcastTasks();
     }
 
     @Scheduled(fixedDelayString = "${mt.async-task.recovery-delay-ms:30000}")
@@ -181,6 +207,64 @@ public class MtAsyncTaskWorkerTask {
         }
     }
 
+    private void submitAvailableBroadcastTasks() {
+        if (!mtProperties.getImBroadcast().isEnabled()) {
+            return;
+        }
+        int concurrency = Math.max(mtProperties.getImBroadcast().getExecutorConcurrency(), 1);
+        int availableSlots = Math.max(concurrency - mtBroadcastTaskExecutor.getActiveCount(), 0);
+        for (int i = 0; i < availableSlots; i++) {
+            ClaimedTask claimedTask = claimNextBroadcastTask();
+            if (claimedTask == null) {
+                return;
+            }
+            try {
+                mtBroadcastTaskExecutor.execute(() -> executeClaimedTask(claimedTask.taskType(), claimedTask.task()));
+            } catch (TaskRejectedException e) {
+                LocalDateTime now = LocalDateTime.now();
+                mtAsyncTaskService.rescheduleWithoutRetry(
+                        claimedTask.task(),
+                        now.plusSeconds(1),
+                        "BROADCAST_EXECUTOR_REJECTED",
+                        now
+                );
+                log.warn("群发任务执行器拒绝任务并已无损重排，taskType={}, taskId={}",
+                        claimedTask.taskType().name(), claimedTask.task().getId());
+                return;
+            }
+        }
+    }
+
+    /**
+     * 按门店 scopeKey 轮转领取，保证单个大商家的大量分片不会长期占满群发线程池。
+     */
+    private ClaimedTask claimNextBroadcastTask() {
+        for (int i = 0; i < BROADCAST_TASK_TYPES.size(); i++) {
+            int index = Math.floorMod(broadcastScheduleCursor.getAndIncrement(), BROADCAST_TASK_TYPES.size());
+            MtAsyncTaskTypeEnum taskType = BROADCAST_TASK_TYPES.get(index);
+            List<Long> taskIds = mtAsyncTaskService.selectExecutableFairTaskIds(
+                    taskType,
+                    broadcastScopeCursors.get(taskType),
+                    1,
+                    LocalDateTime.now()
+            );
+            if (taskIds.isEmpty()) {
+                continue;
+            }
+            MtAsyncTask task = mtAsyncTaskService.claimTask(
+                    taskType,
+                    taskIds.get(0),
+                    workerInstanceId + "-broadcast-dispatcher",
+                    LocalDateTime.now()
+            );
+            if (task != null) {
+                broadcastScopeCursors.put(taskType, fairScopeKey(task));
+                return new ClaimedTask(taskType, task);
+            }
+        }
+        return null;
+    }
+
     private ClaimedTask claimNextWeightedLlmTask() {
         List<MtAsyncTaskTypeEnum> schedule = weightedLlmSchedule();
         if (schedule.isEmpty()) {
@@ -246,6 +330,8 @@ public class MtAsyncTaskWorkerTask {
                 case AUTH_CONFIGURE_IM -> executeAuthConfigureImTask(task);
                 case KNOWLEDGE_DOCUMENT_PARSE -> executeKnowledgeDocumentParseTask(task);
                 case IM_AUTO_REPLY -> executeImAutoReplyTask(task);
+                case IM_BROADCAST_PLAN -> executeImBroadcastPlanTask(task);
+                case IM_BROADCAST_SEND -> executeImBroadcastSendTask(task);
                 default -> throw new IllegalStateException("不支持的任务类型: " + taskType.name());
             }
             mtAsyncTaskService.markSuccess(taskType, taskId, LocalDateTime.now());
@@ -347,6 +433,16 @@ public class MtAsyncTaskWorkerTask {
         imAutoReplyOrchestrationService.execute(payload);
     }
 
+    private void executeImBroadcastPlanTask(MtAsyncTask task) {
+        MtImBroadcastPlanTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImBroadcastPlanTaskPayload.class);
+        imBroadcastPlanService.execute(payload);
+    }
+
+    private void executeImBroadcastSendTask(MtAsyncTask task) {
+        MtImBroadcastSendTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtImBroadcastSendTaskPayload.class);
+        imBroadcastSendService.execute(payload);
+    }
+
     private MtAuthPostProcessTaskPayload parseAuthPayload(MtAsyncTask task) {
         MtAuthPostProcessTaskPayload payload = JsonUtil.toBean(task.getPayloadJson(), MtAuthPostProcessTaskPayload.class);
         if (payload == null || payload.getShopId() == null) {
@@ -369,6 +465,8 @@ public class MtAsyncTaskWorkerTask {
                     .build();
             case KNOWLEDGE_DOCUMENT_PARSE -> resolvePolicy(asyncTask.getKnowledgeDocumentParse());
             case IM_AUTO_REPLY -> resolvePolicy(asyncTask.getImAutoReply());
+            case IM_BROADCAST_PLAN -> resolvePolicy(mtProperties.getImBroadcast().getPlanTask());
+            case IM_BROADCAST_SEND -> resolvePolicy(mtProperties.getImBroadcast().getSendTask());
         };
     }
 

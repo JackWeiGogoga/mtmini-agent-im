@@ -5,5 +5,6 @@ package com.gogoga.backend.enums;
  */
 public enum ImMessageRecordSourceEnum {
     MEITUAN_CALLBACK,
-    AI_AUTO_REPLY
+    AI_AUTO_REPLY,
+    BROADCAST
 }

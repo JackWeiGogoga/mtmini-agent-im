@@ -3,8 +3,9 @@ import { Avatar, Divider, Drawer, Empty, Space, Spin, Tag, Typography } from "an
 import { CustomerServiceOutlined, RobotOutlined, ShopOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { ImConversationHistoryPage, ImConversationMessage } from "@/types";
+import { MessageBody } from "./MessageBody";
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface ConversationSummary {
   conversationId: number;
@@ -124,7 +125,7 @@ export default function ConversationHistoryDrawer({ open, conversation, onClose,
                 <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(item.eventTime).format("MM-DD HH:mm:ss")}</Text>
               </Space>
               <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 10, background: isUser ? "#f0f5ff" : "#fafafa", textAlign: "left" }}>
-                <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.content || "（无正文）"}</Paragraph>
+                <MessageBody msgType={item.msgType} content={item.content} emptyText="（无正文）" maxImageWidth={200} />
               </div>
             </div>
           </div>

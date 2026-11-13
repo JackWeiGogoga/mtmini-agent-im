@@ -9,6 +9,9 @@ import type {
   ImAutoReplyLog,
   ImAutoReplyLogQuery,
   ImConversationHistoryPage,
+  ImBroadcastSetting,
+  ImBroadcastSettingHistory,
+  ImBroadcastSettingUpdateParam,
 } from "@/types";
 
 const MASTER_CONSOLE_BASE_URL = "/system/master-console";
@@ -56,6 +59,56 @@ export async function updateMasterConsoleShopOperationSettings(
     unknown,
     { data: ShopOperationSettingsUpdateParam & { shopId: number } }
   >(`${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/operation-settings`, params);
+  return response.data;
+}
+
+export async function getMasterConsoleBroadcastSetting(
+  shopId: number,
+): Promise<ImBroadcastSetting> {
+  const response = await request.get<unknown, { data: ImBroadcastSetting }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-setting`,
+  );
+  return response.data;
+}
+
+export async function saveMasterConsoleBroadcastSetting(
+  shopId: number,
+  params: ImBroadcastSettingUpdateParam,
+): Promise<ImBroadcastSetting> {
+  const response = await request.put<unknown, { data: ImBroadcastSetting }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-setting`, params,
+  );
+  return response.data;
+}
+
+export async function deleteMasterConsoleBroadcastSetting(
+  shopId: number,
+): Promise<ImBroadcastSetting> {
+  const response = await request.delete<unknown, { data: ImBroadcastSetting }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-setting`,
+  );
+  return response.data;
+}
+
+export async function optimizeMasterConsoleBroadcastContent(
+  shopId: number,
+  content: string,
+): Promise<string> {
+  const response = await request.post<unknown, { data: { content: string } }>(
+    `${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-content/optimize`,
+    { content },
+  );
+  return response.data.content;
+}
+
+export async function getMasterConsoleBroadcastSettingHistory(
+  shopId: number,
+  params?: { pageNum?: number; pageSize?: number },
+): Promise<PageInfo<ImBroadcastSettingHistory>> {
+  const response = await request.get<
+    unknown,
+    { data: PageInfo<ImBroadcastSettingHistory> }
+  >(`${MASTER_CONSOLE_BASE_URL}/shops/${shopId}/broadcast-setting/history`, { params });
   return response.data;
 }
 

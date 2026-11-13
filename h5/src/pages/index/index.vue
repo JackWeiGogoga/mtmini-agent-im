@@ -107,6 +107,29 @@
               >门店授权已失效，请重新授权后继续自动回复。</text
             >
           </view>
+
+          <view
+            class="broadcast-entry"
+            :class="{ 'broadcast-entry-disabled': !broadcastRightGranted }"
+            @tap="openBroadcastDialog"
+          >
+            <view class="broadcast-entry-copy">
+              <text class="broadcast-entry-title">消息群发</text>
+              <text class="broadcast-entry-count"
+                >（已群发{{ broadcastTotalSentCount }}条）</text
+              >
+            </view>
+            <image
+              class="broadcast-entry-icon"
+              src="/static/icons/msg.svg"
+              mode="aspectFit"
+            ></image>
+            <image
+              class="broadcast-entry-badge"
+              src="/static/icons/hot.svg"
+              mode="aspectFit"
+            ></image>
+          </view>
         </view>
 
         <view class="section-card feature-card">
@@ -275,6 +298,193 @@
         >
       </view>
     </view>
+
+    <view
+      v-if="broadcastDialogVisible"
+      class="modal-mask"
+      @tap="closeBroadcastDialog"
+      @touchmove.stop.prevent="noop"
+    >
+      <view class="broadcast-modal" @tap.stop @touchmove.stop>
+        <text class="broadcast-modal-title">群发设置</text>
+
+        <view class="broadcast-field">
+          <text class="broadcast-field-label">日期：</text>
+          <view
+            class="broadcast-select broadcast-select-grow"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
+            @tap="toggleWeekDayPanel"
+          >
+            <text class="broadcast-select-text">{{ weekDaysText }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+          <view
+            class="broadcast-select"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
+            @tap="toggleRepeatModePanel"
+          >
+            <text class="broadcast-select-text">{{ repeatModeText }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+        </view>
+
+        <view v-if="repeatModePanelVisible" class="broadcast-option-panel">
+          <view
+            v-for="option in repeatModeOptions"
+            :key="option.value"
+            class="broadcast-option-item"
+            :class="{
+              'broadcast-option-item-active': form.repeatMode === option.value,
+            }"
+            @tap="selectRepeatMode(option.value)"
+            >{{ option.label }}</view
+          >
+        </view>
+
+        <view v-if="weekDayPanelVisible" class="broadcast-weekday-panel">
+          <view
+            v-for="option in weekDayOptions"
+            :key="option.value"
+            class="broadcast-weekday-item"
+            @tap="toggleWeekDay(option.value)"
+          >
+            <view
+              class="broadcast-weekday-checkbox"
+              :class="{
+                'broadcast-weekday-checkbox-checked': isWeekDaySelected(
+                  option.value,
+                ),
+              }"
+            >
+              <text v-if="isWeekDaySelected(option.value)">✓</text>
+            </view>
+            <text class="broadcast-weekday-label">{{ option.label }}</text>
+          </view>
+        </view>
+
+        <view class="broadcast-field">
+          <text class="broadcast-field-label">时间：</text>
+          <view
+            class="broadcast-select broadcast-select-grow"
+            :class="{ 'broadcast-select-disabled': broadcastBusy }"
+            @tap="toggleTimePanel"
+          >
+            <text class="broadcast-select-text">{{ form.sendTime }}</text>
+            <text class="broadcast-select-arrow">▼</text>
+          </view>
+        </view>
+
+        <view v-if="timePanelVisible" class="broadcast-time-panel">
+          <picker-view
+            class="broadcast-time-picker"
+            :value="timePickerValue"
+            @change="handleSendTimeChange"
+          >
+            <picker-view-column
+              v-for="(column, columnIndex) in timePickerRange"
+              :key="columnIndex"
+            >
+              <view
+                v-for="label in column"
+                :key="label"
+                class="broadcast-time-item"
+                >{{ label }}</view
+              >
+            </picker-view-column>
+          </picker-view>
+        </view>
+
+        <view class="broadcast-field broadcast-field-top">
+          <text class="broadcast-field-label">内容：</text>
+          <view class="broadcast-textarea-wrap">
+            <textarea
+              class="broadcast-textarea"
+              v-model="form.content"
+              placeholder="请填写发送的内容…"
+              placeholder-class="broadcast-textarea-placeholder"
+              :maxlength="broadcastContentMaxLength"
+              :disabled="broadcastOptimizing"
+            ></textarea>
+            <view class="broadcast-textarea-footer">
+              <text class="broadcast-textarea-rule"
+                >规则：禁止发送敏感词信息！</text
+              >
+              <text class="broadcast-textarea-counter"
+                >{{ broadcastContentLength }}/{{
+                  broadcastContentMaxLength
+                }}</text
+              >
+            </view>
+            <view
+              v-if="broadcastOptimizing"
+              class="broadcast-textarea-loading"
+            >
+              <view class="broadcast-textarea-loading-spinner"></view>
+              <text class="broadcast-textarea-loading-text"
+                >AI优化中…</text
+              >
+            </view>
+          </view>
+        </view>
+
+        <view class="broadcast-preset-row">
+          <view
+            v-for="option in presetOptions"
+            :key="option.value"
+            class="broadcast-preset-chip"
+            :class="{
+              'broadcast-preset-chip-active': form.presetType === option.value,
+              'broadcast-preset-chip-disabled': broadcastBusy,
+            }"
+            @tap="selectBroadcastPreset(option)"
+            >{{ option.label }}</view
+          >
+          <view
+            class="broadcast-preset-ai"
+            :class="{ 'broadcast-preset-ai-disabled': broadcastBusy }"
+            @tap="optimizeBroadcastContent"
+          >
+            <image
+              class="broadcast-preset-ai-icon"
+              src="/static/icons/ai.svg"
+              mode="aspectFit"
+            ></image>
+            <text class="broadcast-preset-ai-text">AI</text>
+          </view>
+        </view>
+
+        <view class="broadcast-modal-actions">
+          <view
+            class="broadcast-modal-button broadcast-modal-button-primary"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
+            @tap="submitBroadcastSetting"
+            >发送</view
+          >
+          <view
+            v-if="broadcastConfigured"
+            class="broadcast-modal-button"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
+            @tap="deleteBroadcastSetting"
+            >删除</view
+          >
+          <view
+            v-else
+            class="broadcast-modal-button"
+            :class="{ 'broadcast-modal-button-disabled': broadcastBusy }"
+            @tap="closeBroadcastDialog"
+            >取消</view
+          >
+        </view>
+      </view>
+    </view>
+
+    <!-- AI优化期间罩住整屏，吃掉一切点击/触摸，避免中途切预设、改配置、发送或关弹窗。 -->
+    <view
+      v-if="broadcastOptimizing"
+      class="broadcast-blocking-mask"
+      @tap.stop.prevent="noop"
+      @touchmove.stop.prevent="noop"
+    ></view>
   </view>
 </template>
 
@@ -282,10 +492,13 @@
 import AppTabbar from "../../components/app-tabbar.vue";
 import AppTopNotice from "../../components/app-top-notice.vue";
 import {
+  deleteMtH5BroadcastSetting,
   getMtH5HomeDashboard,
   getShopInfo,
+  optimizeMtH5BroadcastContent,
   reportMtH5BehaviorEvent,
   reportMtH5PageView,
+  saveMtH5BroadcastSetting,
   updateMtH5OperationSettings,
 } from "../../utils/mt-auth";
 import { openMtExternalPage } from "../../utils/ui";
@@ -298,6 +511,65 @@ const RENEWAL_PAGE_URL =
 // 临时关闭首页引流弹窗；恢复展示时改为 true。
 const ACTIVITY_POPUP_ENABLED = false;
 let activityPopupShownInCurrentApp = false;
+
+const BROADCAST_CONTENT_MAX_LENGTH = 100;
+const BROADCAST_WEEK_DAY_OPTIONS = [
+  { value: 1, label: "周一" },
+  { value: 2, label: "周二" },
+  { value: 3, label: "周三" },
+  { value: 4, label: "周四" },
+  { value: 5, label: "周五" },
+  { value: 6, label: "周六" },
+  { value: 7, label: "周日" },
+];
+const BROADCAST_REPEAT_MODE_OPTIONS = [
+  { value: "EVERY", label: "每次" },
+  { value: "ONCE", label: "一次" },
+];
+// 官方预设话术：点击只覆盖内容框文字，不动已选的日期/时间/次数。
+const BROADCAST_PRESET_OPTIONS = [
+  {
+    value: "CANVASSING",
+    label: "餐前拉客",
+    content:
+      "宝子，快到饭点啦~今天大厨元气满满，已为您准备了美味佳肴，快进店里看看呗~",
+  },
+  {
+    value: "PROMOTION",
+    label: "节日促销",
+    content:
+      "宝子，小店即将迎来X周年店庆！收藏店铺即可获得丰厚大礼！联系客服咨询~",
+  },
+  {
+    value: "CLOSURE",
+    label: "歇业公告",
+    content:
+      "宝子，X月X日-X月X日小店临时歇业哟~X月X日恢复营业，届时小店一定再恭迎您的大驾光临~记得收藏店铺避免迷路哟！",
+  },
+];
+// 首次进入（从未配置）时的默认表单。
+const BROADCAST_DEFAULT_FORM = {
+  weekDays: [1, 2, 3, 4, 5, 6, 7],
+  repeatMode: "EVERY",
+  sendTime: "10:30:00",
+  presetType: BROADCAST_PRESET_OPTIONS[0].value,
+  content: BROADCAST_PRESET_OPTIONS[0].content,
+};
+
+function padTwoDigits(value) {
+  return String(value).padStart(2, "0");
+}
+
+function buildRangeLabels(size) {
+  return Array.from({ length: size }, (_, index) => padTwoDigits(index));
+}
+
+function parseTimeParts(timeText) {
+  const [hour = 10, minute = 0, second = 0] = String(timeText || "10:00:00")
+    .split(":")
+    .map((part) => Number(part) || 0);
+  return [hour, minute, second];
+}
 
 function toNumber(value, fallback = 0) {
   const result = Number(value);
@@ -391,6 +663,29 @@ export default {
       hasPowerStats: true,
       supportPromptVisible: false,
       activityPopupVisible: false,
+      broadcastDialogVisible: false,
+      broadcastSubmitting: false,
+      broadcastOptimizing: false,
+      broadcastConfigured: false,
+      broadcastTotalSentCount: 0,
+      // 最近一次服务端群发配置原始数据，供每次打开弹窗时重建表单、丢弃上次未提交的改动。
+      broadcastSettingSnapshot: null,
+      // 默认放行：接口数据回来前不置灰，避免首屏闪一下灰态。
+      broadcastRightGranted: true,
+      weekDayPanelVisible: false,
+      repeatModePanelVisible: false,
+      timePanelVisible: false,
+      weekDayOptions: BROADCAST_WEEK_DAY_OPTIONS,
+      repeatModeOptions: BROADCAST_REPEAT_MODE_OPTIONS,
+      presetOptions: BROADCAST_PRESET_OPTIONS,
+      form: {
+        weekDays: [],
+        repeatMode: "EVERY",
+        sendTime: "10:00:00",
+        // 高亮中的预设类型；手动改文案不清空高亮，直到切到另一个预设。
+        presetType: "",
+        content: "",
+      },
       statsRange: "TODAY",
       statsRangeOptions: [
         { label: "今日", value: "TODAY", compareLabel: "较昨日" },
@@ -415,6 +710,10 @@ export default {
     };
   },
   computed: {
+    // 弹窗处于「忙」态：AI优化中或配置提交/删除中。此时弹窗内所有交互元素统一置灰禁用。
+    broadcastBusy() {
+      return this.broadcastOptimizing || this.broadcastSubmitting;
+    },
     statsTitle() {
       const selectedRange = this.statsRangeOptions.find(
         (item) => item.value === this.statsRange,
@@ -530,6 +829,43 @@ export default {
     knowledgeStatusText() {
       return "已配置";
     },
+    broadcastContentMaxLength() {
+      return BROADCAST_CONTENT_MAX_LENGTH;
+    },
+    broadcastContentLength() {
+      return String(this.form.content || "").length;
+    },
+    weekDaysText() {
+      if (!this.form.weekDays.length) {
+        return "请选择日期";
+      }
+      return this.form.weekDays
+        .map(
+          (day) =>
+            BROADCAST_WEEK_DAY_OPTIONS.find((item) => item.value === day)
+              ?.label,
+        )
+        .filter(Boolean)
+        .join("、");
+    },
+    selectedRepeatModeIndex() {
+      const index = BROADCAST_REPEAT_MODE_OPTIONS.findIndex(
+        (item) => item.value === this.form.repeatMode,
+      );
+      return index === -1 ? 0 : index;
+    },
+    repeatModeText() {
+      return (
+        BROADCAST_REPEAT_MODE_OPTIONS[this.selectedRepeatModeIndex]?.label ||
+        "每次"
+      );
+    },
+    timePickerRange() {
+      return [buildRangeLabels(24), buildRangeLabels(60), buildRangeLabels(60)];
+    },
+    timePickerValue() {
+      return parseTimeParts(this.form.sendTime);
+    },
     powerBalanceAmount() {
       return Math.max(0, Number(this.powerStats.balance || 0));
     },
@@ -576,7 +912,28 @@ export default {
     this.showActivityPopupOnce();
     this.loadDashboard();
   },
+  onHide() {
+    // 兜底：万一弹窗开着就切走了页面，别把 body 滚动一直锁死。
+    this.lockPageScroll(false);
+  },
+  watch: {
+    // uniapp H5 端 @touchmove.prevent 因 passive 监听被忽略，拦不住背景滚动；改为直接锁 body。
+    broadcastDialogVisible(visible) {
+      this.lockPageScroll(visible);
+    },
+  },
   methods: {
+    lockPageScroll(locked) {
+      // #ifdef H5
+      const value = locked ? "hidden" : "";
+      if (document.documentElement) {
+        document.documentElement.style.overflow = value;
+      }
+      if (document.body) {
+        document.body.style.overflow = value;
+      }
+      // #endif
+    },
     showActivityPopupOnce() {
       if (!ACTIVITY_POPUP_ENABLED || activityPopupShownInCurrentApp) {
         return;
@@ -621,6 +978,7 @@ export default {
       this.reauthRequired = Boolean(dashboard.authorization?.reauthRequired);
       const operationSettings = dashboard.operationSettings || {};
       this.autoReplyEnabled = operationSettings.autoReplyEnabled !== false;
+      this.applyBroadcastSetting(dashboard.broadcastSetting);
       this.messageStats = {
         ...this.messageStats,
         ...(dashboard.messageStats || {}),
@@ -674,6 +1032,175 @@ export default {
         });
       } finally {
         this.operationSettingsSubmitting = false;
+      }
+    },
+    applyBroadcastSetting(setting = {}) {
+      const broadcastSetting = setting || {};
+      // 留存原始数据快照：取消未提交的改动后，下次打开可据此还原。
+      this.broadcastSettingSnapshot = broadcastSetting;
+      const configured = Boolean(broadcastSetting.configured);
+      this.broadcastConfigured = configured;
+      this.broadcastTotalSentCount = Number(
+        broadcastSetting.totalSentCount || 0,
+      );
+      // 只有后端明确回 false 才置灰，字段缺失时按放行处理。
+      this.broadcastRightGranted = broadcastSetting.rightGranted !== false;
+      // 只有「从未配置或已删除」(NONE) 才套默认；「一次」已执行完(ONCE_COMPLETED)虽然 configured=false，
+      // 但保留着商家上次的文案，必须原样回显，不能被默认话术覆盖。
+      if ((broadcastSetting.status || "NONE") === "NONE") {
+        this.form = { ...BROADCAST_DEFAULT_FORM };
+        return;
+      }
+      // 已配置或一次已完成：原样回显商家自己存的值，预设高亮按内容是否等于某条话术推断。
+      const content = broadcastSetting.content || "";
+      this.form = {
+        weekDays: Array.isArray(broadcastSetting.weekDays)
+          ? [...broadcastSetting.weekDays]
+          : [],
+        repeatMode: broadcastSetting.repeatMode || "EVERY",
+        sendTime: broadcastSetting.sendTime || "10:00:00",
+        presetType: this.matchPresetType(content),
+        content,
+      };
+    },
+    matchPresetType(content) {
+      const matched = BROADCAST_PRESET_OPTIONS.find(
+        (item) => item.content === content,
+      );
+      return matched ? matched.value : "";
+    },
+    selectBroadcastPreset(option) {
+      // 只覆盖内容框，日期/时间/次数保持不变。
+      this.form.presetType = option.value;
+      this.form.content = option.content;
+    },
+    openBroadcastDialog() {
+      if (!this.broadcastRightGranted) {
+        uni.showToast({
+          title: "当前版本不支持消息群发，请升级后使用",
+          icon: "none",
+        });
+        return;
+      }
+      // 每次打开都从服务端快照重建表单，丢弃上次「切了预设但点取消」残留的脏改动。
+      this.applyBroadcastSetting(this.broadcastSettingSnapshot || {});
+      this.closeBroadcastPanels();
+      this.broadcastDialogVisible = true;
+    },
+    closeBroadcastDialog() {
+      this.broadcastDialogVisible = false;
+      this.closeBroadcastPanels();
+    },
+    /** 三个下拉面板互斥展开，避免弹窗被撑高后按钮被挤出可视区。 */
+    closeBroadcastPanels() {
+      this.weekDayPanelVisible = false;
+      this.repeatModePanelVisible = false;
+      this.timePanelVisible = false;
+    },
+    toggleWeekDayPanel() {
+      const next = !this.weekDayPanelVisible;
+      this.closeBroadcastPanels();
+      this.weekDayPanelVisible = next;
+    },
+    toggleRepeatModePanel() {
+      const next = !this.repeatModePanelVisible;
+      this.closeBroadcastPanels();
+      this.repeatModePanelVisible = next;
+    },
+    toggleTimePanel() {
+      const next = !this.timePanelVisible;
+      this.closeBroadcastPanels();
+      this.timePanelVisible = next;
+    },
+    selectRepeatMode(mode) {
+      this.form.repeatMode = mode;
+      this.repeatModePanelVisible = false;
+    },
+    isWeekDaySelected(day) {
+      return this.form.weekDays.includes(day);
+    },
+    toggleWeekDay(day) {
+      const selected = this.form.weekDays.includes(day)
+        ? this.form.weekDays.filter((item) => item !== day)
+        : [...this.form.weekDays, day];
+      this.form.weekDays = selected.sort((left, right) => left - right);
+    },
+    handleSendTimeChange(event) {
+      const [hour = 0, minute = 0, second = 0] = event?.detail?.value || [];
+      this.form.sendTime = `${padTwoDigits(hour)}:${padTwoDigits(
+        minute,
+      )}:${padTwoDigits(second)}`;
+    },
+    async optimizeBroadcastContent() {
+      if (this.broadcastOptimizing) {
+        return;
+      }
+      const content = String(this.form.content).trim();
+      if (!content) {
+        uni.showToast({ title: "请先填写要优化的内容", icon: "none" });
+        return;
+      }
+      // 用文案框内嵌的读条表达加载态：uni.showLoading 会被弹窗 z-index 盖住，商家看不见易误触重复点。
+      this.broadcastOptimizing = true;
+      try {
+        const result = await optimizeMtH5BroadcastContent(content);
+        if (result?.content) {
+          this.form.content = result.content;
+          // 优化后的文案已不再是任何预设原文，取消预设高亮。
+          this.form.presetType = "";
+        }
+      } catch (error) {
+        uni.showToast({
+          title: error?.message || "优化失败，请重试",
+          icon: "none",
+        });
+      } finally {
+        this.broadcastOptimizing = false;
+      }
+    },
+    async submitBroadcastSetting() {
+      if (this.broadcastSubmitting) {
+        return;
+      }
+      if (!this.form.weekDays.length) {
+        uni.showToast({ title: "请至少选择一个发送日期", icon: "none" });
+        return;
+      }
+      if (!String(this.form.content).trim()) {
+        uni.showToast({ title: "请填写发送的内容", icon: "none" });
+        return;
+      }
+      this.broadcastSubmitting = true;
+      try {
+        const saved = await saveMtH5BroadcastSetting({
+          weekDays: this.form.weekDays,
+          repeatMode: this.form.repeatMode,
+          sendTime: this.form.sendTime,
+          content: String(this.form.content).trim(),
+        });
+        this.applyBroadcastSetting(saved);
+        this.closeBroadcastDialog();
+        uni.showToast({ title: "已保存", icon: "none" });
+      } catch (error) {
+        uni.showToast({ title: error?.message || "保存失败", icon: "none" });
+      } finally {
+        this.broadcastSubmitting = false;
+      }
+    },
+    async deleteBroadcastSetting() {
+      if (this.broadcastSubmitting) {
+        return;
+      }
+      this.broadcastSubmitting = true;
+      try {
+        const cleared = await deleteMtH5BroadcastSetting();
+        this.applyBroadcastSetting(cleared);
+        this.closeBroadcastDialog();
+        uni.showToast({ title: "已删除定时群发", icon: "none" });
+      } catch (error) {
+        uni.showToast({ title: error?.message || "删除失败", icon: "none" });
+      } finally {
+        this.broadcastSubmitting = false;
       }
     },
     goToLogPage() {
@@ -1435,5 +1962,382 @@ export default {
   font-weight: 700;
   line-height: 84rpx;
   text-align: center;
+}
+
+/* 消息群发入口：负边距抵消 ai-card 的内边距，让行尾角标贴齐卡片边缘 */
+.broadcast-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 24rpx -28rpx -28rpx;
+  padding: 24rpx 28rpx;
+  overflow: hidden;
+}
+
+/* 置灰但不隐藏：入口仍可点，点击后提示升级，让商家知道有这个能力。 */
+.broadcast-entry-disabled {
+  opacity: 0.6;
+}
+
+.broadcast-entry-copy {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.broadcast-entry-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2329;
+}
+
+.broadcast-entry-count {
+  font-size: 26rpx;
+  color: #8a9099;
+}
+
+.broadcast-entry-icon {
+  width: 56rpx;
+  height: 56rpx;
+  margin-right: 36rpx;
+}
+
+.broadcast-entry-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.broadcast-modal {
+  width: 100%;
+  max-width: 620rpx;
+  /* 展开时间面板后弹窗会变高，限高加滚动，保证底部按钮始终够得着 */
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 36rpx 32rpx 28rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.broadcast-modal-title {
+  display: block;
+  margin-bottom: 32rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2329;
+  text-align: center;
+  text-decoration: underline;
+}
+
+.broadcast-field {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.broadcast-field-top {
+  align-items: flex-start;
+}
+
+.broadcast-field-label {
+  width: 96rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2329;
+  text-decoration: underline;
+}
+
+.broadcast-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  min-width: 168rpx;
+  padding: 12rpx 16rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+.broadcast-select-disabled {
+  opacity: 0.5;
+}
+
+.broadcast-select-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.broadcast-select-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #1f2329;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.broadcast-select-arrow {
+  font-size: 20rpx;
+  color: #8a9099;
+}
+
+/* 频率与时间都改成弹窗内联面板：uni-app 原生 picker 的弹层挂在页面根节点，
+   层级低于自定义蒙层，会被弹窗盖住，只能内联展开。 */
+.broadcast-option-panel {
+  display: flex;
+  gap: 16rpx;
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 16rpx 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+.broadcast-option-item {
+  padding: 10rpx 28rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  background: #ffffff;
+  font-size: 26rpx;
+  color: #1f2329;
+}
+
+.broadcast-option-item-active {
+  border-color: #f5c73c;
+  background: #fdf4d6;
+}
+
+.broadcast-time-panel {
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 12rpx 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+/* 用 px 而非 rpx：picker-view 默认指示器固定 34px，rpx 换算随屏宽浮动会对不齐 */
+.broadcast-time-picker {
+  width: 100%;
+  height: 170px;
+}
+
+.broadcast-time-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  font-size: 28rpx;
+  color: #1f2329;
+}
+
+.broadcast-weekday-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 20rpx;
+  margin: -8rpx 0 24rpx 112rpx;
+  padding: 20rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  background: #fafbfc;
+}
+
+.broadcast-weekday-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  width: 152rpx;
+}
+
+.broadcast-weekday-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid #c9ced6;
+  border-radius: 6rpx;
+  background: #ffffff;
+  font-size: 22rpx;
+  color: #ffffff;
+}
+
+.broadcast-weekday-checkbox-checked {
+  border-color: #f5c73c;
+  background: #f5c73c;
+}
+
+.broadcast-weekday-label {
+  font-size: 26rpx;
+  color: #1f2329;
+}
+
+.broadcast-textarea-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 16rpx;
+  border: 2rpx solid #d5d8dd;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+/* 优化期间的全屏拦截罩：透明但吃掉所有点击，z-index 高于弹窗(9999)，读条透过它仍可见。 */
+.broadcast-blocking-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: transparent;
+}
+
+/* 加载态直接盖在文案框上，读条明确，避免被弹窗遮住导致的无感误触。 */
+.broadcast-textarea-loading {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8rpx;
+}
+
+.broadcast-textarea-loading-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 4rpx solid #f5c66b;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: broadcast-spin 0.8s linear infinite;
+}
+
+.broadcast-textarea-loading-text {
+  font-size: 26rpx;
+  color: #b9822a;
+}
+
+@keyframes broadcast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.broadcast-textarea {
+  width: 100%;
+  height: 176rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  box-sizing: border-box;
+}
+
+.broadcast-textarea-placeholder {
+  color: #b6bbc3;
+}
+
+.broadcast-textarea-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.broadcast-textarea-rule {
+  font-size: 22rpx;
+  color: #8a9099;
+}
+
+.broadcast-textarea-counter {
+  font-size: 22rpx;
+  color: #b6bbc3;
+}
+
+.broadcast-preset-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.broadcast-preset-chip {
+  padding: 10rpx 16rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  background: #f4f5f7;
+  border: 2rpx solid #e5e6eb;
+  border-radius: 32rpx;
+}
+
+.broadcast-preset-chip-active {
+  color: #b9822a;
+  background: #fdf6e8;
+  border-color: #f5c66b;
+}
+
+.broadcast-preset-chip-disabled {
+  opacity: 0.5;
+}
+
+.broadcast-preset-ai {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-left: auto;
+  padding: 8rpx 14rpx;
+  border-radius: 32rpx;
+}
+
+.broadcast-preset-ai-disabled {
+  opacity: 0.6;
+}
+
+.broadcast-preset-ai-icon {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.broadcast-preset-ai-text {
+  font-size: 22rpx;
+  color: #b9822a;
+}
+
+.broadcast-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32rpx;
+  margin-top: 32rpx;
+}
+
+.broadcast-modal-button {
+  min-width: 128rpx;
+  padding: 0 32rpx;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 68rpx;
+  color: #5a6069;
+  text-align: center;
+}
+
+.broadcast-modal-button-primary {
+  background: #f5c73c;
+  color: #1f2329;
+}
+
+.broadcast-modal-button-disabled {
+  opacity: 0.6;
 }
 </style>

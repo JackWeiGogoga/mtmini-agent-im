@@ -14,6 +14,8 @@ public enum MtAsyncTaskTypeEnum {
     AUTH_CONFIGURE_IM("授权后初始化门店IM"),
     KNOWLEDGE_DOCUMENT_PARSE("知识文档解析"),
     IM_AUTO_REPLY("IM多轮自动回复"),
+    IM_BROADCAST_PLAN("IM群发目标人群编排"),
+    IM_BROADCAST_SEND("IM群发分片发送"),
     ;
 
     private final String desc;
